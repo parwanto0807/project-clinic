@@ -43,6 +43,7 @@ model Clinic {
   journalEntries      JournalEntry[]
   medicalRecords      MedicalRecord[]
   medicines           Medicine[]
+  openingBalances     OpeningBalance[]
   procurementPayments ProcurementPayment[]
   procurements        Procurement[]
   products            Product[]
@@ -54,7 +55,7 @@ model Clinic {
   stockOpnames        StockOpnameSession[]
   systemAccounts      SystemAccount[]
   users               UserClinic[]
-  openingBalances     OpeningBalance[]
+  doctorCommissions   DoctorCommission[]
 
   @@map("clinics")
 }
@@ -181,6 +182,7 @@ model Doctor {
   queueNumbers       QueueNumber[]    @relation("QueueDoctor")
   registrations      Registration[]
   departments        Department[]     @relation("DoctorAllDepts")
+  commissions        DoctorCommission[]
 
   @@index([specialization])
   @@map("doctors")
@@ -564,6 +566,7 @@ model Service {
   clinicId              String?
   categoryId            String?
   coaId                 String?
+  doctorFee             Float                  @default(0)
   appointmentServices   AppointmentService[]
   invoiceItems          InvoiceItem[]
   medicalRecordServices MedicalRecordService[]
@@ -864,6 +867,7 @@ model Invoice {
   patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   registration   Registration? @relation(fields: [registrationId], references: [id])
   payments       Payment[]
+  commissions    DoctorCommission[]
 
   @@index([patientId])
   @@index([status])
@@ -892,7 +896,6 @@ model Payment {
   id             String   @id @default(uuid())
   paymentNo      String   @unique
   invoiceId      String
-  bankId         String?
   paymentDate    DateTime
   amount         Float
   paymentMethod  String
@@ -900,6 +903,7 @@ model Payment {
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  bankId         String?
   bank           Bank?    @relation(fields: [bankId], references: [id])
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -1008,11 +1012,11 @@ model LabOrder {
   completedAt     DateTime?
   analystId       String?
   validatorId     String?
+  attachments     LabOrderAttachment[]
   doctor          Doctor               @relation(fields: [doctorId], references: [id])
   medicalRecord   MedicalRecord        @relation(fields: [medicalRecordId], references: [id])
   patient         Patient              @relation(fields: [patientId], references: [id])
   results         LabResultDetail[]
-  attachments     LabOrderAttachment[]
 
   @@map("lab_orders")
 }
@@ -1385,9 +1389,9 @@ model ChartOfAccount {
   children            ChartOfAccount[]     @relation("AccountHierarchy")
   expenseCategories   ExpenseCategory[]
   journalDetails      JournalDetail[]
+  openingBalanceItems OpeningBalanceItem[]
   services            Service[]
   systemAccounts      SystemAccount[]
-  openingBalanceItems OpeningBalanceItem[]
 
   @@map("chart_of_accounts")
 }
@@ -1477,11 +1481,11 @@ model OpeningBalance {
   status         String               @default("DRAFT")
   totalAmount    Float                @default(0)
   clinicId       String
-  journalEntryId String?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
-  clinic         Clinic               @relation(fields: [clinicId], references: [id])
+  journalEntryId String?
   items          OpeningBalanceItem[]
+  clinic         Clinic               @relation(fields: [clinicId], references: [id])
 
   @@map("opening_balances")
 }
@@ -1521,4 +1525,29 @@ enum AccountCategory {
 enum AccountType {
   HEADER
   DETAIL
+}
+
+model DoctorCommission {
+  id          String   @id @default(uuid())
+  doctorId    String
+  clinicId    String
+  date        DateTime @default(now())
+  description String
+  amount      Float
+  type        String   @default("MANUAL") // "INVOICE" or "MANUAL"
+  status      String   @default("unpaid") // "unpaid" or "paid"
+  paidAt      DateTime?
+  invoiceId   String?
+  sourceId    String? // Link to MedicalRecordService or other source
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  doctor      Doctor   @relation(fields: [doctorId], references: [id])
+  clinic      Clinic   @relation(fields: [clinicId], references: [id])
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([doctorId])
+  @@index([clinicId])
+  @@index([date])
+  @@map("doctor_commissions")
 }

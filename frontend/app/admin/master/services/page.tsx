@@ -10,12 +10,12 @@ import MasterModal from '@/components/admin/master/MasterModal'
 import { StatusBadge, CategoryBadge } from '@/components/admin/master/StatusBadge'
 
 const API = process.env.NEXT_PUBLIC_API_URL + '/api/master'
-const EMPTY = { serviceCode: '', serviceName: '', description: '', categoryId: '', unit: 'session', price: '', coaId: '', isActive: true }
+const EMPTY = { serviceCode: '', serviceName: '', description: '', categoryId: '', unit: 'session', price: '', doctorFee: '', coaId: '', isActive: true }
 
 type ServiceCategory = { id: string; categoryName: string }
 type Service = {
   id: string; serviceCode: string; serviceName: string; description?: string
-  categoryId?: string; serviceCategory?: ServiceCategory; unit?: string; price: number; isActive: boolean;
+  categoryId?: string; serviceCategory?: ServiceCategory; unit?: string; price: number; doctorFee: number; isActive: boolean;
   coaId?: string; coa?: { name: string; code: string }
 }
 
@@ -91,6 +91,7 @@ export default function ServicesPage() {
       categoryId: r.categoryId || '', 
       unit: r.unit || 'session', 
       price: String(r.price), 
+      doctorFee: String(r.doctorFee || 0),
       coaId: r.coaId || '',
       isActive: r.isActive 
     })
@@ -104,7 +105,7 @@ export default function ServicesPage() {
     }
     setSaving(true); setError('')
     try {
-      const payload = { ...form, price: Number(form.price) }
+      const payload = { ...form, price: Number(form.price), doctorFee: Number(form.doctorFee || 0) }
       if (editing) await api.put(`/master/services/${editing.id}`, payload)
       else await api.post('/master/services', payload)
       setModalOpen(false); fetchData()
@@ -121,7 +122,8 @@ export default function ServicesPage() {
     { key: 'serviceCode', label: 'Kode', render: (r) => <span className="text-xs font-bold font-mono text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">{r.serviceCode}</span> },
     { key: 'serviceName', label: 'Nama Layanan', render: (r) => <span className="text-sm font-semibold text-gray-800">{r.serviceName}</span> },
     { key: 'categoryId', label: 'Kategori', render: (r) => <CategoryBadge category={r.serviceCategory?.categoryName || 'Uncategorized'} /> },
-    { key: 'price', label: 'Harga', render: (r) => <span className="text-sm font-bold text-emerald-700">{formatRupiah(r.price)}</span> },
+    { key: 'price', label: 'Harga (Pasien)', render: (r) => <span className="text-sm font-bold text-emerald-700">{formatRupiah(r.price)}</span> },
+    { key: 'doctorFee', label: 'Jasa Medis (Dokter)', render: (r) => <span className="text-sm font-bold text-indigo-600">{formatRupiah(r.doctorFee || 0)}</span> },
     { key: 'coaId', label: 'Pemetaan Akun', render: (r) => r.coa ? (
       <div className="flex flex-col">
         <span className="text-xs font-bold text-gray-700">{r.coa.name}</span>
@@ -174,10 +176,17 @@ export default function ServicesPage() {
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
-                <span>Harga (Rp) *</span>
+                <span>Harga (Pasien) *</span>
               </label>
               <input type="number" value={form.price} onChange={(e) => setForm(p => ({...p, price: e.target.value}))}
                 placeholder="50000" className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-primary font-medium" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                <span className="text-indigo-600">Jasa Medis (Fee Dokter)</span>
+              </label>
+              <input type="number" value={form.doctorFee} onChange={(e) => setForm(p => ({...p, doctorFee: e.target.value}))}
+                placeholder="10000" className="w-full px-4 py-2.5 text-sm border border-indigo-100 bg-indigo-50/30 rounded-xl focus:outline-none focus:border-indigo-500 font-medium text-indigo-700" />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-gray-700 mb-1.5">Nama Layanan *</label>

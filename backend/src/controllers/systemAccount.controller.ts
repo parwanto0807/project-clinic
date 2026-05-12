@@ -114,6 +114,8 @@ export const seedSystemAccounts = async (req: Request, res: Response) => {
             { key: 'ACCUM_DEP_GENERAL', name: 'Akumulasi Penyusutan (General)' },
             { key: 'RETAINED_EARNINGS', name: 'Laba Ditahan' },
             { key: 'COMPOUND_SERVICE_REVENUE', name: 'Pendapatan Jasa Racik / Tuslah' },
+            { key: 'DOCTOR_FEE_PAYABLE', name: 'Hutang Jasa Medik / Doctor Fee' },
+            { key: 'DOCTOR_FEE_EXPENSE', name: 'Beban Jasa Medik / Doctor Fee Expense' },
         ]
 
         const results = []

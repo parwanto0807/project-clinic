@@ -110,6 +110,8 @@ export default function DoctorConsultationPage() {
   const [serviceItems, setServiceItems] = useState<any[]>([])
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [attachments, setAttachments] = useState<any[]>([])
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
 
   const [activeSegment, setActiveSegment] = useState<'nurse' | 'diag' | 'tindakan' | 'lab' | 'rx' | 'history' | 'referral' | 'attachment' | 'consent'>('nurse')
   const [searchMed, setSearchMed] = useState('')
@@ -193,6 +195,7 @@ export default function DoctorConsultationPage() {
           setNotes(data.notes || '')
           setHasInformedConsent(!!data.hasInformedConsent)
           setReferrals(data.referrals || [])
+          setAttachments(data.attachments || [])
           
           if (data.prescriptions && data.prescriptions.length > 0) {
             const savedItems = data.prescriptions.flatMap((rx: any) =>
@@ -324,12 +327,22 @@ export default function DoctorConsultationPage() {
       setFilteredServices([])
       return
     }
-    const filtered = allServices.filter(s => 
-      !searchService || 
-      s.serviceName.toLowerCase().includes(searchService.toLowerCase()) ||
-      s.serviceCode.toLowerCase().includes(searchService.toLowerCase())
-    )
-    setFilteredServices(filtered.slice(0, 10))
+    const filtered = allServices.filter(s => {
+      // Exclude laboratory services from Tindakan Medis
+      const categoryName = s.serviceCategory?.categoryName?.toLowerCase() || '';
+      const serviceName = s.serviceName.toLowerCase();
+      
+      const isLab = categoryName.includes('laboratorium') || 
+                    categoryName.includes('lab') || 
+                    serviceName.includes('lab');
+      
+      if (isLab) return false;
+      
+      return !searchService || 
+        name.includes(searchService.toLowerCase()) ||
+        s.serviceCode.toLowerCase().includes(searchService.toLowerCase());
+    })
+    setFilteredServices(filtered.slice(0, 100))
   }, [searchService, allServices, isServiceDropdownOpen, isReadOnly])
 
   // Click Outside to Close
@@ -645,6 +658,47 @@ export default function DoctorConsultationPage() {
   const handleReprintReferral = (referral: any) => {
     setCurrentPrintReferral(referral)
     setIsReferralPreviewOpen(true)
+  }
+
+  const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !medicalRecord || !queue) return
+
+    setIsUploadingAttachment(true)
+    const toastId = toast.loading('Mengunggah file...')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('medicalRecordId', medicalRecord.id)
+
+      const res = await api.post('clinical/attachments', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      setAttachments([...attachments, res.data])
+      toast.success('File berhasil diunggah', { id: toastId })
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal mengunggah file', { id: toastId })
+    } finally {
+      setIsUploadingAttachment(false)
+      // reset file input
+      e.target.value = ''
+    }
+  }
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus lampiran ini?')) return
+    
+    const toastId = toast.loading('Menghapus lampiran...')
+    try {
+      await api.delete(`clinical/attachments/${attachmentId}`)
+      setAttachments(attachments.filter(a => a.id !== attachmentId))
+      toast.success('Lampiran berhasil dihapus', { id: toastId })
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal menghapus lampiran', { id: toastId })
+    }
   }
 
 
@@ -1094,9 +1148,9 @@ export default function DoctorConsultationPage() {
                                hasFetchedRef.current = null;
                                fetchData();
                             }}
-                            className='px-6 py-3 bg-white border border-slate-200 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:text-primary hover:border-primary transition-all shadow-sm flex items-center gap-2'
+                            className='px-6 py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg shadow-rose-200 flex items-center gap-2 animate-pulse hover:animate-none'
                          >
-                            <FiRefreshCw className={loading ? 'animate-spin' : ''} /> Refresh Hasil
+                            <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Hasil
                          </button>
                      </div>
                   </div>
@@ -1132,40 +1186,46 @@ export default function DoctorConsultationPage() {
                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                                        className='absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[300px] overflow-y-auto'
                                     >
-                                       {allServices.filter(s => {
-                                          const search = searchLab.toLowerCase();
-                                          const name = s.serviceName.toLowerCase();
-                                          const category = s.serviceCategory?.categoryName?.toLowerCase() || '';
-                                          const isLab = name.includes('lab') || category.includes('lab');
-                                          
-                                          if (!search) return isLab;
-                                          return name.includes(search) || category.includes(search);
-                                       }).length > 0 ? (
-                                          allServices.filter(s => 
-                                             s.serviceName.toLowerCase().includes(searchLab.toLowerCase()) ||
-                                             s.serviceCategory?.categoryName?.toLowerCase().includes('lab')
-                                          ).map(svc => (
-                                             <button 
-                                                key={svc.id}
-                                                onClick={() => {
-                                                   if (!labItems.find(i => i.id === svc.id)) {
-                                                      setLabItems([...labItems, svc]);
-                                                   }
-                                                   setSearchLab('');
-                                                   setIsLabDropdownOpen(false);
-                                                }}
-                                                className='w-full px-6 py-4 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0'
-                                             >
-                                                <div>
-                                                   <p className='text-sm font-bold text-slate-800'>{svc.serviceName}</p>
-                                                   <p className='text-[10px] font-bold text-slate-400 uppercase'>{svc.serviceCategory?.categoryName || 'Lab Test'}</p>
-                                                </div>
-                                                <FiPlus className='text-rose-500' />
-                                             </button>
-                                          ))
-                                       ) : (
-                                          <div className='p-8 text-center text-slate-400 text-sm font-bold uppercase tracking-widest'>Pemeriksaan tidak ditemukan</div>
-                                       )}
+                                       {(() => {
+                                          const labFiltered = allServices.filter(s => {
+                                             const search = searchLab.toLowerCase();
+                                             const name = s.serviceName.toLowerCase();
+                                             const category = s.serviceCategory?.categoryName?.toLowerCase() || '';
+                                             
+                                             // Include items in 'Laboratorium Klinik' category or containing 'lab'
+                                             const isLab = category.includes('laboratorium') || 
+                                                           category.includes('lab') || 
+                                                           name.includes('lab');
+                                             
+                                             if (!isLab) return false;
+                                             if (!search) return true;
+                                             return name.includes(search) || category.includes(search);
+                                          });
+
+                                          return labFiltered.length > 0 ? (
+                                             labFiltered.map(svc => (
+                                                <button 
+                                                   key={svc.id}
+                                                   onClick={() => {
+                                                      if (!labItems.find(i => i.id === svc.id)) {
+                                                         setLabItems([...labItems, svc]);
+                                                      }
+                                                      setSearchLab('');
+                                                      setIsLabDropdownOpen(false);
+                                                   }}
+                                                   className='w-full px-6 py-4 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0'
+                                                >
+                                                   <div>
+                                                      <p className='text-sm font-bold text-slate-800'>{svc.serviceName}</p>
+                                                      <p className='text-[10px] font-bold text-slate-400 uppercase'>{svc.serviceCategory?.categoryName || 'Lab Test'}</p>
+                                                   </div>
+                                                   <FiPlus className='text-rose-500' />
+                                                </button>
+                                             ))
+                                          ) : (
+                                             <div className='p-8 text-center text-slate-400 text-sm font-bold uppercase tracking-widest'>Pemeriksaan tidak ditemukan</div>
+                                          );
+                                       })()}
                                     </motion.div>
                                  )}
                               </AnimatePresence>
@@ -1318,14 +1378,14 @@ export default function DoctorConsultationPage() {
                              </div>
 
                              {referralType === 'INTERNAL' ? (
-                               <div className="flex gap-4">
-                                  <select value={referralToClinicId} onChange={e => setReferralToClinicId(e.target.value)} className="flex-1 p-4 border border-slate-200 rounded-2xl text-xs font-bold bg-white focus:border-primary outline-none">
+                               <div className="flex flex-col gap-3">
+                                  <select value={referralToClinicId} onChange={e => setReferralToClinicId(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none">
                                      <option value="">Pilih Klinik Tujuan...</option>
-                                     {clinicsList.filter(c => c.id !== queue.clinicId).map(c => (
+                                     {clinicsList.map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                      ))}
                                   </select>
-                                  <select value={referralToDepartmentId} onChange={e => setReferralToDepartmentId(e.target.value)} className="flex-1 p-4 border border-slate-200 rounded-2xl text-xs font-bold bg-white focus:border-primary outline-none">
+                                  <select value={referralToDepartmentId} onChange={e => setReferralToDepartmentId(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none">
                                      <option value="">Pilih Poli/Unit Tujuan...</option>
                                      {departmentsList.map(d => (
                                         <option key={d.id} value={d.id}>{d.name}</option>
@@ -1333,12 +1393,12 @@ export default function DoctorConsultationPage() {
                                   </select>
                                </div>
                              ) : (
-                               <input value={referralToHospitalName} onChange={e => setReferralToHospitalName(e.target.value)} placeholder="Ketik nama Rumah Sakit tujuan..." className="w-full p-4 border border-slate-200 rounded-2xl text-xs font-bold bg-white focus:border-primary outline-none" />
+                               <input value={referralToHospitalName} onChange={e => setReferralToHospitalName(e.target.value)} placeholder="Ketik nama Rumah Sakit tujuan..." className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none" />
                              )}
 
-                             <textarea value={referralNotes} onChange={e => setReferralNotes(e.target.value)} placeholder="Catatan medis tambahan atau rincian klinis untuk rujukan..." className="w-full p-4 border border-slate-200 rounded-2xl text-xs font-bold bg-white focus:border-primary outline-none min-h-[120px]" />
+                             <textarea value={referralNotes} onChange={e => setReferralNotes(e.target.value)} placeholder="Catatan medis tambahan atau rincian klinis untuk rujukan..." className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none min-h-[120px]" />
                              
-                             <button disabled={isPrinting} onClick={handleSaveAndPrintReferral} className="w-full py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-50">
+                             <button disabled={isPrinting} onClick={handleSaveAndPrintReferral} className="w-full py-4 mt-2 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-50">
                                 {isPrinting ? 'Mencetak...' : 'Cetak & Simpan Rujukan'}
                              </button>
                           </div>
@@ -1379,14 +1439,59 @@ export default function DoctorConsultationPage() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <label className="aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary hover:bg-slate-50 transition-all group">
-                       <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 group-hover:text-primary transition-all">
-                          <FiPlus className="w-8 h-8" />
+                    {!isReadOnly && (
+                      <label className={`aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary hover:bg-slate-50 transition-all group ${isUploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
+                         <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 group-hover:text-primary transition-all">
+                            {isUploadingAttachment ? <FiRefreshCw className="w-8 h-8 animate-spin" /> : <FiPlus className="w-8 h-8" />}
+                         </div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isUploadingAttachment ? 'Mengunggah...' : 'Unggah Foto / PDF'}</p>
+                         <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadAttachment} disabled={isUploadingAttachment} />
+                      </label>
+                    )}
+                    
+                    {attachments.map((attachment) => (
+                      <div key={attachment.id} className="aspect-square border border-slate-200 rounded-[2.5rem] flex flex-col overflow-hidden group relative bg-slate-50">
+                        {attachment.fileType.startsWith('image/') ? (
+                          <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}${attachment.fileUrl}`} alt={attachment.fileName} className="w-full h-4/5 object-cover" />
+                        ) : (
+                          <div className="w-full h-4/5 flex items-center justify-center bg-indigo-50 text-indigo-300">
+                            <FiClipboard className="w-16 h-16" />
+                          </div>
+                        )}
+                        <div className="h-1/5 bg-white px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                          <p className="text-[10px] font-black text-slate-600 truncate mr-2" title={attachment.fileName}>{attachment.fileName}</p>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <a 
+                              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}${attachment.fileUrl}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="p-2 text-primary hover:bg-indigo-50 rounded-lg transition-all"
+                              title="Buka File"
+                            >
+                              <FiMonitor className="w-4 h-4" />
+                            </a>
+                            {!isReadOnly && (
+                              <button 
+                                onClick={() => handleDeleteAttachment(attachment.id)}
+                                className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
+                                title="Hapus File"
+                              >
+                                <FiTrash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {attachments.length === 0 && isReadOnly && (
+                       <div className="aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-slate-50">
+                          <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300">
+                             <FiClipboard className="w-8 h-8" />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada lampiran</p>
                        </div>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unggah Foto / PDF</p>
-                       <input type="file" className="hidden" />
-                    </label>
-                    {/* Placeholder for uploaded items */}
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1835,49 +1940,49 @@ export default function DoctorConsultationPage() {
                     {/* Reuse the design from the template but without fixed positioning */}
                     <div className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden shadow-sm" style={{ padding: '20mm' }}>
                         <div className="absolute top-0 left-0 right-0 h-4 bg-primary"></div>
-                        <div className="flex justify-between items-end border-b-2 border-primary pb-6 mb-8 mt-4">
+                        <div className="flex justify-between items-end border-b-2 border-primary pb-4 mb-6 mt-4">
                           <div>
                              <div className="flex items-center gap-3 mb-2">
-                               <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-xl">
+                               <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-lg">
                                   <FiHeart />
                                </div>
-                               <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
+                               <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
                              </div>
-                             <p className="text-xs text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
+                             <p className="text-[10px] text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
                           </div>
                           <div className="text-right">
-                             <h2 className="text-4xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
+                             <h2 className="text-2xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
                           </div>
                         </div>
                         
-                        <div className="mb-8">
-                          <p className="text-sm mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
+                        <div className="mb-6">
+                          <p className="text-xs mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
                         </div>
                         
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
-                          <table className="w-full text-sm">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+                          <table className="w-full text-xs">
                             <tbody>
-                              <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 font-bold text-base text-slate-900">{queue?.patient.name}</td></tr>
-                              <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
-                              <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Jenis Kelamin</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{['L', 'M', 'Laki-laki'].includes(queue?.patient.gender || '') ? 'Laki-laki' : 'Perempuan'}</td></tr>
+                              <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Nama Pasien</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 font-bold text-sm text-slate-900">{queue?.patient.name}</td></tr>
+                              <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">No. Rekam Medis</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
+                              <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Jenis Kelamin</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{['L', 'M', 'Laki-laki'].includes(queue?.patient.gender || '') ? 'Laki-laki' : 'Perempuan'}</td></tr>
                             </tbody>
                           </table>
                         </div>
                         
-                        <div className="mb-8 border border-slate-200 rounded-2xl p-6 relative overflow-hidden">
+                        <div className="mb-6 border border-slate-200 rounded-xl p-5 relative overflow-hidden">
                            <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
-                           <h3 className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-6 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
-                           <div className="grid grid-cols-2 gap-8 text-sm">
+                           <h3 className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
+                           <div className="grid grid-cols-2 gap-6 text-xs">
                               <div>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Anamnesa (S)</p>
-                                 <p className="whitespace-pre-wrap text-slate-700 mb-6 leading-relaxed">{subjective || '-'}</p>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Pemeriksaan Fisik (O)</p>
+                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Anamnesa (S)</p>
+                                 <p className="whitespace-pre-wrap text-slate-700 mb-4 leading-relaxed">{subjective || '-'}</p>
+                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Pemeriksaan Fisik (O)</p>
                                  <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{objective || '-'}</p>
                               </div>
                               <div>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Diagnosa Sementara (A)</p>
-                                 <p className="whitespace-pre-wrap font-bold text-slate-900 mb-6 leading-relaxed">{diagnosis || '-'}</p>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Terapi Diberikan (P)</p>
+                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Diagnosa Sementara (A)</p>
+                                 <p className="whitespace-pre-wrap font-bold text-slate-900 mb-4 leading-relaxed">{diagnosis || '-'}</p>
+                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Terapi Diberikan (P)</p>
                                  <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{treatmentPlan || '-'}</p>
                               </div>
                            </div>
@@ -1916,53 +2021,53 @@ export default function DoctorConsultationPage() {
             <div className="absolute top-0 left-0 right-0 h-4 bg-primary"></div>
             
             {/* Kop Surat */}
-            <div className="flex justify-between items-end border-b-2 border-primary pb-6 mb-8 mt-4">
+            <div className="flex justify-between items-end border-b-2 border-primary pb-4 mb-6 mt-4">
               <div>
                  <div className="flex items-center gap-3 mb-2">
-                   <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-xl">
+                   <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-lg">
                       <FiHeart />
                    </div>
-                   <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || "KLINIK" : "KLINIK PUSAT"}</h1>
+                   <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || "KLINIK" : "KLINIK PUSAT"}</h1>
                  </div>
-                 <p className="text-xs text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
+                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
               </div>
               <div className="text-right">
-                 <h2 className="text-4xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
+                 <h2 className="text-2xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
               </div>
             </div>
             
-            <div className="mb-8">
-              <p className="text-sm mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
+            <div className="mb-6">
+              <p className="text-xs mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
             </div>
             
             {/* Patient Info Card */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
-              <table className="w-full text-sm">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+              <table className="w-full text-xs">
                 <tbody>
-                  <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 font-bold text-base text-slate-900">{queue.patient.name}</td></tr>
-                  <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{queue.patient.medicalRecordNo}</td></tr>
-                  <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Jenis Kelamin</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{["L", "M", "Laki-laki"].includes(queue.patient.gender) ? "Laki-laki" : "Perempuan"}</td></tr>
+                  <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Nama Pasien</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 font-bold text-sm text-slate-900">{queue.patient.name}</td></tr>
+                  <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">No. Rekam Medis</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{queue.patient.medicalRecordNo}</td></tr>
+                  <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Jenis Kelamin</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{["L", "M", "Laki-laki"].includes(queue.patient.gender) ? "Laki-laki" : "Perempuan"}</td></tr>
                 </tbody>
               </table>
             </div>
             
             {/* Clinical Info Section */}
-            <div className="mb-8 border border-slate-200 rounded-2xl p-6 relative overflow-hidden">
+            <div className="mb-6 border border-slate-200 rounded-xl p-5 relative overflow-hidden">
                <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-6 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
-               <div className="grid grid-cols-2 gap-8 text-sm">
+               <h3 className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
+               <div className="grid grid-cols-2 gap-6 text-xs">
                   <div>
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Anamnesa (S)</p>
-                     <p className="whitespace-pre-wrap text-slate-700 mb-6 leading-relaxed">{subjective || "-"}</p>
+                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Anamnesa (S)</p>
+                     <p className="whitespace-pre-wrap text-slate-700 mb-4 leading-relaxed">{subjective || "-"}</p>
                      
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Pemeriksaan Fisik (O)</p>
+                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Pemeriksaan Fisik (O)</p>
                      <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{objective || "-"}</p>
                   </div>
                   <div>
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Diagnosa Sementara (A)</p>
-                     <p className="whitespace-pre-wrap font-bold text-slate-900 mb-6 leading-relaxed">{diagnosis || "-"}</p>
+                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Diagnosa Sementara (A)</p>
+                     <p className="whitespace-pre-wrap font-bold text-slate-900 mb-4 leading-relaxed">{diagnosis || "-"}</p>
                      
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-2">Terapi Diberikan (P)</p>
+                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Terapi Diberikan (P)</p>
                      <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{treatmentPlan || "-"}</p>
                   </div>
                </div>

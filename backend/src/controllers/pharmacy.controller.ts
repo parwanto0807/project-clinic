@@ -205,14 +205,14 @@ export const updateDispenseStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Resep tidak ditemukan' })
     }
 
-    // NEW: Block dispensing if invoice is not paid
-    if (status === 'dispensed') {
-      const invoices = prescription.medicalRecord?.registration?.invoices || []
-      const isPaid = invoices.some(inv => inv.status === 'paid')
-      if (!isPaid) {
-        return res.status(400).json({ message: 'Obat tidak dapat diserahkan karena pembayaran invoice belum lunas.' })
-      }
-    }
+    // DISABLED: Block dispensing if invoice is not paid
+    // if (status === 'dispensed') {
+    //   const invoices = prescription.medicalRecord?.registration?.invoices || []
+    //   const isPaid = invoices.some(inv => inv.status === 'paid')
+    //   if (!isPaid) {
+    //     return res.status(400).json({ message: 'Obat tidak dapat diserahkan karena pembayaran invoice belum lunas.' })
+    //   }
+    // }
 
     // Attempting to finish dispensing
     if (status === 'dispensed' && prescription.dispenseStatus !== 'dispensed') {

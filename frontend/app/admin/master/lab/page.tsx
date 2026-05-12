@@ -139,6 +139,8 @@ export default function LabMasterPage() {
                 <option value="Kimia Darah">Kimia Darah</option>
                 <option value="Urinalisa">Urinalisa</option>
                 <option value="Imunologi">Imunologi</option>
+                <option value="Imunoserologi">Imunoserologi</option>
+                <option value="Paket Lab">Paket Lab</option>
                 <option value="Mikrobiologi">Mikrobiologi</option>
                 <option value="Lainnya">Lainnya</option>
               </select>

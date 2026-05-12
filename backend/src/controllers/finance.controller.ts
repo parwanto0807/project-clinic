@@ -254,7 +254,29 @@ export const postInvoice = async (req: Request, res: Response) => {
             // 1. Fetch Fresh State
             const invoice = await tx.invoice.findUnique({
                 where: { id: invoiceId },
-                include: { items: true, payments: true, bank: true }
+                include: { 
+                    items: {
+                        include: {
+                            service: {
+                                include: {
+                                    coa: true,
+                                    serviceCategory: true
+                                }
+                            }
+                        }
+                    }, 
+                    registration: true,
+                    patient: {
+                        include: {
+                            medicalRecords: {
+                                orderBy: { recordDate: 'desc' },
+                                take: 1
+                            }
+                        }
+                    },
+                    payments: true, 
+                    bank: true 
+                }
             })
 
             if (!invoice) throw new Error('Invoice tidak ditemukan')
@@ -264,11 +286,13 @@ export const postInvoice = async (req: Request, res: Response) => {
                 throw new Error('Invoice belum dibayar. Mohon lakukan pembayaran terlebih dahulu sebelum posting ke Buku Besar.')
             }
 
+            const commissionRecords: any[] = []
+
             const targetClinicId = invoice.clinicId || currentClinicId
             if (!targetClinicId) throw new Error('Klinik tidak teridentifikasi.')
 
             // 3. Resolve System Accounts & COAs
-            const sysAccountKeys = ['CASH_ACCOUNT', 'BANK_ACCOUNT', 'ACCOUNTS_RECEIVABLE', 'SALES_REVENUE', 'SERVICE_REVENUE', 'SALES_DISCOUNT']
+            const sysAccountKeys = ['CASH_ACCOUNT', 'BANK_ACCOUNT', 'ACCOUNTS_RECEIVABLE', 'SALES_REVENUE', 'SERVICE_REVENUE', 'SALES_DISCOUNT', 'DOCTOR_FEE_PAYABLE', 'DOCTOR_FEE_EXPENSE']
             const sysAccounts = await tx.systemAccount.findMany({
                 where: { key: { in: sysAccountKeys }, OR: [{ clinicId: targetClinicId }, { clinicId: null }] },
                 include: { coa: true },
@@ -288,19 +312,16 @@ export const postInvoice = async (req: Request, res: Response) => {
             })
 
             if (!existingMainJournal) {
-                // Fetch items for revenue mapping
-                const items = await tx.invoiceItem.findMany({
-                    where: { invoiceId },
-                    include: { service: { include: { serviceCategory: true, coa: true } } }
-                })
-
                 const revenueMap = new Map<string, { amount: number; coaName: string }>()
-                for (const item of items) {
+                let totalDoctorFees = 0
+                let totalDoctorSubsidies = 0
+
+                for (const item of invoice.items) {
                     // --- PROFESSIONAL MAPPING LOGIC (Tiered) ---
-                    const sName = (item.service?.serviceName || '').trim().toLowerCase()
-                    const cName = (item.service?.serviceCategory?.categoryName || '').trim().toLowerCase()
-                    const desc = (item.description || '').trim().toLowerCase()
-                    // --- NEW: Hierarchical Model-First Mapping (THE BEST VERSION) ---
+                    const serviceData = item.service as any
+                    const sName = (serviceData?.serviceName || '').trim().toLowerCase()
+                    const cName = (serviceData?.serviceCategory?.categoryName || '').trim().toLowerCase()
+                    
                     const salesRevSys = getSysAcc('SALES_REVENUE')
                     const serviceRevSys = getSysAcc('SERVICE_REVENUE')
                     let targetCoa: any = null
@@ -338,8 +359,35 @@ export const postInvoice = async (req: Request, res: Response) => {
                     }
                     if (!targetCoa) throw new Error(`Akun Pendapatan tidak ditemukan untuk item: ${item.description}`)
 
-                    const current = revenueMap.get(targetCoa.id) || { amount: 0, coaName: targetCoa.name }
-                    revenueMap.set(targetCoa.id, { amount: current.amount + (item.subtotal || 0), coaName: current.coaName })
+                    const totalItemSubtotal = item.subtotal || 0
+                    const doctorFeePerUnit = (serviceData?.doctorFee as number) || 0
+                    const totalDoctorFee = doctorFeePerUnit * item.quantity
+
+                    const clinicPortion = totalItemSubtotal - totalDoctorFee
+
+                    if (clinicPortion > 0) {
+                        const current = revenueMap.get(targetCoa.id) || { amount: 0, coaName: targetCoa.name }
+                        revenueMap.set(targetCoa.id, { amount: current.amount + clinicPortion, coaName: current.coaName })
+                    } else if (clinicPortion < 0) {
+                        // If fee > price, the clinic pays out of pocket (Subsidy/Expense)
+                        totalDoctorSubsidies += Math.abs(clinicPortion)
+                    }
+
+                    if (totalDoctorFee > 0) {
+                        totalDoctorFees += totalDoctorFee
+                        
+                        // Track for centralized report
+                        commissionRecords.push({
+                            doctorId: invoice.registration?.doctorId || invoice.patient.medicalRecords[0]?.doctorId, // Fallback
+                            clinicId: targetClinicId,
+                            invoiceId: invoice.id,
+                            description: item.description,
+                            amount: totalDoctorFee,
+                            type: 'INVOICE',
+                            sourceId: item.id,
+                            date: invoice.invoiceDate
+                        })
+                    }
                 }
 
                 const arSysAcc = getSysAcc('ACCOUNTS_RECEIVABLE')
@@ -348,6 +396,16 @@ export const postInvoice = async (req: Request, res: Response) => {
 
                 const discountSysAcc = getSysAcc('SALES_DISCOUNT')
                 const discountAccount = discountSysAcc?.coa || getCoaByCode('4-1199')
+
+                const doctorPayableSysAcc = getSysAcc('DOCTOR_FEE_PAYABLE')
+                const doctorPayableAccount = doctorPayableSysAcc?.coa || await tx.chartOfAccount.findFirst({
+                    where: { code: '2-1102', OR: [{ clinicId: targetClinicId }, { clinicId: null }] }
+                })
+
+                const doctorExpenseSysAcc = getSysAcc('DOCTOR_FEE_EXPENSE')
+                const doctorExpenseAccount = doctorExpenseSysAcc?.coa || await tx.chartOfAccount.findFirst({
+                    where: { code: '6-1102', OR: [{ clinicId: targetClinicId }, { clinicId: null }] }
+                })
 
                 await tx.journalEntry.create({
                     data: {
@@ -362,10 +420,26 @@ export const postInvoice = async (req: Request, res: Response) => {
                                 ...(invoice.discount > 0 ? [
                                     { coaId: discountAccount?.id || arAccount.id, debit: invoice.discount, credit: 0, description: `Potongan Harga - Inv ${invoice.invoiceNo}` }
                                 ] : []),
+                                ...(totalDoctorSubsidies > 0 ? [
+                                    { 
+                                        coaId: doctorExpenseAccount?.id || '', 
+                                        debit: totalDoctorSubsidies, 
+                                        credit: 0, 
+                                        description: `Beban Subsidi Jasa Medik - Inv ${invoice.invoiceNo}` 
+                                    }
+                                ] : []),
                                 ...Array.from(revenueMap.entries()).map(([coaId, data]) => ({
-                                    coaId, debit: 0, credit: data.amount, description: `Pendapatan ${data.coaName} - Inv ${invoice.invoiceNo}`
-                                }))
-                            ]
+                                    coaId, debit: 0, credit: data.amount, description: `Pendapatan ${data.coaName} (Net) - Inv ${invoice.invoiceNo}`
+                                })),
+                                ...(totalDoctorFees > 0 ? [
+                                    { 
+                                        coaId: doctorPayableAccount?.id || '', 
+                                        debit: 0, 
+                                        credit: totalDoctorFees, 
+                                        description: `Hutang Jasa Medik Dokter - Inv ${invoice.invoiceNo}` 
+                                    }
+                                ] : [])
+                            ].filter(d => d.coaId !== '') // Filter out empty COAs
                         }
                     }
                 })
@@ -453,12 +527,19 @@ export const postInvoice = async (req: Request, res: Response) => {
                 await tx.invoice.update({ where: { id: invoiceId }, data: { isPosted: true } })
             }
 
-            return { 
-                success: true, 
-                message: existingMainJournal 
-                    ? `Sudah terposting sebelumnya. Berhasil sinkronisasi ${paymentSyncCount} pembayaran baru.` 
-                    : `Berhasil memposting invoice dan ${paymentSyncCount} pembayaran ke Buku Besar.`
-            }
+                // 4. Create centralized commission records
+                for (const comm of commissionRecords) {
+                    if (comm.doctorId) {
+                        await (tx as any).doctorCommission.create({ data: comm })
+                    }
+                }
+
+                return { 
+                    success: true, 
+                    message: existingMainJournal 
+                        ? `Sudah terposting sebelumnya. Berhasil sinkronisasi ${paymentSyncCount} pembayaran baru.` 
+                        : `Berhasil memposting invoice dan ${paymentSyncCount} pembayaran ke Buku Besar.`
+                }
         }, {
             timeout: 30000
         })

@@ -605,9 +605,12 @@ export const getServices = async (req: Request, res: Response) => {
 
 export const createService = async (req: Request, res: Response) => {
   try {
+    const { coaId, categoryId, ...rest } = req.body
     const service = await prisma.service.create({ 
       data: { 
-        ...req.body,
+        ...rest,
+        coaId: coaId || null,
+        categoryId: categoryId || null,
         clinicId: (req as any).clinicId
       } 
     })
@@ -621,7 +624,15 @@ export const createService = async (req: Request, res: Response) => {
 export const updateService = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const service = await prisma.service.update({ where: { id }, data: req.body })
+    const { coaId, categoryId, ...rest } = req.body
+    const service = await prisma.service.update({ 
+      where: { id }, 
+      data: {
+        ...rest,
+        coaId: coaId || null,
+        categoryId: categoryId || null
+      } 
+    })
     res.json(service)
   } catch (e) {
     res.status(500).json({ message: (e as Error).message })
@@ -1025,7 +1036,10 @@ export const getProductMasters = async (req: Request, res: Response) => {
             include: { clinic: true }
           }
         },
-        orderBy: { masterName: 'asc' },
+        orderBy: [
+          { productCategory: { categoryName: 'asc' } },
+          { masterName: 'asc' }
+        ],
         skip,
         take
       })

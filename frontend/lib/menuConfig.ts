@@ -49,7 +49,7 @@ export const LAYANAN_UTAMA_GROUPS = [
     moduleId: 'LABORATORY',
     items: [
       { icon: HiOutlineBeaker, label: 'Antrian Laboratorium', href: '/admin/lab/input' },
-      { icon: FiBookOpen,      label: 'Master Parameter Lab', href: '/admin/master/lab' },
+      { icon: FiBookOpen,      label: 'Master Parameter Lab', href: '/admin/master/lab', roles: ['SUPER_ADMIN', 'ADMIN'] },
     ]
   }
 ]
@@ -74,6 +74,7 @@ export const FINANCE_GROUPS = [
       { icon: FiActivity, label: 'Neraca Saldo (Trial Balance)', href: '/admin/finance/reports/trial-balance' },
       { icon: FiTrendingUp, label: 'Laba Rugi (P&L)', href: '/admin/finance/reports/profit-loss' },
       { icon: FiDatabase, label: 'Neraca (Balance Sheet)', href: '/admin/finance/reports/balance-sheet' },
+      { icon: FiDollarSign, label: 'Laporan Jasa Medik', href: '/admin/finance/reports/doctor-fees' },
     ]
   },
   {

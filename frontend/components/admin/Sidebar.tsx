@@ -117,7 +117,10 @@ const SidebarNavGroup = ({
   const isOpen = openGroups.includes(group.label) || isGroupActive
 
   // Check Permissions
-  if (user?.role !== 'SUPER_ADMIN' && group.moduleId && user?.permissions && !user.permissions.includes(group.moduleId)) {
+  const hasRoleAccess = group.roles ? group.roles.includes(user?.role) : false;
+  const hasModuleAccess = user?.role === 'SUPER_ADMIN' || (group.moduleId && user?.permissions?.includes(group.moduleId));
+
+  if (!hasRoleAccess && !hasModuleAccess) {
     return null;
   }
 
@@ -232,7 +235,11 @@ const SidebarContent = ({
 }) => {
   const hasAccessToSection = (groups: any[]) => {
     if (user?.role === 'SUPER_ADMIN') return true;
-    return groups.some(group => group.moduleId && user?.permissions?.includes(group.moduleId));
+    return groups.some(group => {
+      const hasRoleAccess = group.roles ? group.roles.includes(user?.role) : false;
+      const hasModuleAccess = group.moduleId && user?.permissions?.includes(group.moduleId);
+      return hasRoleAccess || hasModuleAccess;
+    });
   };
 
   const isFarmasi = user?.role === 'FARMASI'

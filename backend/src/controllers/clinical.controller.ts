@@ -127,3 +127,37 @@ export const uploadAttachment = async (req: Request, res: Response) => {
     res.status(500).json({ message: (e as Error).message })
   }
 }
+
+export const deleteAttachment = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const attachment = await prisma.medicalRecordAttachment.findUnique({
+      where: { id }
+    })
+
+    if (!attachment) {
+      return res.status(404).json({ message: 'Attachment not found' })
+    }
+
+    // Attempt to delete physical file
+    try {
+      if (attachment.fileUrl.startsWith('/uploads/records/')) {
+        const fileName = attachment.fileUrl.replace('/uploads/records/', '')
+        const filePath = path.join(__dirname, '../../public/uploads/records', fileName)
+        await fs.unlink(filePath)
+      }
+    } catch (fsError) {
+      console.warn('Failed to delete physical file:', fsError)
+      // Continue to delete from DB even if file is missing
+    }
+
+    await prisma.medicalRecordAttachment.delete({
+      where: { id }
+    })
+
+    res.json({ message: 'Attachment deleted successfully' })
+  } catch (e) {
+    res.status(500).json({ message: (e as Error).message })
+  }
+}

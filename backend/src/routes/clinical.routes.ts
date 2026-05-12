@@ -6,7 +6,8 @@ import {
   getReferralsByMedicalRecord,
   getTemplates,
   createTemplate,
-  uploadAttachment
+  uploadAttachment,
+  deleteAttachment
 } from '../controllers/clinical.controller'
 
 const clinicalRoutes = Router()
@@ -24,5 +25,6 @@ clinicalRoutes.post('/templates', createTemplate)
 
 // Attachments
 clinicalRoutes.post('/attachments', upload.single('file'), uploadAttachment)
+clinicalRoutes.delete('/attachments/:id', deleteAttachment)
 
 export default clinicalRoutes

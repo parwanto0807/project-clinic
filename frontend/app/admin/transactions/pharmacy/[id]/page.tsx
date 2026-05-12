@@ -395,37 +395,18 @@ export default function PharmacyDetailPage({ params }: { params: Promise<{ id: s
                    </div>
                  ) : (
                    <div className="space-y-4">
-                      {(() => {
-                        const isPaid = prescription.medicalRecord?.registration?.invoices?.some((inv: any) => inv.status === 'paid');
-                        return prescription.dispenseStatus === 'pending' && (
-                          <div className="space-y-3">
-                               {!isPaid && (
-                                 <div className="space-y-3">
-                                   <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-2">
-                                     <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                                     <p className="text-[9px] font-black text-amber-700 uppercase tracking-tight">Menunggu Pembayaran Kasir...</p>
-                                   </div>
-                                   <button 
-                                      onClick={() => { setIsSubmitting(true); fetchPrescription().finally(() => setIsSubmitting(false)); }}
-                                      disabled={isSubmitting}
-                                      className="w-full py-3 bg-blue-50 text-blue-600 font-black rounded-xl border border-blue-100 hover:bg-blue-100 transition-all uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 mb-2"
-                                   >
-                                      <RefreshCw className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-spin' : ''}`} />
-                                      Cek Status Pembayaran
-                                   </button>
-                                 </div>
-                               )}
-                               <button 
-                                 onClick={() => updateStatus('preparing')} 
-                                 disabled={isSubmitting} 
-                                 className="w-full py-7 bg-primary text-white font-black rounded-[24px] shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:scale-100"
-                               >
-                                  <span className="uppercase tracking-[0.2em] text-[11px]">MULAI PENGERJAAN</span>
-                                  <span className="text-[9px] font-bold opacity-60 uppercase">Ubah Status ke Preparing</span>
-                               </button>
-                          </div>
-                        );
-                      })()}
+                      {prescription.dispenseStatus === 'pending' && (
+                        <div className="space-y-3">
+                             <button 
+                               onClick={() => updateStatus('preparing')} 
+                               disabled={isSubmitting} 
+                               className="w-full py-7 bg-primary text-white font-black rounded-[24px] shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:scale-100"
+                             >
+                                <span className="uppercase tracking-[0.2em] text-[11px]">MULAI PENGERJAAN</span>
+                                <span className="text-[9px] font-bold opacity-60 uppercase">Ubah Status ke Preparing</span>
+                             </button>
+                        </div>
+                      )}
 
                       {prescription.dispenseStatus === 'preparing' && (
                         <div className="space-y-4">
@@ -453,30 +434,15 @@ export default function PharmacyDetailPage({ params }: { params: Promise<{ id: s
                               </div>
                            </div>
                            
-                           {(() => {
-                             const isPaid = prescription.medicalRecord?.registration?.invoices?.some((inv: any) => inv.status === 'paid');
-                             
-                             return (
-                               <>
-                                 {!isPaid && (
-                                   <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 animate-pulse">
-                                     <Banknote className="w-5 h-5 text-rose-500" />
-                                     <p className="text-[10px] font-black text-rose-700 uppercase tracking-tight">Pembayaran Belum Lunas. Pasien harus ke kasir sebelum obat diserahkan.</p>
-                                   </div>
-                                 )}
-                                 
-                                 <button 
-                                   onClick={() => updateStatus('dispensed')} 
-                                   disabled={isSubmitting || !counselingGiven || !isPaid} 
-                                   className="w-full py-7 bg-emerald-600 text-white font-black rounded-[24px] shadow-xl shadow-emerald-200 hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:scale-100"
-                                 >
-                                    <PackageCheck className="w-6 h-6 mb-1" />
-                                    <span className="uppercase tracking-[0.2em] text-[11px]">SERAHKAN & POTONG STOK</span>
-                                    <span className="text-[9px] font-bold opacity-60 uppercase">{!isPaid ? 'MENUNGGU PEMBAYARAN KASIR' : 'Finalisasi Transaksi'}</span>
-                                 </button>
-                               </>
-                             );
-                           })()}
+                           <button 
+                             onClick={() => updateStatus('dispensed')} 
+                             disabled={isSubmitting || !counselingGiven} 
+                             className="w-full py-7 bg-emerald-600 text-white font-black rounded-[24px] shadow-xl shadow-emerald-200 hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:scale-100"
+                           >
+                              <PackageCheck className="w-6 h-6 mb-1" />
+                              <span className="uppercase tracking-[0.2em] text-[11px]">SERAHKAN & POTONG STOK</span>
+                              <span className="text-[9px] font-bold opacity-60 uppercase">Finalisasi Transaksi</span>
+                           </button>
 
                            <button onClick={() => setShowCancelConfirm(true)} disabled={isSubmitting} className="w-full py-3 bg-white text-rose-500 border border-rose-100 font-black rounded-[20px] transition-all uppercase tracking-widest text-[10px] hover:bg-rose-50 shadow-sm active:scale-95 flex items-center justify-center gap-2">
                               Batalkan Siap & Kembalikan ke Antrian

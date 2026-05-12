@@ -16,7 +16,8 @@ const ROLES = [
   'FARMASI',
   'ACCOUNTING',
   'LOGISTIC',
-  'STAFF'
+  'STAFF',
+  'NURSE'
 ]
 
 // Fetch descriptive name for module from Sidebar mapping

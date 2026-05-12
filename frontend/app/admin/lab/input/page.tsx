@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import api from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -28,6 +28,7 @@ type LabResultItem = {
   normalRange: string;
   isCritical: boolean;
   notes: string;
+  category: string;
 }
 
 export default function LabInputPage() {
@@ -105,6 +106,7 @@ export default function LabInputPage() {
         setResults(data.results.map((r: any) => ({
           testMasterId: r.testMasterId,
           testName: r.testMaster?.name || '',
+          category: r.testMaster?.category || 'Umum',
           resultValue: r.resultValue,
           unit: r.testMaster?.unit || '',
           normalRange: r.testMaster?.normalRangeText || '',
@@ -362,6 +364,7 @@ export default function LabInputPage() {
     setResults([...results, {
       testMasterId: master.id,
       testName: master.name,
+      category: master.category || 'Umum',
       resultValue: '',
       unit: master.unit || '',
       normalRange: master.normalRangeText || '',
@@ -689,38 +692,55 @@ export default function LabInputPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.map((r, idx) => (
-                      <tr key={idx} className="border-b border-slate-50/50 group">
-                        <td className="py-6 px-4">
-                          <p className="text-sm font-black text-slate-800 uppercase">{r.testName}</p>
-                        </td>
-                        <td className="py-6 px-4">
-                          <input 
-                            value={r.resultValue} 
-                            disabled={isReadOnly}
-                            onChange={(e) => {
-                              const n = [...results]; 
-                              n[idx].resultValue = e.target.value;
-                              setResults(n);
-                            }}
-                            className={`w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-75 disabled:bg-slate-100/50 ${r.isCritical ? 'text-rose-500' : ''}`} 
-                            placeholder="..." 
-                          />
-                        </td>
-                        <td className="py-6 px-4">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{r.unit || '-'}</span>
-                        </td>
-                        <td className="py-6 px-4">
-                          <span className="text-[10px] font-bold text-slate-500 italic">{r.normalRange || '-'}</span>
-                        </td>
-                        <td className="py-6 px-4">
-                          {!isReadOnly && (
-                            <button onClick={() => setResults(results.filter((_, i) => i !== idx))} className="p-2 text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
-                              <FiTrash2 />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
+                    {Object.entries(results.reduce((acc, curr) => {
+                      if (!acc[curr.category]) acc[curr.category] = []
+                      acc[curr.category].push(curr)
+                      return acc
+                    }, {} as Record<string, typeof results>)).map(([category, items]) => (
+                      <React.Fragment key={category}>
+                        <tr>
+                          <td colSpan={5} className="py-4 px-4 bg-slate-50/50">
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{category}</span>
+                          </td>
+                        </tr>
+                        {items.map((r, itemIdx) => {
+                          // Find original index to update the state correctly
+                          const idx = results.findIndex(res => res.testMasterId === r.testMasterId);
+                          return (
+                            <tr key={idx} className="border-b border-slate-50/50 group">
+                              <td className="py-6 px-4 pl-8">
+                                <p className="text-sm font-black text-slate-800 uppercase">{r.testName}</p>
+                              </td>
+                              <td className="py-6 px-4">
+                                <input 
+                                  value={r.resultValue} 
+                                  disabled={isReadOnly}
+                                  onChange={(e) => {
+                                    const n = [...results]; 
+                                    n[idx].resultValue = e.target.value;
+                                    setResults(n);
+                                  }}
+                                  className={`w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-75 disabled:bg-slate-100/50 ${r.isCritical ? 'text-rose-500' : ''}`} 
+                                  placeholder="..." 
+                                />
+                              </td>
+                              <td className="py-6 px-4">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{r.unit || '-'}</span>
+                              </td>
+                              <td className="py-6 px-4">
+                                <span className="text-[10px] font-bold text-slate-500 italic">{r.normalRange || '-'}</span>
+                              </td>
+                              <td className="py-6 px-4">
+                                {!isReadOnly && (
+                                  <button onClick={() => setResults(results.filter((_, i) => i !== idx))} className="p-2 text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                                    <FiTrash2 />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
