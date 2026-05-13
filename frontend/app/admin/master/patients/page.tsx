@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import api from '@/lib/api'
-import { FiUsers, FiAlertCircle, FiRefreshCw, FiPhone, FiMapPin, FiCalendar, FiUser, FiInfo, FiPlus, FiActivity, FiLock } from 'react-icons/fi'
+import { FiUsers, FiAlertCircle, FiRefreshCw, FiPhone, FiMapPin, FiCalendar, FiUser, FiInfo, FiPlus, FiActivity, FiLock, FiShield } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 import DataTable, { Column } from '@/components/admin/master/DataTable'
 import PageHeader from '@/components/admin/master/PageHeader'
@@ -153,31 +153,26 @@ export default function PatientsPage() {
         {r.bloodType}
       </span>
     )},
-    { key: 'bpjsNumber', label: 'Asuransi', render: (r) => (
-      <div className="flex flex-col">
+    { key: 'bpjsNumber', label: 'Jaminan / Asuransi', render: (r) => (
+      <div className="flex flex-col gap-1.5">
         {r.bpjsNumber ? (
-           <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md w-fit">BPJS: {r.bpjsNumber}</span>
+           <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md w-fit">BPJS: {r.bpjsNumber}</span>
+           </div>
         ) : r.insuranceName ? (
-           <span className="text-[10px] font-black text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md w-fit">{r.insuranceName}</span>
+           <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+              <span className="text-[10px] font-black text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md w-fit">{r.insuranceName}</span>
+           </div>
         ) : (
-           <span className="text-[10px] font-bold text-gray-300">UMUM / CASH</span>
+           <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">UMUM / CASH</span>
         )}
       </div>
     )},
     { key: 'isActive', label: 'Status', render: (r) => <StatusBadge active={r.isActive} /> },
   ]
 
-  const inp = (label: string, key: string, type = 'text', placeholder = '') => (
-    <div>
-      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
-      <input 
-        type={type} value={(form as any)[key] ?? ''} 
-        onChange={(e) => setForm(p => ({...p, [key]: e.target.value}))} 
-        placeholder={placeholder}
-        className="w-full px-4 py-2.5 text-sm border border-gray-100 bg-gray-50/30 rounded-2xl focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all font-bold placeholder:text-gray-300 text-gray-700" 
-      />
-    </div>
-  )
 
   if (!isAllowed) {
     return (
@@ -208,105 +203,236 @@ export default function PatientsPage() {
         emptyText="Belum ada data pasien terdaftar."
       />
 
-      <MasterModal isOpen={modalOpen} onClose={() => setModalOpen(false)}
-        title={editing ? 'Edit Data Pasien' : 'Registrasi Pasien Baru'} size="lg">
-        <div className="space-y-6">
-          {error && <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-medium text-red-700"><FiAlertCircle className="w-4 h-4 flex-shrink-0" />{error}</motion.div>}
+      <MasterModal 
+        isOpen={modalOpen} 
+        onClose={() => setModalOpen(false)}
+        title={editing ? 'Edit Data Pasien' : 'Registrasi Pasien Baru'} 
+        subtitle={editing ? `ID Rekam Medis: ${editing.medicalRecordNo}` : 'Lengkapi informasi identitas dan kontak pasien secara lengkap.'}
+        size="3xl"
+      >
+        <div className="py-2 space-y-8">
+          {error && (
+            <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-md text-sm font-medium text-red-600">
+              <FiAlertCircle className="w-4 h-4 shrink-0" />
+              {error}
+            </div>
+          )}
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Identity Group */}
-            <div className="md:col-span-3 pb-2 border-b border-gray-50 flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-primary rounded-full" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900">Identitas Utama</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            {/* Left Section: Personal & Contact */}
+            <div className="lg:col-span-7 space-y-8">
+              
+              {/* Identity Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <FiUser className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-sm font-semibold text-slate-900">Identitas Pasien</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-1">
+                    <label className="text-[11px] font-medium text-slate-500 flex justify-between items-center">
+                      <span>No. Rekam Medis *</span>
+                      <button type="button" onClick={fetchNextMR} className="text-primary hover:underline flex items-center gap-1 text-[10px] font-semibold">
+                        <FiRefreshCw className="w-2.5 h-2.5" /> Auto
+                      </button>
+                    </label>
+                    <input 
+                      value={form.medicalRecordNo || ''} 
+                      onChange={(e) => setForm(p => ({...p, medicalRecordNo: e.target.value}))}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all font-mono font-medium" 
+                      placeholder="RM-XXXX-XXXX"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[11px] font-medium text-slate-500">Nama Lengkap Pasien *</label>
+                    <input 
+                      type="text" 
+                      value={form.name || ''} 
+                      onChange={(e) => setForm(p => ({...p, name: e.target.value}))} 
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" 
+                      placeholder="Contoh: Budi Santoso"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500">Jenis Kelamin</label>
+                    <div className="flex gap-1 p-1 bg-slate-50 rounded-md border border-slate-200">
+                      {['M', 'F'].map(g => (
+                        <button 
+                          key={g} type="button" 
+                          onClick={() => setForm(p => ({ ...p, gender: g }))}
+                          className={`flex-1 py-1.5 rounded text-xs font-medium transition-all ${form.gender === g ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          {g === 'M' ? 'Laki-laki' : 'Perempuan'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500">Tanggal Lahir</label>
+                    <input 
+                      type="date" 
+                      value={form.dateOfBirth || ''} 
+                      onChange={(e) => setForm(p => ({...p, dateOfBirth: e.target.value}))}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact & Address Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <FiMapPin className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-sm font-semibold text-slate-900">Kontak & Alamat</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500">No. WhatsApp Aktif *</label>
+                    <input 
+                      type="tel" 
+                      value={form.phone || ''} 
+                      onChange={(e) => setForm(p => ({...p, phone: e.target.value}))}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" 
+                      placeholder="0812XXXXXXXX"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500">Email (Opsional)</label>
+                    <input 
+                      type="email" 
+                      value={form.email || ''} 
+                      onChange={(e) => setForm(p => ({...p, email: e.target.value}))}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" 
+                      placeholder="pasien@email.com"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[11px] font-medium text-slate-500">Alamat Lengkap</label>
+                    <textarea 
+                      value={form.address || ''} 
+                      onChange={(e) => setForm(p => ({...p, address: e.target.value}))} 
+                      rows={2}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all resize-none" 
+                      placeholder="Jalan, Blok, No Rumah..." 
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex justify-between items-center">
-                <span>No. Rekam Medis *</span>
-                <button type="button" onClick={fetchNextMR} className="text-primary hover:text-primary-dark transition-colors flex items-center gap-1">
-                  <FiRefreshCw className="w-3 h-3" />
-                  <span className="text-[9px] font-black uppercase">Gen</span>
-                </button>
-              </label>
-              <input value={form.medicalRecordNo || ''} onChange={(e) => setForm(p => ({...p, medicalRecordNo: e.target.value}))}
-                placeholder="RM-20240409-0001" className="w-full px-4 py-2.5 text-sm border border-gray-100 bg-gray-50/30 rounded-2xl focus:outline-none focus:border-primary font-black font-mono text-primary" />
+            {/* Right Section: Medical & Emergency */}
+            <div className="lg:col-span-5 space-y-6">
+              
+              {/* Medical Information */}
+              <div className="p-5 border border-slate-200 rounded-lg bg-slate-50/30 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FiActivity className="w-4 h-4 text-slate-400" />
+                  <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Informasi Medis</h4>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500 block">Golongan Darah</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['-', 'A', 'B', 'AB', 'O'].map(t => (
+                        <button 
+                          key={t} type="button" 
+                          onClick={() => setForm(p => ({...p, bloodType: t}))}
+                          className={`w-9 h-8 flex items-center justify-center rounded border text-xs font-medium transition-all ${form.bloodType === t ? 'bg-primary border-primary text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500 block">Catatan Alergi</label>
+                    <textarea 
+                      value={form.allergies || ''} 
+                      onChange={(e) => setForm(p => ({...p, allergies: e.target.value}))} 
+                      rows={2}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all resize-none" 
+                      placeholder="Sebutkan alergi (jika ada)..." 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Insurance Section */}
+              <div className="p-5 border border-slate-200 rounded-lg bg-slate-50/30 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FiShield className="w-4 h-4 text-slate-400" />
+                  <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Jaminan & Asuransi</h4>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-slate-500 block">No. Kartu BPJS</label>
+                    <input 
+                      type="text" 
+                      value={form.bpjsNumber || ''} 
+                      onChange={(e) => setForm(p => ({...p, bpjsNumber: e.target.value}))} 
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" 
+                      placeholder="0001XXXXXXXXX"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-slate-500 block">Nama Asuransi Lain</label>
+                    <input 
+                      type="text" 
+                      value={form.insuranceName || ''} 
+                      onChange={(e) => setForm(p => ({...p, insuranceName: e.target.value}))} 
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" 
+                      placeholder="Nama Asuransi..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="p-1 space-y-3">
+                 <div className="space-y-3">
+                    <div className="group space-y-1.5">
+                       <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider ml-1">Kontak Darurat (Nama KK)</label>
+                       <input value={form.emergencyContact || ''} onChange={(e) => setForm(p => ({...p, emergencyContact: e.target.value}))} placeholder="Nama Keluarga..." className="w-full px-3 py-2 text-xs border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" />
+                    </div>
+                    <div className="group space-y-1.5">
+                       <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider ml-1">No. HP Darurat</label>
+                       <input value={form.emergencyPhone || ''} onChange={(e) => setForm(p => ({...p, emergencyPhone: e.target.value}))} placeholder="08xxxxxxxx" className="w-full px-3 py-2 text-xs border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all" />
+                    </div>
+                 </div>
+              </div>
             </div>
-
-            <div className="md:col-span-2">{inp('Nama Lengkap Pasien *', 'name', 'text', 'Sesuai KTP')}</div>
-
-            <div>
-               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Jenis Kelamin</label>
-               <div className="grid grid-cols-2 gap-2">
-                  {['M', 'F'].map(g => (
-                    <button 
-                      key={g} type="button" 
-                      onClick={() => setForm(p => ({ ...p, gender: g }))}
-                      className={`py-2.5 rounded-2xl border text-[10px] font-black transition-all ${form.gender === g ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'bg-gray-50 border-gray-100 text-gray-400 hover:bg-gray-100'}`}
-                    >
-                      {g === 'M' ? 'LAKI-LAKI' : 'PEREMPUAN'}
-                    </button>
-                  ))}
-               </div>
-            </div>
-
-            {inp('Tanggal Lahir', 'dateOfBirth', 'date')}
-            
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Golongan Darah</label>
-              <select value={form.bloodType || ''} onChange={(e) => setForm(p => ({...p, bloodType: e.target.value}))}
-                className="w-full px-4 py-2.5 text-sm border border-gray-100 bg-gray-50/30 rounded-2xl focus:outline-none focus:border-primary font-black text-gray-700">
-                {['-', 'A', 'B', 'AB', 'O'].map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-
-            {/* Contact Group */}
-            <div className="md:col-span-3 pb-2 border-b border-gray-50 mt-4 flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-primary rounded-full" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900">Kontak & Alamat</h4>
-            </div>
-
-            {inp('No. Handphone (WhatsApp) *', 'phone', 'tel', '0812xxxx')}
-            {inp('Email (Opsional)', 'email', 'email', 'pasien@mail.com')}
-            
-            <div className="md:col-span-2">
-               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Alamat Domisili</label>
-               <textarea value={form.address || ''} onChange={(e) => setForm(p => ({...p, address: e.target.value}))} rows={2}
-                 className="w-full px-4 py-3 text-sm border border-gray-100 bg-gray-50/30 rounded-2xl focus:outline-none focus:border-primary font-bold placeholder:text-gray-300 text-gray-700 resize-none" placeholder="Alamat lengkap..." />
-            </div>
-
-            {inp('Kota/Kab', 'city')}
-            {inp('Provinsi', 'province')}
-
-            {/* Medical Info Group */}
-            <div className="md:col-span-3 pb-2 border-b border-gray-50 mt-4 flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-rose-500 rounded-full" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500">Informasi Medis & Darurat</h4>
-            </div>
-
-            <div className="md:col-span-3">
-               <label className="block text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1.5 flex items-center gap-2"><FiActivity className="w-3 h-3" /> Riwayat Alergi</label>
-               <textarea value={form.allergies || ''} onChange={(e) => setForm(p => ({...p, allergies: e.target.value}))} rows={2}
-                 className="w-full px-4 py-3 text-sm border border-rose-100 bg-rose-50/10 rounded-2xl focus:outline-none focus:border-rose-400 font-bold placeholder:text-gray-300 text-gray-700 resize-none" placeholder="Sebutkan alergi obat, makanan, dll (Jika ada)..." />
-            </div>
-
-            {inp('Kontak Darurat', 'emergencyContact', 'text', 'Nama Keluarga')}
-            {inp('No. HP Darurat', 'emergencyPhone', 'tel', '08xxxx')}
-            
-            {/* Insurance Group */}
-            <div className="md:col-span-3 pb-2 border-b border-gray-50 mt-4 flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-emerald-500 rounded-full" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Jaminan Kesehatan / Asuransi</h4>
-            </div>
-
-            {inp('No. Kartu BPJS', 'bpjsNumber', 'text', '000xxxxxxxx')}
-            <div className="md:col-span-2">{inp('Nama Asuransi Lainnya', 'insuranceName', 'text', 'cth: Prudential, Allianz (Kosongkan jika hanya BPJS)')}</div>
-
           </div>
 
-          <div className="flex gap-4 pt-6 mt-4 border-t border-gray-100">
-            <button type="button" onClick={() => setModalOpen(false)} className="flex-1 py-3.5 border border-gray-100 rounded-2xl text-[11px] font-black text-gray-400 tracking-widest uppercase hover:bg-gray-50 transition-all active:scale-95">Batal</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-3.5 bg-primary text-white rounded-2xl text-[11px] font-black tracking-widest uppercase shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95">
-                {saving ? 'SEDANG MENULIS DATA...' : (editing ? 'PERBARUI DATA PASIEN' : 'REGISTRASI PASIEN')}
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-100">
+            <button 
+              type="button" 
+              onClick={() => setModalOpen(false)} 
+              className="px-6 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all active:scale-95"
+            >
+              Batal
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saving} 
+              className="px-8 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <FiRefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>{editing ? 'Perbarui Data' : 'Simpan Pasien'}</>
+              )}
             </button>
           </div>
         </div>
