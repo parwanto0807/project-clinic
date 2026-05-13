@@ -81,8 +81,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+// Serve static files - Use process.cwd() to consistently find public folder from root
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
 // Routes
 app.use('/api/settings', siteSettingRoutes);
