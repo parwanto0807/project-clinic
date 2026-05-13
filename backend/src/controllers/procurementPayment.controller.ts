@@ -188,7 +188,7 @@ export const payProcurement = async (req: Request, res: Response) => {
   } catch (err: any) {
     // Hapus file yang sudah terupload jika transaksi gagal
     if (req.file) {
-      const filePath = path.join(__dirname, '../../public/uploads/procurement', req.file.filename)
+      const filePath = path.join(process.cwd(), 'public/uploads/procurement', req.file.filename)
       fs.unlink(filePath, () => {})
     }
     console.error('[ProcurementPayment] payProcurement error:', err)
@@ -424,7 +424,7 @@ export const receiveCash = async (req: Request, res: Response) => {
     })
   } catch (err: any) {
     if (req.file) {
-      const filePath = path.join(__dirname, '../../public/uploads/procurement', req.file.filename)
+      const filePath = path.join(process.cwd(), 'public/uploads/procurement', req.file.filename)
       fs.unlink(filePath, () => {})
     }
     console.error('[ProcurementPayment] receiveCash error:', err)

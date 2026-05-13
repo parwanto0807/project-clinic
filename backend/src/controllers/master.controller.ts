@@ -391,7 +391,7 @@ export const getDoctors = async (req: Request, res: Response) => {
 // Helper to process and save doctor photo as WebP
 const processDoctorPhoto = async (file: Express.Multer.File): Promise<string> => {
   const fileName = `doctor-${Date.now()}.webp`
-  const uploadDir = path.join(__dirname, '../../public/uploads/doctors')
+  const uploadDir = path.join(process.cwd(), 'public/uploads/doctors')
   
   // Ensure directory exists
   await fs.mkdir(uploadDir, { recursive: true })
@@ -721,7 +721,7 @@ export const deleteServiceCategory = async (req: Request, res: Response) => {
 // Helper to process and save medicine photo as WebP
 const processMedicinePhoto = async (file: Express.Multer.File): Promise<string> => {
   const fileName = `medicine-${Date.now()}.webp`
-  const uploadDir = path.join(__dirname, '../../public/uploads/medicines')
+  const uploadDir = path.join(process.cwd(), 'public/uploads/medicines')
   
   // Ensure directory exists
   await fs.mkdir(uploadDir, { recursive: true })
@@ -1372,7 +1372,7 @@ async function resolveAssetCOA(assetType: string, clinicId: string) {
 // Helper to process and save asset photo as WebP
 const processAssetPhoto = async (file: Express.Multer.File): Promise<string> => {
   const fileName = `asset-${Date.now()}.webp`
-  const uploadDir = path.join(__dirname, '../../public/uploads/assets')
+  const uploadDir = path.join(process.cwd(), 'public/uploads/assets')
   
   // Ensure directory exists
   await fs.mkdir(uploadDir, { recursive: true })
@@ -1658,7 +1658,7 @@ export const getInventoryProducts = async (req: Request, res: Response) => {
 // Helper for inventory product image processing
 const processProductPhoto = async (file: Express.Multer.File): Promise<string> => {
   const fileName = `product-${Date.now()}.webp`
-  const uploadDir = path.join(__dirname, '../../public/uploads/products')
+  const uploadDir = path.join(process.cwd(), 'public/uploads/products')
   await fs.mkdir(uploadDir, { recursive: true })
   const filePath = path.join(uploadDir, fileName)
   await sharp(file.buffer).resize(500, 500, { fit: 'cover' }).webp({ quality: 80 }).toFile(filePath)

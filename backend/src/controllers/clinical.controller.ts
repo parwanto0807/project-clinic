@@ -106,7 +106,7 @@ export const uploadAttachment = async (req: Request, res: Response) => {
     }
 
     const fileName = `${Date.now()}-${req.file.originalname}`
-    const uploadDir = path.join(__dirname, '../../public/uploads/records')
+    const uploadDir = path.join(process.cwd(), 'public/uploads/records')
     await fs.mkdir(uploadDir, { recursive: true })
     
     const filePath = path.join(uploadDir, fileName)
@@ -144,7 +144,7 @@ export const deleteAttachment = async (req: Request, res: Response) => {
     try {
       if (attachment.fileUrl.startsWith('/uploads/records/')) {
         const fileName = attachment.fileUrl.replace('/uploads/records/', '')
-        const filePath = path.join(__dirname, '../../public/uploads/records', fileName)
+        const filePath = path.join(process.cwd(), 'public/uploads/records', fileName)
         await fs.unlink(filePath)
       }
     } catch (fsError) {

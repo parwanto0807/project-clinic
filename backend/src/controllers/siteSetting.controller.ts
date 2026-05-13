@@ -69,7 +69,7 @@ export class SiteSettingController {
       // Physically delete the file
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, '../../public/uploads/videos', filename);
+      const filePath = path.join(process.cwd(), 'public/uploads/videos', filename);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
@@ -91,7 +91,7 @@ export class SiteSettingController {
       const path = require('path');
       
       const fileName = `website-${Date.now()}${path.extname(req.file.originalname)}`;
-      const uploadDir = path.join(__dirname, '../../public/uploads/website');
+      const uploadDir = path.join(process.cwd(), 'public/uploads/website');
       
       // Ensure directory exists
       if (!fs.existsSync(uploadDir)) {

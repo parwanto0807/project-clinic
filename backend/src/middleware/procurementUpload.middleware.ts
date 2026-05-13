@@ -7,7 +7,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 
-const uploadDir = path.join(__dirname, '../../public/uploads/procurement')
+const uploadDir = path.join(process.cwd(), 'public/uploads/procurement')
 
 // Pastikan direktori ada
 if (!fs.existsSync(uploadDir)) {
