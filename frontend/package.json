@@ -4,9 +4,9 @@
   "description": "Frontend for Clinic Management System",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' next dev -p 3004",
+    "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' next dev -p 3006",
     "build": "cross-env NODE_OPTIONS='--max-old-space-size=4096' next build",
-    "start": "next start -p 3004",
+    "start": "next start -p 3006",
     "lint": "next lint",
     "clean": "powershell -Command \"if (Test-Path .next) { Remove-Item -Recurse -Force .next }\""
   },

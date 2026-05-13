@@ -41,8 +41,6 @@ export default function RootLayout({
         />
         {/* Anti-flicker: runs synchronously before paint to apply stored theme */}
         <link rel="icon" href="/favicon.ico" />
-        <link rel="preconnect" href="http://localhost:5004" />
-        <link rel="dns-prefetch" href="http://localhost:5004" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
