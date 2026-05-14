@@ -103,7 +103,7 @@ export const announceQueue = (
   }
 
   utterance.lang = 'id-ID';
-  utterance.rate = 2; // Fast and snappy
+  utterance.rate = 0.9; // More natural and clear for announcements
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
 
