@@ -95,38 +95,38 @@ model User {
 }
 
 model Patient {
-  id               String          @id @default(uuid())
-  medicalRecordNo  String          @unique
-  name             String
-  email            String?
-  phone            String
-  address          String?
-  city             String?
-  province         String?
-  zipCode          String?
-  dateOfBirth      DateTime?
-  gender           String?
-  bloodType        String?
-  identityType     String?
-  identityNumber   String?
-  emergencyContact String?
-  emergencyPhone   String?
-  allergies        String?
+  id                 String          @id @default(uuid())
+  medicalRecordNo    String          @unique
+  name               String
+  email              String?
+  phone              String
+  address            String?
+  city               String?
+  province           String?
+  zipCode            String?
+  dateOfBirth        DateTime?
+  gender             String?
+  bloodType          String?
+  identityType       String?
+  identityNumber     String?
+  emergencyContact   String?
+  emergencyPhone     String?
+  allergies          String?
   oldMedicalRecordNo String?         @unique
-  familyHeadName      String?
-  age                 Float?
-  isActive            Boolean         @default(true)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  bpjsNumber       String?
-  insuranceName    String?
-  appointments     Appointment[]
-  invoices         Invoice[]
-  labOrders        LabOrder[]
-  medicalRecords   MedicalRecord[]
-  prescriptions    Prescription[]
-  queueNumbers     QueueNumber[]
-  registrations    Registration[]
+  familyHeadName     String?
+  age                Float?
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  bpjsNumber         String?
+  insuranceName      String?
+  appointments       Appointment[]
+  invoices           Invoice[]
+  labOrders          LabOrder[]
+  medicalRecords     MedicalRecord[]
+  prescriptions      Prescription[]
+  queueNumbers       QueueNumber[]
+  registrations      Registration[]
 
   @@index([medicalRecordNo])
   @@index([phone])
@@ -162,30 +162,30 @@ model Registration {
 }
 
 model Doctor {
-  id                 String           @id @default(uuid())
-  userId             String           @unique
-  licenseNumber      String           @unique
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  licenseNumber      String             @unique
   name               String
-  email              String?          @unique
+  email              String?            @unique
   phone              String
   specialization     String
   bio                String?
   profilePicture     String?
   yearsOfExperience  Int?
-  isActive           Boolean          @default(true)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   queueCode          String?
   appointments       Appointment[]
-  managedDepartments Department[]     @relation("DeptHead")
+  managedDepartments Department[]       @relation("DeptHead")
   schedules          DoctorSchedule[]
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   labOrders          LabOrder[]
   medicalRecords     MedicalRecord[]
   prescriptions      Prescription[]
-  queueNumbers       QueueNumber[]    @relation("QueueDoctor")
+  queueNumbers       QueueNumber[]      @relation("QueueDoctor")
   registrations      Registration[]
-  departments        Department[]     @relation("DoctorAllDepts")
+  departments        Department[]       @relation("DoctorAllDepts")
   commissions        DoctorCommission[]
 
   @@index([specialization])
@@ -612,37 +612,37 @@ model AppointmentService {
 }
 
 model ProductMaster {
-  id                String           @id @default(uuid())
-  masterCode        String           @unique
-  masterName        String
-  description       String?
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  medicineId        String?          @unique
-  categoryId        String?
-  image             String?
-  brand             String?
-  productType       String?
-  defaultUnit       String?          @default("pcs")
-  manufacturer      String?
-  minStock          Int?             @default(0)
-  purchasePrice     Float?           @default(0)
-  reorderPoint      Int?             @default(0)
-  sellingPrice      Float?           @default(0)
-  purchaseUnit      String?          @default("box")
-  sku               String?          @unique
-  storageUnit       String?          @default("pcs")
-  supplier          String?
-  usedUnit          String?          @default("pcs")
+  id                 String           @id @default(uuid())
+  masterCode         String           @unique
+  masterName         String
+  description        String?
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  medicineId         String?          @unique
+  categoryId         String?
+  image              String?
+  brand              String?
+  productType        String?
+  defaultUnit        String?          @default("pcs")
+  manufacturer       String?
+  minStock           Int?             @default(0)
+  purchasePrice      Float?           @default(0)
+  reorderPoint       Int?             @default(0)
+  sellingPrice       Float?           @default(0)
+  purchaseUnit       String?          @default("box")
+  sku                String?          @unique
+  storageUnit        String?          @default("pcs")
+  supplier           String?
+  usedUnit           String?          @default("pcs")
   qtyPerPurchaseUnit Float?           @default(1)
   qtyPerStorageUnit  Float?           @default(1)
-  compoundFormulaId String?          @unique
-  assets            Asset[]
-  productCategory   ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  compoundFormula   CompoundFormula? @relation(fields: [compoundFormulaId], references: [id])
-  medicine          Medicine?        @relation(fields: [medicineId], references: [id])
-  products          Product[]
+  compoundFormulaId  String?          @unique
+  assets             Asset[]
+  productCategory    ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  compoundFormula    CompoundFormula? @relation(fields: [compoundFormulaId], references: [id])
+  medicine           Medicine?        @relation(fields: [medicineId], references: [id])
+  products           Product[]
 
   @@index([masterCode])
   @@index([categoryId])
@@ -673,9 +673,9 @@ model Product {
   purchaseUnit       String
   storageUnit        String
   usedUnit           String
-  qtyPerPurchaseUnit  Float?           @default(1)
-  qtyPerStorageUnit   Float?           @default(1)
-  quantity           Float            @default(0)
+  qtyPerPurchaseUnit Float?                  @default(1)
+  qtyPerStorageUnit  Float?                  @default(1)
+  quantity           Float                   @default(0)
   minimumStock       Int
   reorderQuantity    Int
   purchasePrice      Float
@@ -851,31 +851,31 @@ model AssetInsurance {
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  invoiceNo      String        @unique
+  id             String             @id @default(uuid())
+  invoiceNo      String             @unique
   appointmentId  String?
   patientId      String
   invoiceDate    DateTime
   dueDate        DateTime?
-  subtotal       Float         @default(0)
-  discount       Float         @default(0)
-  tax            Float         @default(0)
+  subtotal       Float              @default(0)
+  discount       Float              @default(0)
+  tax            Float              @default(0)
   total          Float
-  amountPaid     Float         @default(0)
-  status         String        @default("unpaid")
+  amountPaid     Float              @default(0)
+  status         String             @default("unpaid")
   notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   clinicId       String?
-  isPosted       Boolean       @default(false)
+  isPosted       Boolean            @default(false)
   postedAt       DateTime?
   bankId         String?
   registrationId String?
   items          InvoiceItem[]
-  bank           Bank?         @relation(fields: [bankId], references: [id])
-  clinic         Clinic?       @relation(fields: [clinicId], references: [id])
-  patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  registration   Registration? @relation(fields: [registrationId], references: [id])
+  bank           Bank?              @relation(fields: [bankId], references: [id])
+  clinic         Clinic?            @relation(fields: [clinicId], references: [id])
+  patient        Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  registration   Registration?      @relation(fields: [registrationId], references: [id])
   payments       Payment[]
   commissions    DoctorCommission[]
 
@@ -1409,23 +1409,23 @@ model ChartOfAccount {
 }
 
 model CashTransfer {
-  id               String         @id @default(uuid())
-  transferNo       String         @unique
-  date             DateTime
-  fromCoaId        String
-  toCoaId          String
-  amount           Float
-  description      String?
-  status           String         @default("DRAFT") // DRAFT, POSTED
-  journalEntryId   String?        @unique
-  clinicId         String
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  
-  fromCoa          ChartOfAccount @relation("FromCoa", fields: [fromCoaId], references: [id])
-  toCoa            ChartOfAccount @relation("ToCoa", fields: [toCoaId], references: [id])
-  journalEntry     JournalEntry?  @relation(fields: [journalEntryId], references: [id])
-  clinic           Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  transferNo     String   @unique
+  date           DateTime
+  fromCoaId      String
+  toCoaId        String
+  amount         Float
+  description    String?
+  status         String   @default("DRAFT") // DRAFT, POSTED
+  journalEntryId String?  @unique
+  clinicId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  fromCoa      ChartOfAccount @relation("FromCoa", fields: [fromCoaId], references: [id])
+  toCoa        ChartOfAccount @relation("ToCoa", fields: [toCoaId], references: [id])
+  journalEntry JournalEntry?  @relation(fields: [journalEntryId], references: [id])
+  clinic       Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
   @@map("cash_transfers")
 }
@@ -1450,16 +1450,16 @@ model Bank {
 }
 
 model JournalEntry {
-  id          String          @id @default(uuid())
-  date        DateTime
-  description String
-  referenceNo String?
-  entryType   String          @default("MANUAL")
-  clinicId    String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  details     JournalDetail[]
-  clinic      Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  id           String          @id @default(uuid())
+  date         DateTime
+  description  String
+  referenceNo  String?
+  entryType    String          @default("MANUAL")
+  clinicId     String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  details      JournalDetail[]
+  clinic       Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   cashTransfer CashTransfer?
 
   @@index([clinicId])
@@ -1563,23 +1563,23 @@ enum AccountType {
 }
 
 model DoctorCommission {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   doctorId    String
   clinicId    String
-  date        DateTime @default(now())
+  date        DateTime  @default(now())
   description String
   amount      Float
-  type        String   @default("MANUAL") // "INVOICE" or "MANUAL"
-  status      String   @default("unpaid") // "unpaid" or "paid"
+  type        String    @default("MANUAL") // "INVOICE" or "MANUAL"
+  status      String    @default("unpaid") // "unpaid" or "paid"
   paidAt      DateTime?
   invoiceId   String?
   sourceId    String? // Link to MedicalRecordService or other source
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  doctor      Doctor   @relation(fields: [doctorId], references: [id])
-  clinic      Clinic   @relation(fields: [clinicId], references: [id])
-  invoice     Invoice? @relation(fields: [invoiceId], references: [id])
+  doctor  Doctor   @relation(fields: [doctorId], references: [id])
+  clinic  Clinic   @relation(fields: [clinicId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
 
   @@index([doctorId])
   @@index([clinicId])

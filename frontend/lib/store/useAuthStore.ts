@@ -9,6 +9,8 @@ interface Clinic {
   name: string
   code: string
   address?: string
+  phone?: string
+  email?: string
   isMain?: boolean
 }
 

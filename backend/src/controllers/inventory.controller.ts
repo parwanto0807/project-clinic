@@ -745,12 +745,17 @@ export const bulkLoadInventory = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    // 1. Get all current stocks for this branch
-    const stocks = await prisma.inventoryStock.findMany({
-      where: { branchId },
-      include: { product: true, batch: true }
+    // 1. Get all products registered to this branch
+    const branchProducts = await prisma.product.findMany({
+      where: { clinicId: branchId },
+      include: { 
+        inventoryStocks: {
+          include: { batch: true }
+        }
+      }
     });
-    console.log(`[InventoryController] bulkLoadInventory: Found ${stocks.length} stock records in branch ${branchId}`);
+    
+    console.log(`[InventoryController] bulkLoadInventory: Found ${branchProducts.length} products in branch ${branchId}`);
 
     // 2. Identify items already in the session to avoid duplicates
     const existingItems = await prisma.stockOpnameItem.findMany({
@@ -758,28 +763,52 @@ export const bulkLoadInventory = async (req: Request, res: Response) => {
     });
     const existingKeys = new Set(existingItems.map(i => `${i.productId}-${i.batchId || 'null'}`));
 
-    // 3. Filter and prepare data for bulk creation
-    const newItemsData = stocks
-      .filter(s => !existingKeys.has(`${s.productId}-${s.batchId || 'null'}`))
-      .map(s => {
-        const unitPrice = s.batch?.purchasePrice || s.product.purchasePrice || 0;
-        return {
-          sessionId,
-          productId: s.productId,
-          batchId: s.batchId,
-          systemQty: s.onHandQty,
-          physicalQty: s.onHandQty,
-          diffQty: 0,
-          unitPrice,
-          subtotal: s.onHandQty * unitPrice,
-          status: 'DRAFT'
-        };
-      });
+    // 3. Flatten products and their stocks for opname
+    const newItemsData: any[] = [];
 
-    console.log(`[InventoryController] bulkLoadInventory: Adding ${newItemsData.length} new items to session`);
+    branchProducts.forEach(product => {
+      if (product.inventoryStocks.length > 0) {
+        // Load existing batches/stocks
+        product.inventoryStocks.forEach(s => {
+          const key = `${s.productId}-${s.batchId || 'null'}`;
+          if (!existingKeys.has(key)) {
+            const unitPrice = s.batch?.purchasePrice || product.purchasePrice || 0;
+            newItemsData.push({
+              sessionId,
+              productId: s.productId,
+              batchId: s.batchId,
+              systemQty: s.onHandQty,
+              physicalQty: s.onHandQty,
+              diffQty: 0,
+              unitPrice,
+              subtotal: s.onHandQty * unitPrice,
+              status: 'DRAFT'
+            });
+          }
+        });
+      } else {
+        // Load product even if no stock record exists (0 stock)
+        const key = `${product.id}-null`;
+        if (!existingKeys.has(key)) {
+          newItemsData.push({
+            sessionId,
+            productId: product.id,
+            batchId: null,
+            systemQty: 0,
+            physicalQty: 0,
+            diffQty: 0,
+            unitPrice: product.purchasePrice || 0,
+            subtotal: 0,
+            status: 'DRAFT'
+          });
+        }
+      }
+    });
+
+    console.log(`[InventoryController] bulkLoadInventory: Adding ${newItemsData.length} entries to session`);
 
     if (newItemsData.length > 0) {
-      await prisma.stockOpnameItem.createMany({ data: newItemsData as any });
+      await prisma.stockOpnameItem.createMany({ data: newItemsData });
     }
 
     // 4. Update session total value

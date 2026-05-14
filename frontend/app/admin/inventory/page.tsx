@@ -40,7 +40,12 @@ export default function InventoryDashboard() {
   const [stocks, setStocks] = useState<Stock[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'medicine' | 'asset'>('all')
+  
+  // Pagination State
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<any>(null)
   
   // Mutation Dialog State
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null)
@@ -51,14 +56,33 @@ export default function InventoryDashboard() {
     setIsMutationDialogOpen(true)
   }
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const fetchStocks = async () => {
     try {
       if (!activeClinicId) return
       setIsLoading(true)
       const res = await api.get('/inventory/stocks', {
-        params: { branchId: activeClinicId }
+        params: { 
+          branchId: activeClinicId,
+          page,
+          limit: 10,
+          search: debouncedSearch
+        }
       })
-      setStocks(res.data)
+      
+      // The API returns paginated data: { data: [], meta: {} }
+      if (res.data.meta) {
+        setStocks(res.data.data)
+        setMeta(res.data.meta)
+      } else {
+        setStocks(res.data)
+        setMeta(null)
+      }
     } catch (error) {
       console.error('Fetch error:', error)
       toast.error('Gagal mengambil data stok')
@@ -69,22 +93,26 @@ export default function InventoryDashboard() {
 
   useEffect(() => {
     fetchStocks()
-  }, [activeClinicId])
+  }, [activeClinicId, page, debouncedSearch])
 
-  const filteredStocks = stocks.filter(s => {
-    const matchesSearch = s.product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        s.product.productCode.toLowerCase().includes(searchTerm.toLowerCase())
-    if (filterType === 'all') return matchesSearch
-    if (filterType === 'medicine') return matchesSearch && s.product.isMedicine
-    if (filterType === 'asset') return matchesSearch && !s.product.isMedicine
-    return matchesSearch
-  })
+  // Reset to page 1 on search
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
 
   const lowStockItems = stocks.filter(s => (s.onHandQty || 0) <= (s.minStockAlert || 0))
   const totalAssetValue = stocks.reduce((sum, s) => {
     const price = s.batch?.purchasePrice || s.product?.purchasePrice || 0;
     return sum + ((s.onHandQty || 0) * price);
   }, 0)
+
+  // Client-side category filtering (The API currently doesn't filter by medicine/asset type)
+  const filteredStocks = stocks.filter(s => {
+    if (filterType === 'all') return true
+    if (filterType === 'medicine') return s.product.isMedicine
+    if (filterType === 'asset') return !s.product.isMedicine
+    return true
+  })
 
   return (
     <div className="p-3 md:p-6 lg:p-8 max-w-[1600px] mx-auto min-h-screen pb-32">
@@ -319,6 +347,62 @@ export default function InventoryDashboard() {
         onClose={() => setIsMutationDialogOpen(false)}
         stock={selectedStock}
       />
+
+      {/* Pagination Section */}
+      {meta && meta.totalPages > 1 && (
+        <div className="mt-10 flex flex-col md:flex-row items-center justify-between gap-6 px-6 py-6 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-200/50">
+          <div className="flex flex-col">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Status Navigasi</p>
+            <p className="text-xs font-bold text-gray-600">
+              Menampilkan <span className="text-primary font-black">{((page - 1) * 10) + 1}</span> - <span className="text-primary font-black">{Math.min(page * 10, meta.total)}</span> dari <span className="text-gray-900 font-black">{meta.total}</span> Item
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-5 py-2.5 rounded-2xl bg-gray-50 text-gray-400 font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-gray-50 transition-all border border-transparent hover:border-gray-200"
+            >
+              Kembali
+            </button>
+
+            <div className="flex items-center gap-1 mx-2">
+              {[...Array(meta.totalPages)].map((_, i) => {
+                const p = i + 1;
+                // Only show current, first, last and neighbors
+                if (p === 1 || p === meta.totalPages || (p >= page - 1 && p <= page + 1)) {
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-10 h-10 rounded-xl font-black text-xs transition-all ${
+                        page === p 
+                        ? 'bg-primary text-white shadow-lg shadow-primary/30 scale-110 z-10' 
+                        : 'text-gray-400 hover:bg-gray-50'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                }
+                if (p === page - 2 || p === page + 2) {
+                  return <span key={p} className="text-gray-300">••</span>;
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+              disabled={page === meta.totalPages}
+              className="px-5 py-2.5 rounded-2xl bg-primary text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100 transition-all"
+            >
+              Lanjut
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

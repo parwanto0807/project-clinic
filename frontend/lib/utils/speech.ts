@@ -64,38 +64,47 @@ export const announceQueue = (
     .replace(/^hj\.\s+/i, '');
 
   // Format Queue Number for better pronunciation (e.g., A-01 -> A, 0 1)
+  // Use "Nomor Antrean" (formal Indonesian) and add pauses with commas
   const formattedQueueNo = queueNo
     ? queueNo.split('').join(' ').replace(' - ', ', ')
     : '';
 
+  // Better phrasing with natural pauses
   const text = queueNo 
-    ? `Nomor antrian, ${formattedQueueNo}, atas nama ${cleanName}, silakan menuju ${room}.`
+    ? `Nomor antrean, ${formattedQueueNo}. Atas nama, ${cleanName}. Silakan menuju, ${room}.`
     : name;
   
   const utterance = new SpeechSynthesisUtterance(text);
   
-  // Try to find Indonesian voice
+  // 🎙️ IMPROVED VOICE SELECTION
   const loadVoices = () => {
     const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find(v => 
-      v.lang.startsWith('id') && 
-      (v.name.includes('Gadis') || v.name.includes('Andini') || v.name.toLowerCase().includes('female'))
-    ) || voices.find(v => v.lang.startsWith('id'));
     
-    if (idVoice) {
-      utterance.voice = idVoice;
+    // Priority: 
+    // 1. Google Indonesian (Best for Chrome)
+    // 2. Microsoft Natural/Online Indonesian (Best for Edge)
+    // 3. Known female Indonesian voices
+    // 4. Any Indonesian voice
+    const bestVoice = 
+      voices.find(v => v.lang.startsWith('id') && v.name.includes('Google')) ||
+      voices.find(v => v.lang.startsWith('id') && v.name.includes('Natural')) ||
+      voices.find(v => v.lang.startsWith('id') && (v.name.includes('Gadis') || v.name.includes('Andini') || v.name.toLowerCase().includes('female'))) ||
+      voices.find(v => v.lang.startsWith('id'));
+    
+    if (bestVoice) {
+      utterance.voice = bestVoice;
+      console.log(`[Speech] Using voice: ${bestVoice.name}`);
     }
   };
 
   loadVoices();
-  // If voices weren't loaded yet, try again when they change (though usually they are ready by now)
   if (window.speechSynthesis.onvoiceschanged !== undefined) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
   
   utterance.lang = 'id-ID';
-  utterance.rate = 0.95; 
-  utterance.pitch = 1.05; 
+  utterance.rate = 0.88; // Slightly slower for clarity
+  utterance.pitch = 1.0; // Natural pitch
   utterance.volume = 1.0;
   
   // Add to queue and process

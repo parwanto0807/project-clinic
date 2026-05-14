@@ -18,6 +18,8 @@ type LabOrder = {
   patient: { name: string; medicalRecordNo: string; dateOfBirth?: string; gender?: string };
   doctor: { name: string };
   attachments?: any[];
+  orderedTestsSummary?: string[]; // Tests ordered by the doctor
+  labNotesSummary?: string; // Doctor's lab notes/instructions
 }
 
 type LabResultItem = {
@@ -459,7 +461,7 @@ export default function LabInputPage() {
                   onClick={() => loadOrderDetails(order.id)}
                   className="bg-white border border-slate-200 rounded-[2rem] p-6 hover:shadow-xl hover:shadow-slate-200/50 hover:border-primary transition-all cursor-pointer group"
                 >
-                  <div className="flex justify-between items-start mb-6">
+                  <div className="flex justify-between items-start mb-4">
                     <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 font-black text-lg border border-rose-100 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all">
                       {order.orderNo.slice(-2)}
                     </div>
@@ -469,14 +471,43 @@ export default function LabInputPage() {
                     </span>
                   </div>
                   
-                  <div className="space-y-1 mb-6">
+                  <div className="space-y-1 mb-4">
                     <h3 className="text-base font-black text-slate-900 tracking-tight">{order.patient.name}</h3>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{order.patient.medicalRecordNo}</p>
                   </div>
 
-                  <div className="pt-6 border-t border-slate-50 flex flex-col gap-3">
+                  {/* Ordered Tests Preview */}
+                  {order.orderedTestsSummary && order.orderedTestsSummary.length > 0 && (
+                    <div className="mb-4 p-3 bg-sky-50 rounded-2xl border border-sky-100">
+                      <p className="text-[8px] font-black text-sky-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <HiOutlineBeaker className="w-3 h-3" /> Pemeriksaan Diminta
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {order.orderedTestsSummary.slice(0, 3).map((t, i) => (
+                          <span key={i} className="px-2 py-1 bg-white border border-sky-200 text-sky-700 rounded-lg text-[9px] font-black uppercase">
+                            {t}
+                          </span>
+                        ))}
+                        {order.orderedTestsSummary.length > 3 && (
+                          <span className="px-2 py-1 bg-sky-100 text-sky-500 rounded-lg text-[9px] font-black uppercase">
+                            +{order.orderedTestsSummary.length - 3} lagi
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lab Notes Preview */}
+                  {order.labNotesSummary && (
+                    <div className="mb-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                      <p className="text-[8px] font-black text-amber-500 uppercase tracking-widest mb-1">Catatan Dokter</p>
+                      <p className="text-[10px] font-medium text-amber-800 line-clamp-2">{order.labNotesSummary}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-slate-50 flex flex-col gap-3">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <FiUser className="w-3 h-3" /> {order.doctor.name}
+                      <FiUser className="w-3 h-3" /> dr. {order.doctor.name}
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       <HiOutlineBeaker className="w-3 h-3" /> {order.orderNo}
@@ -595,9 +626,9 @@ export default function LabInputPage() {
         </div>
       </div>
 
-      <div className="p-6 max-w-7xl mx-auto grid grid-cols-12 gap-8">
-        <div className="col-span-12 lg:col-span-8 space-y-8">
-          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm min-h-[600px]">
+      <div className="p-6 max-w-7xl mx-auto space-y-8">
+        {/* Main Results Panel — Full Width */}
+        <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm w-full">
             <div className="flex items-center justify-between mb-10 pb-6 border-b border-slate-50">
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Input Hasil Parameter</h3>
               {!isReadOnly && (
@@ -646,34 +677,134 @@ export default function LabInputPage() {
               )}
             </div>
 
-            {/* Requested Tests Section */}
-            {orderDetails?.medicalRecord && (
-              <div className="mb-10 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                   <FiClipboard /> Permintaan Dokter (Tindakan Lab)
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {/* From Final Services */}
-                  {orderDetails.medicalRecord.services?.filter((s: any) => 
-                    s.service?.serviceName?.toLowerCase().includes('lab') || 
-                    s.service?.serviceCategory?.categoryName?.toLowerCase().includes('lab')
-                  ).map((s: any) => (
-                    <span key={s.id} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 uppercase shadow-sm">
-                      {s.service?.serviceName}
-                    </span>
-                  ))}
-                  
-                  {/* From Draft Services if present */}
-                  {orderDetails.medicalRecord.consultationDraft?.services?.filter((s: any) => 
-                    s.isLab || s.name?.toLowerCase().includes('lab')
-                  ).map((s: any, idx: number) => (
-                    <span key={`draft-${s.serviceId}-${idx}`} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 uppercase shadow-sm border-dashed">
-                      {s.name} (Draft)
-                    </span>
-                  ))}
+            {/* Doctor Instructions Panel — shown when order is opened */}
+            {orderDetails && (
+              <div className="mb-8 rounded-[2rem] border border-sky-100 bg-gradient-to-br from-sky-50 to-indigo-50/30 overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-sky-100/60">
+                  <div className="w-8 h-8 bg-sky-500 rounded-xl flex items-center justify-center shrink-0">
+                    <FiClipboard className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Instruksi & Permintaan Dokter</p>
+                    <p className="text-[9px] font-bold text-sky-400 uppercase tracking-widest">dr. {orderDetails.doctor?.name}</p>
+                  </div>
+                </div>
 
-                  {(!orderDetails.medicalRecord.services?.length && !orderDetails.medicalRecord.consultationDraft?.services?.length) && (
-                    <p className="text-[10px] font-bold text-slate-300 italic uppercase">Tidak ada detail tindakan terlampir</p>
+                <div className="p-6 space-y-5">
+                  {/* Ordered Lab Tests — specific test masters chosen by doctor */}
+                  {(() => {
+                    const ordered: any[] = orderDetails.doctorInstructions?.orderedTests || []
+                    // Also check consultationDraft as fallback
+                    const draftLab = orderDetails.medicalRecord?.consultationDraft?.services?.filter((s: any) => s.isLab) || []
+                    const finalServiceLab = orderDetails.medicalRecord?.services?.filter((s: any) =>
+                      s.service?.serviceName?.toLowerCase().includes('lab') ||
+                      s.service?.serviceCategory?.categoryName?.toLowerCase().includes('lab')
+                    ) || []
+
+                    const hasOrdered = ordered.length > 0
+                    const hasDraft = draftLab.length > 0
+                    const hasFinal = finalServiceLab.length > 0
+
+                    if (!hasOrdered && !hasDraft && !hasFinal) return null
+
+                    return (
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <HiOutlineBeaker className="w-3 h-3" /> Pemeriksaan Yang Diminta
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {/* From doctorInstructions (specific test masters, most accurate) */}
+                          {ordered.map((t: any, i: number) => {
+                            const testMaster = testMasters.find((m: any) => m.name?.toLowerCase() === t.name?.toLowerCase())
+                            return (
+                              <button
+                                key={`ordered-${i}`}
+                                onClick={() => testMaster && !isReadOnly && addTest(testMaster)}
+                                title={testMaster && !isReadOnly ? `Klik untuk tambah parameter "${testMaster.name}" ke hasil` : t.name}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase border transition-all shadow-sm
+                                  ${testMaster && !isReadOnly
+                                    ? results.find(r => r.testMasterId === testMaster.id)
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                                      : 'bg-white border-sky-200 text-sky-700 hover:bg-sky-500 hover:text-white hover:border-sky-500 cursor-pointer'
+                                    : 'bg-white border-slate-200 text-slate-600 cursor-default'
+                                  }`}
+                              >
+                                {testMaster && results.find(r => r.testMasterId === testMaster.id)
+                                  ? <FiCheckCircle className="w-3 h-3 text-emerald-500" />
+                                  : testMaster && !isReadOnly
+                                    ? <FiPlus className="w-3 h-3" />
+                                    : <HiOutlineBeaker className="w-3 h-3" />
+                                }
+                                {t.name}
+                              </button>
+                            )
+                          })}
+
+                          {/* From final services */}
+                          {hasFinal && finalServiceLab.map((s: any) => (
+                            <span key={s.id} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold uppercase shadow-sm">
+                              <FiCheckCircle className="w-3 h-3 text-indigo-400" /> {s.service?.serviceName}
+                            </span>
+                          ))}
+
+                          {/* From draft services */}
+                          {!hasFinal && hasDraft && draftLab.map((s: any, idx: number) => {
+                            const testMaster = testMasters.find((m: any) =>
+                              m.name?.toLowerCase() === s.name?.toLowerCase() ||
+                              m.code?.toLowerCase() === s.code?.toLowerCase()
+                            )
+                            return (
+                              <button
+                                key={`draft-${idx}`}
+                                onClick={() => testMaster && !isReadOnly && addTest(testMaster)}
+                                title={testMaster && !isReadOnly ? `Klik untuk tambah parameter "${s.name}"` : s.name}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase border transition-all shadow-sm
+                                  ${testMaster && !isReadOnly
+                                    ? results.find(r => r.testMasterId === testMaster.id)
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                                      : 'bg-white border-sky-200 text-sky-700 hover:bg-sky-500 hover:text-white hover:border-sky-500 cursor-pointer'
+                                    : 'bg-white border-amber-200 text-amber-700 cursor-default'
+                                  }`}
+                              >
+                                {testMaster && results.find(r => r.testMasterId === testMaster.id)
+                                  ? <FiCheckCircle className="w-3 h-3 text-emerald-500" />
+                                  : testMaster && !isReadOnly ? <FiPlus className="w-3 h-3" /> : <HiOutlineBeaker className="w-3 h-3" />
+                                }
+                                {s.name}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {!isReadOnly && ordered.length > 0 && (
+                          <p className="mt-3 text-[9px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1">
+                            <FiPlus className="w-3 h-3" /> Klik badge biru untuk langsung tambah parameter ke tabel hasil
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Doctor's Lab Notes */}
+                  {orderDetails.doctorInstructions?.labNotes && (
+                    <div className="p-4 bg-white/70 rounded-2xl border border-sky-100">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Catatan / Instruksi Dokter</p>
+                      <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-line">
+                        {orderDetails.doctorInstructions.labNotes}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* No instructions at all */}
+                  {!orderDetails.doctorInstructions?.labNotes &&
+                    !orderDetails.doctorInstructions?.orderedTests?.length &&
+                    !orderDetails.medicalRecord?.consultationDraft?.services?.filter((s: any) => s.isLab).length &&
+                    !orderDetails.medicalRecord?.services?.filter((s: any) =>
+                      s.service?.serviceName?.toLowerCase().includes('lab')
+                    ).length && (
+                    <p className="text-[10px] font-bold text-slate-300 italic uppercase text-center py-2">
+                      Tidak ada instruksi khusus dari dokter
+                    </p>
                   )}
                 </div>
               </div>
@@ -684,10 +815,10 @@ export default function LabInputPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-50">
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Parameter</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 w-32">Hasil</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 w-[30%]">Parameter</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Hasil</th>
                       <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 w-24">Satuan</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Nilai Normal</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 w-[25%]">Nilai Normal</th>
                       <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 w-12"></th>
                     </tr>
                   </thead>
@@ -711,7 +842,7 @@ export default function LabInputPage() {
                               <td className="py-6 px-4 pl-8">
                                 <p className="text-sm font-black text-slate-800 uppercase">{r.testName}</p>
                               </td>
-                              <td className="py-6 px-4">
+                              <td className="py-4 px-4 w-full">
                                 <input 
                                   value={r.resultValue} 
                                   disabled={isReadOnly}
@@ -720,8 +851,8 @@ export default function LabInputPage() {
                                     n[idx].resultValue = e.target.value;
                                     setResults(n);
                                   }}
-                                  className={`w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-75 disabled:bg-slate-100/50 ${r.isCritical ? 'text-rose-500' : ''}`} 
-                                  placeholder="..." 
+                                  className={`w-full min-w-[160px] p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-75 disabled:bg-slate-100/50 ${r.isCritical ? 'text-rose-500 border-rose-200 bg-rose-50' : ''}`} 
+                                  placeholder="Masukkan nilai..." 
                                 />
                               </td>
                               <td className="py-6 px-4">
@@ -751,10 +882,10 @@ export default function LabInputPage() {
                 <p className="text-xs font-black text-slate-300 uppercase tracking-widest leading-loose">Pilih parameter hasil<br/>untuk diinput</p>
               </div>
             )}
-          </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-4 space-y-8">
+        {/* Bottom Sidebar Row — 3 columns */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Catatan Lab & Klinis</h4>
             <textarea 

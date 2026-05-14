@@ -154,6 +154,8 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
     } = req.body
 
     const result = await prisma.$transaction(async (tx) => {
+      let previousServiceIds: string[] = [];
+
       // 1. Update Medical Record with Doctor's findings
       const mr = await tx.medicalRecord.update({
         where: { id: medicalRecordId },
@@ -177,17 +179,30 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
       if (services && Array.isArray(services)) {
         // Record them to MedicalRecord only if FINAL (for billing/history)
         if (isFinal) {
+          // Track existing services before deletion so we can clean them up from invoice later
+          const previousServices = await tx.medicalRecordService.findMany({
+            where: { medicalRecordId: mr.id },
+            select: { serviceId: true }
+          })
+          previousServiceIds = previousServices.map(s => s.serviceId)
+
           await tx.medicalRecordService.deleteMany({ where: { medicalRecordId: mr.id } })
           for (const s of services) {
-            await tx.medicalRecordService.create({
-              data: {
-                medicalRecordId: mr.id,
-                serviceId: s.serviceId,
-                quantity: s.quantity || 1,
-                price: s.price,
-                notes: s.notes || ''
-              }
-            })
+            // Lab items are also recorded here now so they can be reloaded on reopen
+            // but we still trigger LabOrder separately below
+
+            const serviceExists = await tx.service.findUnique({ where: { id: s.serviceId } })
+            if (serviceExists) {
+              await tx.medicalRecordService.create({
+                data: {
+                  medicalRecordId: mr.id,
+                  serviceId: s.serviceId,
+                  quantity: s.quantity || 1,
+                  price: s.price,
+                  notes: s.notes || ''
+                }
+              })
+            }
           }
         }
 
@@ -249,7 +264,31 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
           const validMedicineIds = new Set(existingMedicines.map((m: any) => m.id))
           const safePrescriptions = validPrescriptions.filter((item: any) => validMedicineIds.has(item.medicineId))
 
-          if (safePrescriptions.length > 0) {
+          // SERVER-SIDE STOCK VALIDATION: Read real-time stock from DB to prevent race conditions
+          // This is the authoritative check — frontend check is only UX hint
+          // Check current stock against prescriptions from the PRODUCT table (the actual stock)
+          for (const item of safePrescriptions) {
+            const product = await tx.product.findFirst({
+              where: {
+                clinicId: mr.clinicId,
+                masterProduct: { medicineId: item.medicineId }
+              },
+              select: { id: true, quantity: true, productName: true }
+            })
+            if (product) {
+              const requestedQty = parseInt(item.quantity) || 0
+              if (requestedQty > product.quantity) {
+                throw new Error(`Stok tidak mencukupi untuk ${product.productName}: dibutuhkan ${requestedQty}, tersedia ${product.quantity}`)
+              }
+            }
+          }
+
+          // Only create prescription if none exists yet for this medical record (prevent duplicate on reopen)
+          const existingPrescription = await tx.prescription.findFirst({
+            where: { medicalRecordId: mr.id }
+          })
+
+          if (!existingPrescription && safePrescriptions.length > 0) {
             const pCount = await tx.prescription.count()
             const pNo = `RX-${Date.now().toString().slice(-6)}-${(pCount + 1).toString().padStart(3, '0')}`
 
@@ -272,22 +311,111 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
                 }
               }
             })
+          } else if (existingPrescription) {
+            // Update existing prescription items (reopen case)
+            await tx.prescriptionItem.deleteMany({ where: { prescriptionId: existingPrescription.id } })
+            for (const item of safePrescriptions) {
+              await tx.prescriptionItem.create({
+                data: {
+                  prescriptionId: existingPrescription.id,
+                  medicineId: item.medicineId,
+                  quantity: parseInt(item.quantity) || 0,
+                  dosage: item.dosage,
+                  frequency: item.frequency,
+                  duration: item.duration,
+                  instructions: item.instructions
+                }
+              })
+            }
           }
         }
       }
 
-      // 3. Update Invoice with Services & Medicines (Only if Final)
+      // 3. Update Invoice with Services, Medicines & Lab (Only if Final)
       const invoice = await tx.invoice.findFirst({
-        where: { patientId: mr.patientId, clinicId: mr.clinicId, status: 'unpaid' },
+        where: { patientId: mr.patientId, clinicId: mr.clinicId, status: { in: ['unpaid', 'draft'] } },
         orderBy: { createdAt: 'desc' }
       })
 
       if (invoice) {
+        // PREVENT DUPLICATE ITEMS ON REOPEN: Remove existing items added by this medical record
+        // We do this by checking if invoice items already exist for this mr's services
+        // Strategy: delete all existing items from this invoice that were generated from doctor consultation
+        // then re-insert fresh. This handles the reopen case cleanly.
+        const existingMrItems = await tx.invoiceItem.findFirst({
+          where: { invoiceId: invoice.id }
+        })
+        
+        // Only clear & re-add if invoice already has items (reopen scenario)
+        // For fresh saves, items will be empty
+        if (existingMrItems) {
+          // Remove items that were previously added from doctor consultation
+          // Use the previousServiceIds we collected at the start of the transaction
+          // (They are available here because we are still in the same transaction)
+          const serviceIdsToRemove = [
+            ...(previousServiceIds || []),
+            ...(services?.map((s: any) => s.serviceId) || []),
+          ]
+          
+          if (serviceIdsToRemove.length > 0) {
+            await tx.invoiceItem.deleteMany({
+              where: {
+                invoiceId: invoice.id,
+                serviceId: { in: [...new Set(serviceIdsToRemove)] }
+              }
+            })
+          }
+          // Also remove medicine items (grouped under obat/medicine services)
+          // We search by both code and name to be thorough
+          const medicineServices = await tx.service.findMany({
+            where: {
+              OR: [
+                { serviceCode: 'MED-GEN' },
+                { serviceName: { contains: 'Obat', mode: 'insensitive' } }
+              ],
+              AND: {
+                OR: [{ clinicId: mr.clinicId }, { clinic: { isMain: true } }]
+              }
+            }
+          })
+          if (medicineServices.length > 0) {
+            await tx.invoiceItem.deleteMany({
+              where: { 
+                invoiceId: invoice.id, 
+                serviceId: { in: medicineServices.map(s => s.id) } 
+              }
+            })
+          }
+
+          // Also remove lab service items
+          const labServicesToClean = await tx.service.findMany({
+            where: {
+              OR: [
+                { serviceCode: 'LAB-GEN' },
+                { serviceName: { contains: 'Laboratorium', mode: 'insensitive' } },
+                { serviceName: { contains: 'Pemeriksaan', mode: 'insensitive' } }
+              ],
+              AND: {
+                OR: [{ clinicId: mr.clinicId }, { clinic: { isMain: true } }]
+              }
+            }
+          })
+          if (labServicesToClean.length > 0) {
+            await tx.invoiceItem.deleteMany({
+              where: { 
+                invoiceId: invoice.id, 
+                serviceId: { in: labServicesToClean.map(s => s.id) } 
+              }
+            })
+          }
+        }
+
         let additionalTotal = 0
 
-        // Add Services
+        // Add Services (non-lab)
         if (services && Array.isArray(services)) {
           for (const s of services) {
+            if (s.isLab) continue // Lab handled separately below
             const serviceData = await tx.service.findUnique({ where: { id: s.serviceId } })
             if (serviceData) {
               const itemPrice = parseFloat(s.price) || serviceData.price
@@ -308,11 +436,60 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
           }
         }
 
-        // 3.1 Pre-fetch Service for Medicine (One time only)
+        // 3.1 Pre-fetch/Create generic Lab Service for invoice line item
+        const labServices = (services || []).filter((s: any) => s.isLab)
+        if (labServices.length > 0) {
+          let labService = await tx.service.findFirst({
+            where: {
+              OR: [
+                { serviceCode: 'LAB-GEN' },
+                { serviceName: { contains: 'Pemeriksaan Laboratorium', mode: 'insensitive' } }
+              ],
+              AND: {
+                OR: [{ clinicId: mr.clinicId }, { clinic: { isMain: true } }]
+              }
+            }
+          })
+          if (!labService) {
+            labService = await tx.service.create({
+              data: {
+                serviceCode: 'LAB-GEN',
+                serviceName: 'Pemeriksaan Laboratorium',
+                price: 0,
+                isActive: true,
+                clinicId: mr.clinicId
+              }
+            })
+          }
+          // Add each lab test as a separate invoice line
+          for (const lab of labServices) {
+            const labPrice = parseFloat(lab.price) || 0
+            const subtotal = labPrice * 1
+            await tx.invoiceItem.create({
+              data: {
+                invoiceId: invoice.id,
+                serviceId: labService.id,
+                description: lab.name || lab.serviceName || 'Pemeriksaan Laboratorium',
+                quantity: 1,
+                price: labPrice,
+                subtotal
+              }
+            })
+            additionalTotal += subtotal
+          }
+        }
+
+        // 3.2 Pre-fetch Service for Medicine (One time only)
+        // Consistent lookup: Code first, then Name fallback
         let obatService = await tx.service.findFirst({
           where: { 
-            serviceName: { contains: 'Obat', mode: 'insensitive' },
-            OR: [ { clinicId: mr.clinicId }, { clinic: { isMain: true } } ]
+            OR: [
+              { serviceCode: 'MED-GEN' },
+              { serviceName: { contains: 'Obat', mode: 'insensitive' } }
+            ],
+            AND: {
+              OR: [ { clinicId: mr.clinicId }, { clinic: { isMain: true } } ]
+            }
           }
         })
         
@@ -360,11 +537,15 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
           }
         }
 
+        // Recalculate full invoice total from all items (more accurate than increment)
+        const allItems = await tx.invoiceItem.findMany({ where: { invoiceId: invoice.id } })
+        const newSubtotal = allItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
+        
         await tx.invoice.update({
           where: { id: invoice.id },
           data: {
-            subtotal: { increment: additionalTotal },
-            total: { increment: additionalTotal }
+            subtotal: newSubtotal,
+            total: newSubtotal
           }
         })
       }

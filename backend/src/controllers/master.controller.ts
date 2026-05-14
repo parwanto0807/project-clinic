@@ -2117,9 +2117,10 @@ export const importPatients = async (req: Request, res: Response) => {
     let totalImported = 0
     let totalUpdated = 0
     const errors: string[] = []
-
     const currentYear = new Date().getFullYear()
 
+    // Phase 1: Collect all data from worksheets
+    const patientsToProcess: any[] = []
     for (const worksheet of workbook.worksheets) {
       const headers: string[] = []
       const headerRow = worksheet.getRow(1)
@@ -2130,42 +2131,69 @@ export const importPatients = async (req: Request, res: Response) => {
       const rowCount = worksheet.rowCount
       for (let i = 2; i <= rowCount; i++) {
         const row = worksheet.getRow(i)
+        const rowData: any = {}
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber]
+          if (header) rowData[header] = cell.value
+        })
+
+        const oldNo = rowData['NO REGISTRASI'] || rowData['No Registrasi'] || rowData['NO_REGISTRASI']
+        const name = rowData['NAMA PASIEN'] || rowData['Nama Pasien'] || rowData['NAMA']
+        const genderRaw = rowData['JENIS KELA'] || rowData['Jenis Kelamin'] || rowData['JK']
+        const age = rowData['USIA'] || rowData['Usia'] || rowData['Umur']
+        const headOfFamily = rowData['Nama KK'] || rowData['Kepala Keluarga']
+        const address = rowData['ALAMAT'] || rowData['Alamat']
+        const phone = rowData['No Telp'] || rowData['NO TELP'] || rowData['PHONE'] || rowData['HP'] || rowData['Telepon'] || rowData['no Telp']
+
+        if (!name) continue
+
+        let gender = 'MALE'
+        const gStr = String(genderRaw || '').toUpperCase().trim()
+        if (gStr === 'P' || gStr === 'PR' || gStr.includes('PEREMPUAN') || gStr.includes('WANITA') || gStr.includes('FEMALE')) {
+          gender = 'FEMALE'
+        } else if (gStr === 'L' || gStr === 'LK' || gStr.includes('LAKI') || gStr.includes('PRIA') || gStr.includes('MALE')) {
+          gender = 'MALE'
+        }
+
+        let dob = null
+        if (age) {
+          const birthYear = currentYear - Math.floor(Number(age))
+          dob = new Date(birthYear, 0, 1)
+        }
+
+        patientsToProcess.push({
+          name: String(name),
+          gender,
+          age: age ? Number(age) : null,
+          dateOfBirth: dob,
+          address: address ? String(address) : null,
+          familyHeadName: headOfFamily ? String(headOfFamily) : null,
+          phone: phone ? String(phone) : '-',
+          oldMedicalRecordNo: oldNo ? String(oldNo) : null
+        })
+      }
+    }
+
+    // Phase 2: Parallel Batch Processing
+    const BATCH_SIZE = 500
+    const prefix = `RM-${currentYear}`
+    
+    // Get initial count once
+    let currentSequence = await prisma.patient.count({ where: { medicalRecordNo: { startsWith: prefix } } })
+
+    for (let i = 0; i < patientsToProcess.length; i += BATCH_SIZE) {
+      const chunk = patientsToProcess.slice(i, i + BATCH_SIZE)
+      
+      await Promise.all(chunk.map(async (data) => {
         try {
-          const rowData: any = {}
-          row.eachCell((cell, colNumber) => {
-            const header = headers[colNumber]
-            if (header) rowData[header] = cell.value
-          })
-
-          const oldNo = rowData['NO REGISTRASI'] || rowData['No Registrasi'] || rowData['NO_REGISTRASI']
-          const name = rowData['NAMA PASIEN'] || rowData['Nama Pasien'] || rowData['NAMA']
-          const genderRaw = rowData['JENIS KELA'] || rowData['Jenis Kelamin'] || rowData['JK']
-          const age = rowData['USIA'] || rowData['Usia'] || rowData['Umur']
-          const headOfFamily = rowData['Nama KK'] || rowData['Kepala Keluarga']
-          const address = rowData['ALAMAT'] || rowData['Alamat']
-          const phone = rowData['No Telp'] || rowData['NO TELP'] || rowData['PHONE'] || rowData['HP'] || rowData['Telepon'] || rowData['no Telp']
-
-          if (!name) continue
-
-          let gender = 'MALE'
-          const gStr = String(genderRaw || '').toUpperCase().trim()
-          if (gStr === 'P' || gStr === 'PR' || gStr.includes('PEREMPUAN') || gStr.includes('WANITA') || gStr.includes('FEMALE')) {
-            gender = 'FEMALE'
-          } else if (gStr === 'L' || gStr === 'LK' || gStr.includes('LAKI') || gStr.includes('PRIA') || gStr.includes('MALE')) {
-            gender = 'MALE'
-          }
-
-          let dob = null
-          if (age) {
-            const birthYear = currentYear - Math.floor(Number(age))
-            dob = new Date(birthYear, 0, 1)
-          }
-
           const existing = await prisma.patient.findFirst({
             where: {
               OR: [
-                ...(oldNo ? [{ oldMedicalRecordNo: String(oldNo) }] : []),
-                { name: String(name), address: address ? { contains: String(address).substring(0, 10) } : undefined }
+                ...(data.oldMedicalRecordNo ? [{ oldMedicalRecordNo: data.oldMedicalRecordNo }] : []),
+                { 
+                  name: data.name, 
+                  address: data.address ? { contains: data.address.substring(0, 10) } : undefined 
+                }
               ].filter(Boolean) as any
             }
           })
@@ -2174,39 +2202,32 @@ export const importPatients = async (req: Request, res: Response) => {
             await prisma.patient.update({
               where: { id: existing.id },
               data: {
-                address: address ? String(address) : existing.address,
-                familyHeadName: headOfFamily ? String(headOfFamily) : existing.familyHeadName,
-                age: age ? Number(age) : existing.age,
-                gender,
-                dateOfBirth: dob || existing.dateOfBirth,
-                phone: phone ? String(phone) : existing.phone
+                address: data.address,
+                familyHeadName: data.familyHeadName,
+                age: data.age,
+                gender: data.gender,
+                dateOfBirth: data.dateOfBirth,
+                phone: data.phone
               }
             })
             totalUpdated++
           } else {
-            const prefix = `RM-${new Date().getFullYear()}`
-            const count = await prisma.patient.count({ where: { medicalRecordNo: { startsWith: prefix } } })
-            const mrNo = `${prefix}-${(count + 1 + totalImported).toString().padStart(6, '0')}`
-
+            // Sequence is handled by an atomic increment or we fetch it per chunk to be safe
+            // But since this is a serial loop over chunks, we can increment locally
+            const mrNo = `${prefix}-${(++currentSequence).toString().padStart(6, '0')}`
             await prisma.patient.create({
               data: {
-                medicalRecordNo: mrNo,
-                oldMedicalRecordNo: oldNo ? String(oldNo) : null,
-                name: String(name),
-                gender,
-                age: age ? Number(age) : null,
-                dateOfBirth: dob,
-                address: address ? String(address) : null,
-                familyHeadName: headOfFamily ? String(headOfFamily) : null,
-                phone: phone ? String(phone) : '-',
+                ...data,
+                medicalRecordNo: mrNo
               }
             })
             totalImported++
           }
         } catch (err: any) {
-          errors.push(`Gagal memproses baris ${i}: ${err.message}`)
+          errors.push(`Gagal memproses ${data.name}: ${err.message}`)
         }
-      }
+      }))
+      console.log(`[Import] Progress: ${Math.min(i + BATCH_SIZE, patientsToProcess.length)} / ${patientsToProcess.length}`)
     }
 
     res.json({

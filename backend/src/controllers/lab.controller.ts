@@ -106,13 +106,33 @@ export const getLabOrders = async (req: Request, res: Response) => {
         patient: { select: { name: true, medicalRecordNo: true } },
         doctor: { select: { name: true } },
         medicalRecord: {
-          include: { clinic: true }
+          select: {
+            id: true,
+            clinicId: true,
+            labNotes: true,
+            clinic: true,
+            consultationDraft: true
+          }
         },
         attachments: true
       },
       orderBy: { orderDate: 'desc' }
     })
-    res.json(orders)
+
+    // Enrich each order with a summary of ordered tests
+    const enriched = orders.map(order => {
+      const draft = (order.medicalRecord as any)?.consultationDraft
+      const orderedTests = draft?.services
+        ?.filter((s: any) => s.isLab)
+        .map((s: any) => s.name) || []
+      return {
+        ...order,
+        labNotesSummary: (order.medicalRecord as any)?.labNotes || '',
+        orderedTestsSummary: orderedTests
+      }
+    })
+
+    res.json(enriched)
   } catch (e) {
     res.status(500).json({ message: (e as Error).message })
   }
@@ -133,7 +153,8 @@ export const getLabOrderDetails = async (req: Request, res: Response) => {
           include: {
             services: { include: { service: true } },
             clinic: true
-          }
+          },
+          // Include labNotes, labResults, and consultationDraft for doctor instructions
         },
         results: {
           include: { testMaster: true }
@@ -142,7 +163,24 @@ export const getLabOrderDetails = async (req: Request, res: Response) => {
       }
     })
     if (!order) return res.status(404).json({ message: 'Order not found' })
-    res.json(order)
+
+    // Attach doctor's lab notes and ordered tests to the response
+    const enriched = {
+      ...order,
+      doctorInstructions: {
+        labNotes: (order.medicalRecord as any)?.labNotes || '',
+        labResults: (order.medicalRecord as any)?.labResults || '',
+        // Lab tests requested: from consultationDraft (draft mode) or from services (final mode)
+        orderedTests: (
+          (order.medicalRecord as any)?.consultationDraft?.services
+            ?.filter((s: any) => s.isLab)
+            .map((s: any) => ({ name: s.name, price: s.price, code: s.code })) ||
+          []
+        ),
+      }
+    }
+
+    res.json(enriched)
   } catch (e) {
     res.status(500).json({ message: (e as Error).message })
   }
@@ -150,6 +188,7 @@ export const getLabOrderDetails = async (req: Request, res: Response) => {
 
 /**
  * Update Lab Results
+ * When status = 'completed', also sync invoice items with actual testMaster prices
  */
 export const updateLabResults = async (req: Request, res: Response) => {
   try {
@@ -182,14 +221,113 @@ export const updateLabResults = async (req: Request, res: Response) => {
           status,
           clinicalNotes,
           completedAt: status === 'completed' ? new Date() : null
+        },
+        include: {
+          medicalRecord: {
+            select: { id: true, patientId: true, clinicId: true }
+          },
+          patient: { select: { id: true } }
         }
       })
-      
+
+      // 4. SYNC INVOICE — Only when marking as COMPLETED (final send to doctor)
+      if (status === 'completed' && results && Array.isArray(results) && results.length > 0) {
+        const mr = (updatedOrder as any).medicalRecord
+        if (mr) {
+          // Find the active invoice for this patient
+          const invoice = await tx.invoice.findFirst({
+            where: {
+              patientId: mr.patientId,
+              clinicId: mr.clinicId,
+              status: { in: ['unpaid', 'draft'] }
+            },
+            orderBy: { createdAt: 'desc' }
+          })
+
+          if (invoice) {
+            // Find or create the LAB-GEN service used as a grouping service for invoice items
+            let labService = await tx.service.findFirst({
+              where: {
+                OR: [
+                  { serviceCode: 'LAB-GEN' },
+                  { serviceName: { contains: 'Pemeriksaan Laboratorium', mode: 'insensitive' } }
+                ],
+                AND: {
+                  OR: [{ clinicId: mr.clinicId }, { clinic: { isMain: true } }]
+                }
+              }
+            })
+            if (!labService) {
+              labService = await tx.service.create({
+                data: {
+                  serviceCode: 'LAB-GEN',
+                  serviceName: 'Pemeriksaan Laboratorium',
+                  price: 0,
+                  isActive: true,
+                  clinicId: mr.clinicId
+                }
+              })
+            }
+
+            // Remove existing lab invoice items for this order (prevent duplicates on re-send)
+            // We identify them by description containing the lab order no or by serviceId=LAB-GEN
+            await tx.invoiceItem.deleteMany({
+              where: {
+                invoiceId: invoice.id,
+                serviceId: labService.id
+              }
+            })
+
+            // Re-insert accurate line items using actual testMaster prices
+            let labTotal = 0
+            for (const resItem of results) {
+              const testMaster = await tx.labTestMaster.findUnique({
+                where: { id: resItem.testMasterId }
+              })
+              if (testMaster) {
+                const itemPrice = testMaster.price || 0
+                const subtotal = itemPrice * 1
+                await tx.invoiceItem.create({
+                  data: {
+                    invoiceId: invoice.id,
+                    serviceId: labService.id,
+                    description: testMaster.name,
+                    quantity: 1,
+                    price: itemPrice,
+                    subtotal
+                  }
+                })
+                labTotal += subtotal
+              }
+            }
+
+            // Recalculate invoice total from all items
+            const allItems = await tx.invoiceItem.findMany({
+              where: { invoiceId: invoice.id }
+            })
+            const newSubtotal = allItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
+
+            await tx.invoice.update({
+              where: { id: invoice.id },
+              data: {
+                subtotal: newSubtotal,
+                total: newSubtotal
+              }
+            })
+
+            console.log(`[Lab] Invoice ${invoice.id} updated with ${results.length} lab tests, total lab: Rp ${labTotal.toLocaleString('id-ID')}`)
+          }
+        }
+      }
+
       return updatedOrder
+    }, {
+      timeout: 30000
     })
     
     res.json(result)
   } catch (e) {
+    console.error('[Lab] updateLabResults error:', e)
     res.status(400).json({ message: (e as Error).message })
   }
 }

@@ -8,7 +8,7 @@ import {
   FiActivity, FiCheckCircle, FiRefreshCw, FiUser, 
   FiHome, FiAlertCircle, FiClipboard, FiHeart, FiThermometer, FiWind,
   FiEdit3, FiTrash2, FiSearch, FiPackage, FiInfo, FiArrowLeft, FiSave, FiRotateCcw, FiPrinter,
-  FiPlus, FiMinus, FiDollarSign, FiHash, FiClock, FiChevronDown, FiCalendar, FiLock,
+  FiPlus, FiMinus, FiDollarSign, FiHash, FiClock, FiChevronDown, FiCalendar, FiLock, FiUnlock,
   FiMonitor
 } from 'react-icons/fi'
 import { HiOutlineBeaker } from 'react-icons/hi'
@@ -136,6 +136,7 @@ export default function DoctorConsultationPage() {
   
   // Lab State
   const [labItems, setLabItems] = useState<any[]>([])
+  const [labTestMasters, setLabTestMasters] = useState<any[]>([])
   const [searchLab, setSearchLab] = useState('')
   const [isLabDropdownOpen, setIsLabDropdownOpen] = useState(false)
   const [isLabPreviewOpen, setIsLabPreviewOpen] = useState(false)
@@ -165,7 +166,7 @@ export default function DoctorConsultationPage() {
       const queueHeaders = qData?.clinicId ? { 'x-clinic-id': qData.clinicId } : undefined
 
       // Fetch independent resources in parallel to reduce total load time
-      const [medicalRecordRes, historyRes, svcRes, templateRes, clinicsRes, deptsRes] = await Promise.all([
+      const [medicalRecordRes, historyRes, svcRes, labTestRes, templateRes, clinicsRes, deptsRes] = await Promise.all([
         qData.registrationId
           ? api.get(`transactions/medical-records/registration/${qData.registrationId}`)
           : Promise.resolve({ data: null }),
@@ -176,6 +177,7 @@ export default function DoctorConsultationPage() {
           params: { isActive: true, allClinics: true },
           headers: queueHeaders
         }),
+        api.get('/lab/test-masters'),
         api.get('clinical/templates'),
         api.get('master/clinics'),
         api.get('master/departments')
@@ -207,7 +209,9 @@ export default function DoctorConsultationPage() {
                 frequency: item.frequency,
                 duration: item.duration,
                 instructions: item.instructions || '',
-                unit: item.unit || item.medicine?.unit || 'unit' // Tambahkan satuan
+                unit: item.unit || item.medicine?.unit || 'unit',
+                availableStock: item.medicine?.stock ?? 0,
+                alreadySavedInDB: true // Flag: already persisted, skip frontend stock check
               }))
             )
             setPrescriptionItems(savedItems)
@@ -215,7 +219,16 @@ export default function DoctorConsultationPage() {
 
           if (data.consultationDraft) {
              const draft = data.consultationDraft;
-             if (draft.prescriptions) setPrescriptionItems(draft.prescriptions);
+             if (draft.prescriptions) {
+               // Merge draft prescriptions with availableStock from previously loaded DB prescriptions
+               // to avoid losing stock info when draft overrides
+               setPrescriptionItems(draft.prescriptions.map((dp: any) => ({
+                 ...dp,
+                 // Keep availableStock if it exists in draft, else mark as unknown (server will validate)
+                 availableStock: dp.availableStock ?? undefined,
+                 alreadySavedInDB: false
+               })));
+             }
              if (draft.services) {
                 // Separate general services and lab services
                 const generalServices = draft.services.filter((s: any) => !s.isLab);
@@ -233,13 +246,24 @@ export default function DoctorConsultationPage() {
           }
            // In actual completed items, they should come from actual medical record services if present
            if (data.services && data.services.length > 0 && qData.status === 'completed') {
-             setServiceItems(data.services.map((s: any) => ({
-                serviceId: s.serviceId,
-                name: s.service?.serviceName || 'Layanan',
-                code: s.service?.serviceCode || '',
-                price: s.price,
-                quantity: s.quantity
-             })))
+             const allSavedServices = data.services.map((s: any) => ({
+               serviceId: s.serviceId,
+               name: s.service?.serviceName || 'Layanan',
+               code: s.service?.serviceCode || '',
+               price: s.price,
+               quantity: s.quantity,
+               // Check if it's a lab service based on code or name
+               isLab: s.service?.serviceCode === 'LAB-GEN' || 
+                      s.service?.serviceName?.toLowerCase().includes('lab')
+             }));
+
+             setServiceItems(allSavedServices.filter((s: any) => !s.isLab));
+             setLabItems(allSavedServices.filter((s: any) => s.isLab).map((s: any) => ({
+               id: s.serviceId,
+               serviceName: s.name,
+               price: s.price,
+               serviceCode: s.code
+             })));
            }
         }
 
@@ -250,7 +274,11 @@ export default function DoctorConsultationPage() {
       }
 
       // Fetch services for tindakan based on queue's clinic context
-      setAllServices(svcRes.data)
+      const servicesData = svcRes.data.data || svcRes.data
+      setAllServices(Array.isArray(servicesData) ? servicesData : [])
+
+      // Set Lab Test Masters
+      setLabTestMasters(Array.isArray(labTestRes.data) ? labTestRes.data : [])
 
       // Fetch templates, clinics, depts
       setTemplates(templateRes.data)
@@ -363,6 +391,7 @@ export default function DoctorConsultationPage() {
       medicineId: m.medicineId || m.id, // Use product id if medicineId is null (for compound formulas)
       name: m.masterName,
       quantity: 1,
+      availableStock: m.availableStock ?? m.stock,
       dosage: m.medicine?.strength || '',
       frequency: '3x1',
       duration: '5 hari',
@@ -384,11 +413,38 @@ export default function DoctorConsultationPage() {
     setSearchService('')
   }
 
+  const handleReopen = async () => {
+    if (!confirm('Buka kembali rekam medis ini untuk pengeditan? Status antrean akan dikembalikan ke "Processing".')) return
+    try {
+      setLoading(true)
+      await api.patch(`transactions/queues/${id}/status`, { status: 'processing' })
+      toast.success('Rekam medis berhasil dibuka kembali')
+      hasFetchedRef.current = null
+      fetchData()
+    } catch (e: any) {
+      toast.error('Gagal membuka kembali rekam medis: ' + (e.response?.data?.message || e.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSaveConsultation = async (isFinal: boolean = true, goToPrescription: boolean = false) => {
     if (!queue || !medicalRecord || isReadOnly) return
     setSaving(true)
     const toastId = toast.loading(isFinal ? 'Menyimpan hasil konsultasi...' : 'Menyimpan draft...')
     try {
+      // Validate prescription quantities against stock
+      // Skip validation for items already saved in DB (alreadySavedInDB=true)
+      // Server will perform authoritative real-time stock check
+      for (const p of prescriptionItems) {
+        if (p.alreadySavedInDB) continue // Already in DB, server validates against real-time stock
+        if (p.availableStock !== undefined && p.availableStock !== null && (parseInt(p.quantity) || 0) > p.availableStock) {
+          toast.error(`Stok tidak mencukupi untuk ${p.name} (Tersedia: ${p.availableStock})`, { id: toastId })
+          setSaving(false)
+          return
+        }
+      }
+
       await api.post('transactions/medical-records/doctor', {
         queueId: queue.id,
         medicalRecordId: medicalRecord.id,
@@ -771,9 +827,22 @@ export default function DoctorConsultationPage() {
           
           <div className="flex items-center gap-2">
             {isReadOnly ? (
-              <div className="flex items-center gap-3 px-6 py-3 bg-slate-100 text-slate-500 rounded-xl border border-slate-200 cursor-default">
-                 <FiLock className="w-4 h-4" />
-                 <span className="text-[10px] font-black uppercase tracking-widest leading-none">REKAM MEDIS TERKUNCI</span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 px-6 py-3 bg-slate-100 text-slate-500 rounded-xl border border-slate-200 cursor-default">
+                   <FiLock className="w-4 h-4" />
+                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">REKAM MEDIS TERKUNCI</span>
+                </div>
+                {['SUPER_ADMIN', 'ADMIN', 'DOCTOR'].includes(user?.role || '') && (
+                  <button 
+                    onClick={handleReopen} 
+                    className="px-6 py-3 bg-white border border-rose-200 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all shadow-sm group"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FiUnlock className="w-4 h-4 group-hover:rotate-12 transition-transform" /> 
+                      BUKA KEMBALI
+                    </span>
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -1005,20 +1074,71 @@ export default function DoctorConsultationPage() {
                           
                           <div className="flex flex-wrap items-center gap-4 flex-1">
                             <div className="flex-1 min-w-[120px]">
-                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Frekuensi</label>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block flex items-center justify-between">
+                                <span>Frekuensi</span>
+                                {p.availableStock !== undefined && (
+                                  <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black border ${p.availableStock > 10 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                                    STOK: {p.availableStock}
+                                  </span>
+                                )}
+                              </label>
                               <input disabled={isReadOnly} value={p.frequency} onChange={(e) => { const n = [...prescriptionItems]; n[idx].frequency = e.target.value; setPrescriptionItems(n); }} placeholder="e.g. 3x1" className={`w-full px-4 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`} />
                             </div>
                             <div className="flex-1 min-w-[200px]">
                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Instruksi Khusus</label>
-                              <input disabled={isReadOnly} value={p.instructions} onChange={(e) => { const n = [...prescriptionItems]; n[idx].instructions = e.target.value; setPrescriptionItems(n); }} placeholder="e.g. Sesudah makan" className={`w-full px-4 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`} />
+                              <select 
+                                disabled={isReadOnly} 
+                                value={['Sesudah makan', 'Sebelum makan'].includes(p.instructions) ? p.instructions : 'Lainnya'} 
+                                onChange={(e) => { 
+                                  const val = e.target.value;
+                                  const n = [...prescriptionItems]; 
+                                  if (val !== 'Lainnya') {
+                                    n[idx].instructions = val; 
+                                  } else {
+                                    n[idx].instructions = '';
+                                  }
+                                  setPrescriptionItems(n); 
+                                }} 
+                                className={`w-full px-4 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none mb-2 ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`}
+                              >
+                                <option value="Sesudah makan">Sesudah makan</option>
+                                <option value="Sebelum makan">Sebelum makan</option>
+                                <option value="Lainnya">Lainnya / Manual...</option>
+                              </select>
+                              {(!['Sesudah makan', 'Sebelum makan'].includes(p.instructions) || p.instructions === '') && (
+                                <input 
+                                  disabled={isReadOnly} 
+                                  value={p.instructions} 
+                                  onChange={(e) => { const n = [...prescriptionItems]; n[idx].instructions = e.target.value; setPrescriptionItems(n); }} 
+                                  placeholder="Ketik instruksi manual..." 
+                                  className={`w-full px-4 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`} 
+                                />
+                              )}
                             </div>
                             <div className="w-32">
                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">
                                 Qty {p.unit && <span className="text-primary">({p.unit})</span>}
                               </label>
-                              <div className={`flex items-center border border-slate-200 rounded-xl overflow-hidden ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`}>
-                                 <input disabled={isReadOnly} type="number" value={p.quantity} onChange={(e) => { const n = [...prescriptionItems]; n[idx].quantity = e.target.value; setPrescriptionItems(n); }} className="w-full text-center py-2 text-xs font-black outline-none bg-transparent" />
+                              <div className={`flex flex-col border border-slate-200 rounded-xl overflow-hidden ${isReadOnly ? 'bg-slate-50' : 'bg-white'} ${(p.availableStock !== undefined && (parseInt(p.quantity) || 0) > p.availableStock) ? 'border-rose-500 bg-rose-50' : ''}`}>
+                                 <input 
+                                    disabled={isReadOnly} 
+                                    type="number" 
+                                    value={p.quantity} 
+                                    onChange={(e) => { 
+                                      const val = parseInt(e.target.value) || 0;
+                                      if (p.availableStock !== undefined && val > p.availableStock) {
+                                        toast.error(`Stok tidak mencukupi (Tersedia: ${p.availableStock})`);
+                                      }
+                                      const n = [...prescriptionItems]; 
+                                      n[idx].quantity = e.target.value; 
+                                      setPrescriptionItems(n); 
+                                    }} 
+                                    className="w-full text-center py-2 text-xs font-black outline-none bg-transparent" 
+                                 />
                               </div>
+                              {p.availableStock !== undefined && (parseInt(p.quantity) || 0) > p.availableStock && (
+                                <p className="text-[8px] font-black text-rose-500 uppercase mt-1 text-center animate-pulse">Melebihi Stok!</p>
+                              )}
                             </div>
                             {!isReadOnly && (
                               <div className="flex items-end">
@@ -1188,19 +1308,13 @@ export default function DoctorConsultationPage() {
                                        className='absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[300px] overflow-y-auto'
                                     >
                                        {(() => {
-                                          const labFiltered = allServices.filter(s => {
+                                          const labFiltered = labTestMasters.filter(s => {
                                              const search = searchLab.toLowerCase();
-                                             const name = s.serviceName.toLowerCase();
-                                             const category = s.serviceCategory?.categoryName?.toLowerCase() || '';
+                                             const name = s.name.toLowerCase();
+                                             const category = s.category?.toLowerCase() || '';
                                              
-                                             // Include items in 'Laboratorium Klinik' category or containing 'lab'
-                                             const isLab = category.includes('laboratorium') || 
-                                                           category.includes('lab') || 
-                                                           name.includes('lab');
-                                             
-                                             if (!isLab) return false;
                                              if (!search) return true;
-                                             return name.includes(search) || category.includes(search);
+                                             return name.includes(search) || category.includes(search) || s.code.toLowerCase().includes(search);
                                           });
 
                                           return labFiltered.length > 0 ? (
@@ -1209,7 +1323,12 @@ export default function DoctorConsultationPage() {
                                                    key={svc.id}
                                                    onClick={() => {
                                                       if (!labItems.find(i => i.id === svc.id)) {
-                                                         setLabItems([...labItems, svc]);
+                                                         setLabItems([...labItems, {
+                                                           ...svc,
+                                                           serviceName: svc.name,
+                                                           serviceCode: svc.code,
+                                                           serviceCategory: { categoryName: svc.category }
+                                                         }]);
                                                       }
                                                       setSearchLab('');
                                                       setIsLabDropdownOpen(false);
@@ -1217,10 +1336,16 @@ export default function DoctorConsultationPage() {
                                                    className='w-full px-6 py-4 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0'
                                                 >
                                                    <div>
-                                                      <p className='text-sm font-bold text-slate-800'>{svc.serviceName}</p>
-                                                      <p className='text-[10px] font-bold text-slate-400 uppercase'>{svc.serviceCategory?.categoryName || 'Lab Test'}</p>
+                                                      <p className='text-sm font-bold text-slate-800 uppercase tracking-tight'>{svc.name}</p>
+                                                      <div className="flex items-center gap-2 mt-1">
+                                                         <p className='text-[10px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
+                                                         {svc.unit && <span className="text-[9px] font-bold text-slate-400 italic">Unit: {svc.unit}</span>}
+                                                      </div>
                                                    </div>
-                                                   <FiPlus className='text-rose-500' />
+                                                   <div className="text-right">
+                                                      <p className="text-xs font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
+                                                      <FiPlus className='text-rose-500 ml-auto mt-1' />
+                                                   </div>
                                                 </button>
                                              ))
                                           ) : (
@@ -1696,6 +1821,7 @@ export default function DoctorConsultationPage() {
                       medicineId: m.medicineId || m.id,
                       name: m.masterName,
                       quantity: 1,
+                      availableStock: m.availableStock ?? m.stock,
                       dosage: m.medicine?.strength || '',
                       frequency: '3x1',
                       duration: '5 hari',
