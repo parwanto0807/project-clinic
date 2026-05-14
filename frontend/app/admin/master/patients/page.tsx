@@ -14,6 +14,7 @@ import Link from 'next/link'
 const API = process.env.NEXT_PUBLIC_API_URL + '/api/master'
 const EMPTY = { 
   medicalRecordNo: '', 
+  oldMedicalRecordNo: '',
   name: '', 
   email: '', 
   phone: '', 
@@ -26,6 +27,7 @@ const EMPTY = {
   bloodType: '-', 
   identityType: 'KTP', 
   identityNumber: '', 
+  familyHeadName: '',
   emergencyContact: '', 
   emergencyPhone: '', 
   allergies: '', 
@@ -34,7 +36,7 @@ const EMPTY = {
   isActive: true 
 }
 
-type Patient = typeof EMPTY & { id: string; createdAt: string; updatedAt: string }
+type Patient = typeof EMPTY & { id: string; createdAt: string; updatedAt: string; age?: number }
 
 export default function PatientsPage() {
   const { user } = useAuthStore()
@@ -42,24 +44,40 @@ export default function PatientsPage() {
   const [data, setData] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState({ total: 0, totalPages: 1 })
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Patient | null>(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Debounce logic
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1) // Reset page on search
+    }, 500)
+    return () => clearTimeout(handler)
+  }, [search])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const params: any = {}
-      if (search) params.search = search
+      const params: any = { page, limit: 10 }
+      if (debouncedSearch) params.search = debouncedSearch
       const res = await api.get('/master/patients', { params })
-      // Extract the data array from the paginated response object if necessary
-      const patientsArray = Array.isArray(res.data) ? res.data : (res.data.data || [])
-      setData(patientsArray)
+      
+      if (res.data.meta) {
+        setData(res.data.data)
+        setMeta(res.data.meta)
+      } else {
+        const patientsArray = Array.isArray(res.data) ? res.data : (res.data.data || [])
+        setData(patientsArray)
+      }
     } finally { setLoading(false) }
-  }, [search])
+  }, [debouncedSearch, page])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -121,20 +139,32 @@ export default function PatientsPage() {
   }
 
   const columns: Column<Patient>[] = [
-    { key: 'medicalRecordNo', label: 'No. RM', render: (r) => (
-      <div className="flex flex-col">
-        <span className="text-xs font-black font-mono text-primary bg-primary/5 px-2 py-1 rounded-lg border border-primary/10 w-fit">{r.medicalRecordNo}</span>
-        <span className="text-[10px] text-gray-400 mt-1 font-bold">{new Date(r.createdAt).toLocaleDateString('id-ID')}</span>
+    { key: 'medicalRecordNo', label: 'No. Rekam Medis', render: (r) => (
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-black font-mono text-primary bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10 w-fit">{r.medicalRecordNo}</span>
+        {r.oldMedicalRecordNo && (
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">ID Lama:</span>
+            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 rounded border border-amber-100">{r.oldMedicalRecordNo}</span>
+          </div>
+        )}
       </div>
     )},
-    { key: 'name', label: 'Nama Pasien', render: (r) => (
+    { key: 'name', label: 'Identitas Pasien', render: (r) => (
       <div className="flex items-center gap-3 py-1">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-white shadow-sm ${r.gender === 'F' ? 'bg-rose-500' : 'bg-blue-500'}`}>
+        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white shadow-md ${r.gender === 'F' ? 'bg-gradient-to-br from-rose-400 to-rose-600' : 'bg-gradient-to-br from-blue-400 to-blue-600'}`}>
           {r.name.charAt(0)}
         </div>
         <div className="flex flex-col">
-          <span className="text-sm font-black text-gray-900 tracking-tight">{r.name}</span>
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{r.gender === 'M' ? 'Laki-laki' : 'Perempuan'} • {r.dateOfBirth ? `${new Date().getFullYear() - new Date(r.dateOfBirth).getFullYear()} Thn` : '-'}</span>
+          <span className="text-[13px] font-black text-gray-900 tracking-tight leading-tight">{r.name}</span>
+          <div className="flex items-center gap-2 mt-0.5">
+             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{r.gender === 'M' ? 'L' : 'P'} • {r.age || (r.dateOfBirth ? `${new Date().getFullYear() - new Date(r.dateOfBirth).getFullYear()} Thn` : '-')}</span>
+             {r.familyHeadName && (
+               <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                 <FiUser className="w-2.5 h-2.5" /> KK: {r.familyHeadName}
+               </span>
+             )}
+          </div>
         </div>
       </div>
     )},
@@ -210,6 +240,9 @@ export default function PatientsPage() {
         searchPlaceholder="Cari nama, No. RM, No. HP, atau No. KTP..."
         onEdit={openEdit} onDelete={handleDelete}
         emptyText="Belum ada data pasien terdaftar."
+        page={page}
+        totalPages={meta.totalPages}
+        onPageChange={setPage}
       />
 
       <MasterModal 

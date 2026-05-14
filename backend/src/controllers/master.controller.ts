@@ -1939,7 +1939,7 @@ export const getPatients = async (req: Request, res: Response) => {
     const { search, isActive } = req.query
     const currentUser = (req as any).user
     const currentClinicId = (req as any).clinicId
-    const isAdminView = (req as any).isAdminView
+    const isAdminView = (req as any).isAdminView || currentUser?.role === 'ADMIN'
 
     // Security Filter: Doctors only see their own patients
     const isDoctor = currentUser?.role === 'DOCTOR'
@@ -1983,6 +1983,7 @@ export const getPatients = async (req: Request, res: Response) => {
           OR: [
             { name: { contains: String(search), mode: 'insensitive' as any } },
             { medicalRecordNo: { contains: String(search), mode: 'insensitive' as any } },
+            { oldMedicalRecordNo: { contains: String(search), mode: 'insensitive' as any } },
             { phone: { contains: String(search), mode: 'insensitive' as any } },
             { identityNumber: { contains: String(search), mode: 'insensitive' as any } },
           ]
