@@ -135,7 +135,7 @@ export default function ImportPatientsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 flex-shrink-0" />
-                Kolom opsional: **NO REGISTRASI** (Lama), **Nama KK**, **ALAMAT**.
+                Kolom opsional: **NO REGISTRASI** (Lama), **No Telp**, **Nama KK**, **ALAMAT**.
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 flex-shrink-0" />

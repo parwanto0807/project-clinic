@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt'
 import sharp from 'sharp'
 import path from 'path'
 import fs from 'fs/promises'
-import * as XLSX from 'xlsx'
+import * as ExcelJS from 'exceljs'
 import { getPaginationOptions, PaginatedResult } from '../utils/pagination'
 import { CacheService } from '../lib/cache'
 
@@ -2106,30 +2106,45 @@ export const importPatients = async (req: Request, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'File tidak ditemukan' })
 
-    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' })
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(req.file.buffer)
+
     let totalImported = 0
     let totalUpdated = 0
     const errors: string[] = []
 
     const currentYear = new Date().getFullYear()
 
-    for (const sheetName of workbook.SheetNames) {
-      const sheet = workbook.Sheets[sheetName]
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+    for (const worksheet of workbook.worksheets) {
+      const headers: string[] = []
+      const headerRow = worksheet.getRow(1)
+      headerRow.eachCell((cell, colNumber) => {
+        headers[colNumber] = String(cell.value || '').trim()
+      })
 
-      for (const row of rows) {
+      const rowCount = worksheet.rowCount
+      for (let i = 2; i <= rowCount; i++) {
+        const row = worksheet.getRow(i)
         try {
-          const oldNo = row['NO REGISTRASI'] || row['No Registrasi'] || row['NO_REGISTRASI']
-          const name = row['NAMA PASIEN'] || row['Nama Pasien'] || row['NAMA']
-          const genderRaw = row['JENIS KELA'] || row['Jenis Kelamin'] || row['JK']
-          const age = row['USIA'] || row['Usia'] || row['Umur']
-          const headOfFamily = row['Nama KK'] || row['Kepala Keluarga']
-          const address = row['ALAMAT'] || row['Alamat']
+          const rowData: any = {}
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber]
+            if (header) rowData[header] = cell.value
+          })
+
+          const oldNo = rowData['NO REGISTRASI'] || rowData['No Registrasi'] || rowData['NO_REGISTRASI']
+          const name = rowData['NAMA PASIEN'] || rowData['Nama Pasien'] || rowData['NAMA']
+          const genderRaw = rowData['JENIS KELA'] || rowData['Jenis Kelamin'] || rowData['JK']
+          const age = rowData['USIA'] || rowData['Usia'] || rowData['Umur']
+          const headOfFamily = rowData['Nama KK'] || rowData['Kepala Keluarga']
+          const address = rowData['ALAMAT'] || rowData['Alamat']
+          const phone = rowData['No Telp'] || rowData['NO TELP'] || rowData['PHONE'] || rowData['HP'] || rowData['Telepon'] || rowData['no Telp']
 
           if (!name) continue
 
           let gender = 'MALE'
-          if (genderRaw && String(genderRaw).toUpperCase().startsWith('P')) gender = 'FEMALE'
+          const gStr = String(genderRaw || '').toUpperCase()
+          if (gStr.startsWith('P') || gStr.includes('FEMALE') || gStr === 'WANITA') gender = 'FEMALE'
 
           let dob = null
           if (age) {
@@ -2154,7 +2169,8 @@ export const importPatients = async (req: Request, res: Response) => {
                 familyHeadName: headOfFamily ? String(headOfFamily) : existing.familyHeadName,
                 age: age ? Number(age) : existing.age,
                 gender,
-                dateOfBirth: dob || existing.dateOfBirth
+                dateOfBirth: dob || existing.dateOfBirth,
+                phone: phone ? String(phone) : existing.phone
               }
             })
             totalUpdated++
@@ -2173,13 +2189,13 @@ export const importPatients = async (req: Request, res: Response) => {
                 dateOfBirth: dob,
                 address: address ? String(address) : null,
                 familyHeadName: headOfFamily ? String(headOfFamily) : null,
-                phone: row['PHONE'] || '-',
+                phone: phone ? String(phone) : '-',
               }
             })
             totalImported++
           }
         } catch (err: any) {
-          errors.push(`Gagal memproses baris "${row['NAMA PASIEN']}": ${err.message}`)
+          errors.push(`Gagal memproses baris ${i}: ${err.message}`)
         }
       }
     }
@@ -2193,4 +2209,5 @@ export const importPatients = async (req: Request, res: Response) => {
     res.status(500).json({ message: e.message })
   }
 }
+
 
