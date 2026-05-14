@@ -2148,8 +2148,12 @@ export const importPatients = async (req: Request, res: Response) => {
           if (!name) continue
 
           let gender = 'MALE'
-          const gStr = String(genderRaw || '').toUpperCase()
-          if (gStr.startsWith('P') || gStr.includes('FEMALE') || gStr === 'WANITA') gender = 'FEMALE'
+          const gStr = String(genderRaw || '').toUpperCase().trim()
+          if (gStr === 'P' || gStr === 'PR' || gStr.includes('PEREMPUAN') || gStr.includes('WANITA') || gStr.includes('FEMALE')) {
+            gender = 'FEMALE'
+          } else if (gStr === 'L' || gStr === 'LK' || gStr.includes('LAKI') || gStr.includes('PRIA') || gStr.includes('MALE')) {
+            gender = 'MALE'
+          }
 
           let dob = null
           if (age) {

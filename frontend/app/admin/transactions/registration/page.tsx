@@ -19,6 +19,9 @@ interface Patient {
   id: string
   name: string
   medicalRecordNo: string
+  oldMedicalRecordNo?: string
+  familyHeadName?: string
+  age?: number
   phone: string
   gender: string
   dateOfBirth: string
@@ -116,16 +119,24 @@ export default function RegistrationPage() {
   // Search Patient
   useEffect(() => {
     const timeout = setTimeout(async () => {
-      if (!searchQuery && !isFetchAll) {
+      // Don't search if query is too short
+      if (searchQuery.length < 3) {
         setPatients([])
         return
       }
+
       setSearching(true)
       try {
         const { data } = await api.get('/master/patients', { 
-          params: { search: searchQuery } 
+          params: { 
+            search: searchQuery,
+            page: 1,
+            limit: 20 // Only load top 20 matches for selection
+          } 
         })
-        setPatients(data)
+        // Handle paginated response
+        const patientsArray = data.meta ? data.data : (Array.isArray(data) ? data : [])
+        setPatients(patientsArray)
       } catch (e) {
         console.error(e)
       } finally {
@@ -133,7 +144,7 @@ export default function RegistrationPage() {
       }
     }, 500)
     return () => clearTimeout(timeout)
-  }, [searchQuery, isFetchAll])
+  }, [searchQuery])
 
   const handleRegistration = async () => {
     if (!selectedPatient || !activeClinicId) return
@@ -191,17 +202,15 @@ export default function RegistrationPage() {
     }
   }
 
-  const patientInp = (label: string, key: string, type = 'text', placeholder = '') => (
-    <div>
-      <label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
-      <input 
-        type={type} value={(patientForm as any)[key]} 
-        onChange={(e) => setPatientForm(p => ({...p, [key]: e.target.value}))} 
-        placeholder={placeholder}
-        className="w-full px-3 md:px-4 py-2 md:py-2.5 text-sm border border-gray-100 bg-gray-50/30 rounded-2xl focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all font-bold placeholder:text-gray-300 text-gray-700" 
-      />
-    </div>
-  )
+  const availableDoctors = useMemo(() => {
+    return doctors.filter(d => !selectedDeptId || (d.departments && d.departments.some(dept => dept.id === selectedDeptId)))
+  }, [doctors, selectedDeptId])
+
+  const canContinue = useMemo(() => {
+    if (!selectedDeptId && !selectedDoctorId) return false
+    if (selectedDeptId && availableDoctors.length === 0) return false
+    return true
+  }, [selectedDeptId, selectedDoctorId, availableDoctors])
 
   // UI Helpers
   const StepIndicator = () => (
@@ -247,34 +256,27 @@ export default function RegistrationPage() {
       <AnimatePresence mode="wait">
         {step === 1 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 md:space-y-6">
-            <div className="bg-indigo-50/50 p-3 md:p-4 rounded-2xl border border-indigo-100/50 flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
-              <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm flex-shrink-0">
-                <FiSearch className="w-4 h-4 md:w-5 md:h-5" />
+              <div className="bg-indigo-50/50 p-3 md:p-4 rounded-2xl border border-indigo-100/50 flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm flex-shrink-0">
+                  <FiSearch className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-gray-900 leading-tight truncate">Cari Pasien Terdaftar</p>
+                  <p className="text-[9px] md:text-[10px] text-indigo-600 font-bold mt-0.5 lowercase truncate">Ketik min. 3 karakter (Nama, RM Baru/Lama, HP, Alamat, KK, atau BPJS).</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-gray-900 leading-tight truncate">Cari Pasien Terdaftar</p>
-                <p className="text-[9px] md:text-[10px] text-indigo-600 font-bold mt-0.5 lowercase truncate">Gunakan Nama, RM, atau No HP.</p>
-              </div>
-            </div>
-
+  
               <div className="relative group">
                 <FiSearch className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5 md:w-4 md:h-4 group-hover:text-primary transition-colors" />
                 <input 
                   type="text" 
-                  placeholder="Cari Pasien (Nama, No. RM, HP)..."
+                  placeholder="Ketik Nama, No. RM, HP, Alamat, atau No. BPJS..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 md:pl-10 pr-10 md:pr-12 py-2.5 md:py-3 bg-white border border-gray-100 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-bold"
                 />
-                <button 
-                  onClick={() => setIsFetchAll(true)}
-                  className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 p-1.5 md:p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-primary transition-all border border-transparent hover:border-gray-200"
-                  title="Tampilkan Semua Pasien"
-                >
-                  <FiChevronDown className={`w-4 h-4 md:w-5 md:h-5 transition-transform ${isFetchAll ? 'rotate-180' : ''}`} />
-                </button>
                 {searching && (
-                  <div className="absolute right-10 md:right-14 top-1/2 -translate-y-1/2">
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
                      <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                   </div>
                 )}
@@ -293,22 +295,34 @@ export default function RegistrationPage() {
                       <FiUser className="w-5 h-5 md:w-6 md:h-6" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-black text-gray-900 text-sm md:text-base truncate">{p.name}</p>
-                        <span className="text-[9px] md:text-[10px] font-black text-primary bg-primary/5 px-1.5 md:px-2 py-0.5 rounded border border-primary/20 truncate">{p.medicalRecordNo}</span>
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <p className="font-black text-gray-900 text-sm md:text-base leading-tight">{p.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] md:text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20">{p.medicalRecordNo}</span>
+                          {p.oldMedicalRecordNo && (
+                            <span className="text-[9px] md:text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">ID LAMA: {p.oldMedicalRecordNo}</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-6 gap-y-0.5 md:gap-y-1">
-                        <p className="text-[10px] md:text-xs text-gray-500 font-medium flex items-center gap-1.5 truncate">
-                          <FiUser className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400 flex-shrink-0" />
-                          {p.gender === 'M' ? 'Laki-laki' : 'Perempuan'} • {p.dateOfBirth ? new Date(p.dateOfBirth).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) : '-'}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                           <p className="text-[10px] md:text-xs text-gray-500 font-bold flex items-center gap-1.5">
+                            <FiUser className="w-3 h-3 text-gray-400" />
+                            {p.gender === 'M' ? 'Pria' : 'Wanita'} • {p.age || (p.dateOfBirth ? `${new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear()} Thn` : '-')}
+                          </p>
+                          {p.familyHeadName && (
+                            <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex items-center gap-1">
+                              KK: {p.familyHeadName}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] md:text-xs text-gray-600 font-bold flex items-center gap-1.5">
+                          <FiActivity className="w-3 h-3 text-gray-400" />
+                          {p.phone && p.phone !== '-' ? p.phone : <span className="text-gray-300 italic">No HP Kosong</span>}
                         </p>
-                        <p className="text-[10px] md:text-xs text-gray-500 font-medium flex items-center gap-1.5 truncate">
-                          <FiActivity className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400 flex-shrink-0" />
-                          {p.phone}
-                        </p>
-                        <p className="text-[9px] md:text-xs text-gray-400 font-medium md:col-span-2 flex items-start gap-1.5 mt-0.5 md:mt-1 border-t border-gray-50 pt-0.5 md:pt-1 truncate">
-                          <FiMapPin className="w-3 h-3 md:w-3.5 md:h-3.5 mt-0.5 text-gray-300 flex-shrink-0" />
-                          <span className="italic truncate">{p.address || 'Alamat tidak tersedia'}</span>
+                        <p className="text-[9px] md:text-xs text-gray-400 font-medium md:col-span-2 flex items-start gap-1.5 pt-1 border-t border-gray-50">
+                          <FiMapPin className="w-3 h-3 mt-0.5 text-gray-300" />
+                          <span className="line-clamp-1 italic">{p.address || 'Alamat tidak tersedia'}</span>
                         </p>
                       </div>
                     </div>
@@ -344,7 +358,7 @@ export default function RegistrationPage() {
                     <label className="text-[10px] md:text-xs font-bold text-gray-500">Poli / Departemen</label>
                     <select 
                       value={selectedDeptId || ''}
-                      onChange={(e) => setSelectedDeptId(e.target.value)}
+                      onChange={(e) => { setSelectedDeptId(e.target.value); setSelectedDoctorId(''); }}
                       className="w-full px-3 md:px-4 py-2 md:py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs md:text-sm font-bold focus:outline-none focus:bg-white focus:border-primary transition-all"
                     >
                       <option value="">Semua Poli</option>
@@ -359,13 +373,20 @@ export default function RegistrationPage() {
                       className="w-full px-3 md:px-4 py-2 md:py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs md:text-sm font-bold focus:outline-none focus:bg-white focus:border-primary transition-all"
                     >
                       <option value="">Pilih Dokter</option>
-                      {doctors
-                        .filter(d => !selectedDeptId || (d.departments && d.departments.some(dept => dept.id === selectedDeptId)))
-                        .map(d => <option key={d.id} value={d.id}>{d.name}</option>)
-                      }
+                      {availableDoctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
                 </div>
+
+                {selectedDeptId && availableDoctors.length === 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-700 animate-in fade-in slide-in-from-top-1">
+                    <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest">Peringatan</p>
+                      <p className="text-xs font-bold">Belum ada Dokter yang ditugaskan di Poli ini. Silakan hubungi admin master data.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5 pt-2">
                   <label className="text-[10px] md:text-xs font-bold text-gray-500">Jenis Kunjungan</label>
@@ -405,7 +426,7 @@ export default function RegistrationPage() {
                 </button>
                 <button 
                   onClick={() => setStep(3)}
-                  disabled={!selectedDeptId && !selectedDoctorId}
+                  disabled={!canContinue}
                   className="flex-1 px-4 md:px-6 py-2.5 md:py-3 bg-primary text-white font-black rounded-xl text-xs md:text-sm shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                 >
                   Lanjut ke Konfirmasi
