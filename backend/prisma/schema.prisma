@@ -112,7 +112,10 @@ model Patient {
   emergencyContact String?
   emergencyPhone   String?
   allergies        String?
-  isActive         Boolean         @default(true)
+  oldMedicalRecordNo String?         @unique
+  familyHeadName      String?
+  age                 Float?
+  isActive            Boolean         @default(true)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   bpjsNumber       String?

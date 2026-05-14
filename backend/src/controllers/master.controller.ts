@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt'
 import sharp from 'sharp'
 import path from 'path'
 import fs from 'fs/promises'
+import * as XLSX from 'xlsx'
 import { getPaginationOptions, PaginatedResult } from '../utils/pagination'
 import { CacheService } from '../lib/cache'
 
@@ -2100,3 +2101,96 @@ export const deletePatient = async (req: Request, res: Response) => {
     res.status(500).json({ message: (e as Error).message })
   }
 }
+
+export const importPatients = async (req: Request, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'File tidak ditemukan' })
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' })
+    let totalImported = 0
+    let totalUpdated = 0
+    const errors: string[] = []
+
+    const currentYear = new Date().getFullYear()
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName]
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+
+      for (const row of rows) {
+        try {
+          const oldNo = row['NO REGISTRASI'] || row['No Registrasi'] || row['NO_REGISTRASI']
+          const name = row['NAMA PASIEN'] || row['Nama Pasien'] || row['NAMA']
+          const genderRaw = row['JENIS KELA'] || row['Jenis Kelamin'] || row['JK']
+          const age = row['USIA'] || row['Usia'] || row['Umur']
+          const headOfFamily = row['Nama KK'] || row['Kepala Keluarga']
+          const address = row['ALAMAT'] || row['Alamat']
+
+          if (!name) continue
+
+          let gender = 'MALE'
+          if (genderRaw && String(genderRaw).toUpperCase().startsWith('P')) gender = 'FEMALE'
+
+          let dob = null
+          if (age) {
+            const birthYear = currentYear - Math.floor(Number(age))
+            dob = new Date(birthYear, 0, 1)
+          }
+
+          const existing = await prisma.patient.findFirst({
+            where: {
+              OR: [
+                ...(oldNo ? [{ oldMedicalRecordNo: String(oldNo) }] : []),
+                { name: String(name), address: address ? { contains: String(address).substring(0, 10) } : undefined }
+              ].filter(Boolean) as any
+            }
+          })
+
+          if (existing) {
+            await prisma.patient.update({
+              where: { id: existing.id },
+              data: {
+                address: address ? String(address) : existing.address,
+                familyHeadName: headOfFamily ? String(headOfFamily) : existing.familyHeadName,
+                age: age ? Number(age) : existing.age,
+                gender,
+                dateOfBirth: dob || existing.dateOfBirth
+              }
+            })
+            totalUpdated++
+          } else {
+            const prefix = `RM-${new Date().getFullYear()}`
+            const count = await prisma.patient.count({ where: { medicalRecordNo: { startsWith: prefix } } })
+            const mrNo = `${prefix}-${(count + 1 + totalImported).toString().padStart(6, '0')}`
+
+            await prisma.patient.create({
+              data: {
+                medicalRecordNo: mrNo,
+                oldMedicalRecordNo: oldNo ? String(oldNo) : null,
+                name: String(name),
+                gender,
+                age: age ? Number(age) : null,
+                dateOfBirth: dob,
+                address: address ? String(address) : null,
+                familyHeadName: headOfFamily ? String(headOfFamily) : null,
+                phone: row['PHONE'] || '-',
+              }
+            })
+            totalImported++
+          }
+        } catch (err: any) {
+          errors.push(`Gagal memproses baris "${row['NAMA PASIEN']}": ${err.message}`)
+        }
+      }
+    }
+
+    res.json({
+      message: 'Proses import selesai',
+      summary: { totalImported, totalUpdated, totalErrors: errors.length },
+      errors: errors.slice(0, 10)
+    })
+  } catch (e: any) {
+    res.status(500).json({ message: e.message })
+  }
+}
+

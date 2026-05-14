@@ -21,3 +21,17 @@ export const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter
 })
+
+export const uploadDocument = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req: any, file: any, cb: any) => {
+    const allowedTypes = /xlsx|xls|csv/
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
+    if (extname) {
+      return cb(null, true)
+    } else {
+      cb(new Error('Hanya file dokumen (XLSX, XLS, CSV) yang diizinkan!'))
+    }
+  }
+})

@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import api from '@/lib/api'
-import { FiUsers, FiAlertCircle, FiRefreshCw, FiPhone, FiMapPin, FiCalendar, FiUser, FiInfo, FiPlus, FiActivity, FiLock, FiShield } from 'react-icons/fi'
+import { FiUsers, FiAlertCircle, FiRefreshCw, FiPhone, FiMapPin, FiCalendar, FiUser, FiInfo, FiPlus, FiActivity, FiLock, FiShield, FiFileText } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 import DataTable, { Column } from '@/components/admin/master/DataTable'
 import PageHeader from '@/components/admin/master/PageHeader'
 import MasterModal from '@/components/admin/master/MasterModal'
 import { StatusBadge } from '@/components/admin/master/StatusBadge'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 
 const API = process.env.NEXT_PUBLIC_API_URL + '/api/master'
 const EMPTY = { 
@@ -193,7 +194,15 @@ export default function PatientsPage() {
         icon={<FiUsers className="w-5 h-5 sm:w-6 sm:h-6" />}
         onAdd={openAdd} addLabel="Pasien Baru" count={data.length}
         breadcrumb={['Admin', 'Data Master', 'Pasien']}
-      />
+      >
+        <Link 
+          href="/admin/master/patients/import"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-sm mr-2"
+        >
+          <FiFileText className="w-4 h-4" />
+          <span>Import Excel</span>
+        </Link>
+      </PageHeader>
       
       <DataTable
         data={data} columns={columns} loading={loading}

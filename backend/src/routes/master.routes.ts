@@ -14,7 +14,7 @@ import {
   getAssets, createAsset, updateAsset, deleteAsset,
   getProductCategories, createProductCategory, updateProductCategory, deleteProductCategory,
   getInventoryProducts, createInventoryProduct, updateInventoryProduct, deleteInventoryProduct,
-  getPatients, getPatientById, getNextMRNo, createPatient, updatePatient, deletePatient
+  getPatients, getPatientById, getNextMRNo, createPatient, updatePatient, deletePatient, importPatients
 } from '../controllers/master.controller'
 import { getCOAs, createCOA, updateCOA, deleteCOA, getCoaBalances } from '../controllers/coa.controller'
 import { getBanks, createBank, updateBank, deleteBank } from '../controllers/bank.controller'
@@ -29,7 +29,7 @@ import {
   depreciateAsset, depreciateAllAssets, disposeAsset, getAssetRegister, syncAssetOpeningBalance
 } from '../controllers/assetFinance.controller'
 
-import { upload } from '../middleware/upload.middleware'
+import { upload, uploadDocument } from '../middleware/upload.middleware'
 
 const masterRoutes = Router()
 
@@ -156,6 +156,7 @@ masterRoutes.delete('/inventory/:id', deleteInventoryProduct)
 // Patients
 masterRoutes.get('/patients', getPatients)
 masterRoutes.get('/patients/next-mr', getNextMRNo)
+masterRoutes.post('/patients/import', uploadDocument.single('file'), importPatients)
 masterRoutes.get('/patients/:id', getPatientById)
 masterRoutes.post('/patients', createPatient)
 masterRoutes.put('/patients/:id', updatePatient)
