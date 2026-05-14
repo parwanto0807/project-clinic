@@ -481,7 +481,7 @@ export const postInvoice = async (req: Request, res: Response) => {
                 const normalizedMethod = (pay.paymentMethod || '').toUpperCase()
 
                 if (normalizedMethod === 'CASH') {
-                    const cashAcc = getSysAcc('CASH_ACCOUNT')
+                    const cashAcc = await getSysAcc('CASH_ACCOUNT')
                     
                     // Priority 1: Check System Accounts (CASH_ACCOUNT) for this clinic
                     debitCoaId = cashAcc?.coaId || null
@@ -505,7 +505,7 @@ export const postInvoice = async (req: Request, res: Response) => {
                         }))?.id || null
                     }
                 } else {
-                    const bankAcc = getSysAcc('BANK_ACCOUNT')
+                    const bankAcc = await getSysAcc('BANK_ACCOUNT')
                     // Priority 1: Use bank from the payment itself (NEW: More accurate for individual transfers)
                     // Priority 2: Fallback to bank from invoice bankId
                     // Priority 3: Fallback to System Account
