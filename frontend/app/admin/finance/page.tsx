@@ -6,7 +6,7 @@ import {
   FiDollarSign, FiFileText, FiSearch, FiFilter, 
   FiClock, FiCheckCircle, FiMoreVertical, FiEye, 
   FiCreditCard, FiCalendar, FiArrowRight, FiActivity, FiShare2, FiZap, FiSend, FiPlus, FiBriefcase, FiEdit2, FiX,
-  FiRotateCcw, FiRepeat, FiShield,
+  FiRefreshCw, FiRepeat, FiShield,
   FiUser
 } from 'react-icons/fi'
 import { toast } from 'react-hot-toast'
@@ -413,9 +413,9 @@ export default function FinanceDashboard() {
         </div>
 
         <AnimatePresence mode="popLayout">
-           {loading ? (
-             <div className="py-32 text-center flex flex-col items-center">
-                <FiRotateCcw className="w-10 h-10 text-primary animate-spin mb-4 opacity-30" />
+            {loading ? (
+              <div className="py-32 text-center flex flex-col items-center">
+                 <FiRefreshCw className="w-10 h-10 text-primary animate-spin mb-4 opacity-30" />
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Checking Finances...</p>
              </div>
            ) : invoices.length === 0 ? (
@@ -1056,7 +1056,7 @@ export default function FinanceDashboard() {
                         disabled={processing}
                         className="py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2"
                      >
-                        {processing ? <FiRotateCcw className="w-4 h-4 animate-spin" /> : <><FiCheckCircle className="w-4 h-4" /> <span>Ya, Posting</span></>}
+                        {processing ? <FiRefreshCw className="w-4 h-4 animate-spin" /> : <><FiCheckCircle className="w-4 h-4" /> <span>Ya, Posting</span></>}
                      </button>
                   </div>
                </motion.div>

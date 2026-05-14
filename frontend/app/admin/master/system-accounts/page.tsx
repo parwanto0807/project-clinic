@@ -31,6 +31,9 @@ const SYSTEM_KEYS = [
   { key: 'ACCUM_DEP_GENERAL', name: 'Akumulasi Penyusutan (General)', desc: 'Akun kontra-aset untuk menampung akumulasi penyusutan aset tetap.', category: 'ASSET' },
   { key: 'RETAINED_EARNINGS', name: 'Laba Ditahan', desc: 'Akumulasi laba bersih tahun-tahun sebelumnya.', category: 'EQUITY' },
   { key: 'COMPOUND_SERVICE_REVENUE', name: 'Pendapatan Jasa Racik / Tuslah', desc: 'Akun pendapatan untuk jasa peracikan obat puyer/kapsul.', category: 'REVENUE' },
+  { key: 'LAB_REVENUE', name: 'Pendapatan Laboratorium', desc: 'Akun pendapatan untuk layanan laboratorium dan pemeriksaan penunjang.', category: 'REVENUE' },
+  { key: 'DOCTOR_FEE_PAYABLE', name: 'Hutang Jasa Medik / Doctor Fee', desc: 'Kewajiban pembayaran jasa kepada dokter (titipan).', category: 'LIABILITY' },
+  { key: 'DOCTOR_FEE_EXPENSE', name: 'Beban Jasa Medik / Doctor Fee Expense', desc: 'Beban biaya jasa dokter yang ditanggung klinik.', category: 'EXPENSE' },
 ]
 
 export default function SystemAccountsPage() {
@@ -85,7 +88,7 @@ export default function SystemAccountsPage() {
     const matches = mappings.filter(m => m.key === key)
     if (matches.length === 0) return ''
     const branchSpecific = matches.find(m => m.clinicId !== null)
-    return branchSpecific ? branchSpecific.coaId : matches[0].coaId
+    return (branchSpecific ? branchSpecific.coaId : matches[0].coaId) || ''
   }
 
   return (

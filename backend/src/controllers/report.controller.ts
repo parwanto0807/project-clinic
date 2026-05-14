@@ -29,6 +29,11 @@ export const getDoctorFeeReport = async (req: Request, res: Response) => {
       ...(status ? { status: String(status) } : {}),
       ...(clinicId ? { clinicId: String(clinicId) } : (!isAdminView ? { clinicId: currentClinicId } : {})),
       ...(Object.keys(dateWhere).length > 0 ? { date: dateWhere } : {}),
+      // Filter out pharmacy/medicine items from the report
+      NOT: [
+        { description: { contains: 'obat', mode: 'insensitive' } },
+        { description: { contains: 'farmasi', mode: 'insensitive' } }
+      ]
     }
 
     const [total, results] = await Promise.all([

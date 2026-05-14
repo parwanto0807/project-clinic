@@ -31,12 +31,18 @@ export const getPharmacyQueues = async (req: Request, res: Response) => {
         lt: nextDate
       }
     } else {
-      // Default to today if no date specified
+      // Default behavior when no specific date is requested:
+      // Show ALL items that are still in process (pending/preparing/ready) 
+      // AND items that were already dispensed but occurred today.
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      whereClause.prescriptionDate = {
-        gte: today
-      }
+      
+      whereClause.OR = [
+        // Show everything that is NOT yet fully dispensed (regardless of date)
+        { dispenseStatus: { in: ['pending', 'preparing', 'ready'] } },
+        // Show anything created today (including dispensed items)
+        { prescriptionDate: { gte: today } }
+      ]
     }
 
     const prescriptions = await prisma.prescription.findMany({

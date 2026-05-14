@@ -430,6 +430,18 @@ export default function DoctorConsultationPage() {
 
   const handleSaveConsultation = async (isFinal: boolean = true, goToPrescription: boolean = false) => {
     if (!queue || !medicalRecord || isReadOnly) return
+
+    // Confirmation dialog for final saving
+    if (isFinal) {
+      const confirmSave = window.confirm(
+        "Konfirmasi Penyelesaian Pemeriksaan\n\n" +
+        "Apakah Anda yakin ingin menyelesaikan pemeriksaan ini? \n" +
+        "Setelah disimpan, rekam medis akan dikunci secara permanen untuk keperluan arsip (Archive) dan tidak dapat dibuka kembali untuk pengeditan. \n\n" +
+        "Pastikan semua diagnosis, tindakan, dan resep obat sudah benar."
+      );
+      if (!confirmSave) return;
+    }
+
     setSaving(true)
     const toastId = toast.loading(isFinal ? 'Menyimpan hasil konsultasi...' : 'Menyimpan draft...')
     try {
@@ -832,17 +844,7 @@ export default function DoctorConsultationPage() {
                    <FiLock className="w-4 h-4" />
                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">REKAM MEDIS TERKUNCI</span>
                 </div>
-                {['SUPER_ADMIN', 'ADMIN', 'DOCTOR'].includes(user?.role || '') && (
-                  <button 
-                    onClick={handleReopen} 
-                    className="px-6 py-3 bg-white border border-rose-200 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all shadow-sm group"
-                  >
-                    <span className="flex items-center gap-2">
-                      <FiUnlock className="w-4 h-4 group-hover:rotate-12 transition-transform" /> 
-                      BUKA KEMBALI
-                    </span>
-                  </button>
-                )}
+                {/* Buka Kembali hidden per request to maintain record integrity once locked */}
               </div>
             ) : (
               <>

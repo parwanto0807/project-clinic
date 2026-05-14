@@ -292,19 +292,42 @@ export const postInvoice = async (req: Request, res: Response) => {
             if (!targetClinicId) throw new Error('Klinik tidak teridentifikasi.')
 
             // 3. Resolve System Accounts & COAs
-            const sysAccountKeys = ['CASH_ACCOUNT', 'BANK_ACCOUNT', 'ACCOUNTS_RECEIVABLE', 'SALES_REVENUE', 'SERVICE_REVENUE', 'SALES_DISCOUNT', 'DOCTOR_FEE_PAYABLE', 'DOCTOR_FEE_EXPENSE']
+            const sysAccountKeys = ['CASH_ACCOUNT', 'BANK_ACCOUNT', 'ACCOUNTS_RECEIVABLE', 'SALES_REVENUE', 'SERVICE_REVENUE', 'SALES_DISCOUNT', 'LAB_REVENUE', 'DOCTOR_FEE_PAYABLE', 'DOCTOR_FEE_EXPENSE']
             const sysAccounts = await tx.systemAccount.findMany({
                 where: { key: { in: sysAccountKeys }, OR: [{ clinicId: targetClinicId }, { clinicId: null }] },
                 include: { coa: true },
                 orderBy: { clinicId: 'desc' }
             })
-            const getSysAcc = (key: string) => sysAccounts.find(s => s.key === key)
 
-            const codesToFind = ['4-1101', '4-1102', '4-1201', '4-1301', '4-1401', '4-1501']
-            const coaAccounts = await tx.chartOfAccount.findMany({
-                where: { code: { in: codesToFind }, OR: [{ clinicId: targetClinicId }, { clinicId: null }] }
-            })
-            const getCoaByCode = (code: string) => coaAccounts.find(a => a.code === code)
+            // Helper to find specific COA by suffix (e.g. 4-1101-K001)
+            const resolveSpecificCoa = async (coa: any, clinicId: string) => {
+                if (!coa || !clinicId) return coa
+                const clinic = await tx.clinic.findUnique({ where: { id: clinicId }, select: { code: true } })
+                if (!clinic?.code) return coa
+
+                const baseCode = coa.code.split('-').length > 2 
+                    ? coa.code.split('-').slice(0, 2).join('-') 
+                    : coa.code
+                
+                const specificCode = `${baseCode}-${clinic.code}`
+                const specificCoa = await tx.chartOfAccount.findFirst({
+                    where: { code: specificCode, OR: [{ clinicId }, { clinicId: null }] }
+                })
+                return specificCoa || coa
+            }
+
+            const getSysAcc = async (key: string) => {
+                const sys = sysAccounts.find(s => s.key === key)
+                if (!sys?.coa) return null
+                return await resolveSpecificCoa(sys.coa, targetClinicId)
+            }
+
+            const getCoaByCode = async (code: string) => {
+                const coa = await tx.chartOfAccount.findFirst({
+                    where: { code, OR: [{ clinicId: targetClinicId }, { clinicId: null }] }
+                })
+                return await resolveSpecificCoa(coa, targetClinicId)
+            }
 
             // --- SECTION A: ACCRUAL JOURNAL (REVENUE) ---
             const existingMainJournal = await tx.journalEntry.findFirst({
@@ -322,45 +345,50 @@ export const postInvoice = async (req: Request, res: Response) => {
                     const sName = (serviceData?.serviceName || '').trim().toLowerCase()
                     const cName = (serviceData?.serviceCategory?.categoryName || '').trim().toLowerCase()
                     
-                    const salesRevSys = getSysAcc('SALES_REVENUE')
-                    const serviceRevSys = getSysAcc('SERVICE_REVENUE')
                     let targetCoa: any = null
 
                     // 1. Priority 1: Direct Service Mapping (Specific override)
                     if (item.service?.coaId) {
-                        targetCoa = item.service.coa
+                        targetCoa = await resolveSpecificCoa(item.service.coa, targetClinicId)
                     }
 
                     // 2. Priority 2: System Account Category mapping (Logic-driven)
                     if (!targetCoa) {
                         if (cName.includes('obat') || cName.includes('farmasi') || sName.includes('obat')) {
-                            targetCoa = salesRevSys?.coa
-                        } else if (cName.includes('lab') || cName.includes('tindakan') || sName.includes('konsul') || sName.includes('admin')) {
-                            targetCoa = serviceRevSys?.coa
+                            targetCoa = await getSysAcc('SALES_REVENUE') || await getCoaByCode('4-1301')
+                        } else if (cName.includes('lab') || sName.includes('lab') || sName.includes('diagnostik')) {
+                            targetCoa = await getSysAcc('LAB_REVENUE') || await getCoaByCode('4-1401')
+                        } else if (cName.includes('tindakan') || sName.includes('konsul') || sName.includes('admin')) {
+                            targetCoa = await getSysAcc('SERVICE_REVENUE')
                         }
                     }
 
                     // 3. Priority 3: Legacy Keyword Search (Dynamic Fallback)
                     if (!targetCoa) {
                         if (sName.includes('obat')) {
-                            targetCoa = salesRevSys?.coa || getCoaByCode('4-1301')
+                            targetCoa = await getSysAcc('SALES_REVENUE') || await getCoaByCode('4-1301')
                         } else if (sName.includes('pendaftaran') || sName.includes('admin') || sName.includes('kartu')) {
-                            targetCoa = getCoaByCode('4-1501')
+                            targetCoa = await getCoaByCode('4-1501')
                         } else if (sName.includes('lab') || sName.includes('diagnostik')) {
-                            targetCoa = getCoaByCode('4-1401')
+                            targetCoa = await getSysAcc('LAB_REVENUE') || await getCoaByCode('4-1401')
                         } else if (sName.includes('tindakan')) {
-                            targetCoa = getCoaByCode('4-1201')
+                            targetCoa = await getCoaByCode('4-1201')
                         }
                     }
 
                     // 4. Ultimate Fallback: Default Service Revenue
                     if (!targetCoa) {
-                        targetCoa = serviceRevSys?.coa || getCoaByCode('4-1101')
+                        targetCoa = await getSysAcc('SERVICE_REVENUE') || await getCoaByCode('4-1101')
                     }
+
                     if (!targetCoa) throw new Error(`Akun Pendapatan tidak ditemukan untuk item: ${item.description}`)
 
                     const totalItemSubtotal = item.subtotal || 0
-                    const doctorFeePerUnit = (serviceData?.doctorFee as number) || 0
+                    
+                    // Specific logic: Medicine/Pharmacy items NEVER generate doctor fees/commissions
+                    const isPharmacyItem = cName.includes('obat') || cName.includes('farmasi') || sName.includes('obat')
+                    const doctorFeePerUnit = isPharmacyItem ? 0 : ((serviceData?.doctorFee as number) || 0)
+                    
                     const totalDoctorFee = doctorFeePerUnit * item.quantity
 
                     const clinicPortion = totalItemSubtotal - totalDoctorFee
@@ -390,22 +418,14 @@ export const postInvoice = async (req: Request, res: Response) => {
                     }
                 }
 
-                const arSysAcc = getSysAcc('ACCOUNTS_RECEIVABLE')
-                const arAccount = arSysAcc?.coa || await tx.chartOfAccount.findFirst({ where: { code: '1-1201', OR: [{ clinicId: targetClinicId }, { clinicId: null }] } })
+                const arAccount = await getSysAcc('ACCOUNTS_RECEIVABLE') || await getCoaByCode('1-1201')
                 if (!arAccount) throw new Error('Akun Piutang (ACCOUNTS_RECEIVABLE) tidak tersedia.')
 
-                const discountSysAcc = getSysAcc('SALES_DISCOUNT')
-                const discountAccount = discountSysAcc?.coa || getCoaByCode('4-1199')
+                const discountAccount = await getSysAcc('SALES_DISCOUNT') || await getCoaByCode('4-1199')
 
-                const doctorPayableSysAcc = getSysAcc('DOCTOR_FEE_PAYABLE')
-                const doctorPayableAccount = doctorPayableSysAcc?.coa || await tx.chartOfAccount.findFirst({
-                    where: { code: '2-1102', OR: [{ clinicId: targetClinicId }, { clinicId: null }] }
-                })
+                const doctorPayableAccount = await getSysAcc('DOCTOR_FEE_PAYABLE') || await getCoaByCode('2-1102')
 
-                const doctorExpenseSysAcc = getSysAcc('DOCTOR_FEE_EXPENSE')
-                const doctorExpenseAccount = doctorExpenseSysAcc?.coa || await tx.chartOfAccount.findFirst({
-                    where: { code: '6-1102', OR: [{ clinicId: targetClinicId }, { clinicId: null }] }
-                })
+                const doctorExpenseAccount = await getSysAcc('DOCTOR_FEE_EXPENSE') || await getCoaByCode('6-1102')
 
                 await tx.journalEntry.create({
                     data: {
@@ -447,8 +467,7 @@ export const postInvoice = async (req: Request, res: Response) => {
 
             // --- SECTION B: PAYMENT JOURNALS (CASH/BANK) ---
             const payments = await tx.payment.findMany({ where: { invoiceId } })
-            const arSysAccForPay = getSysAcc('ACCOUNTS_RECEIVABLE')
-            const arAccountForPay = arSysAccForPay?.coa || await tx.chartOfAccount.findFirst({ where: { code: '1-1201', OR: [{ clinicId: targetClinicId }, { clinicId: null }] } })
+            const arAccountForPay = await getSysAcc('ACCOUNTS_RECEIVABLE') || await getCoaByCode('1-1201')
             
             let paymentSyncCount = 0
             for (const pay of payments) {

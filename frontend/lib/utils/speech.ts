@@ -15,7 +15,7 @@ let isSpeaking = false;
 // Function to process the queue
 const processQueue = () => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  
+
   if (isSpeaking || speechQueue.length === 0) return;
 
   const item = speechQueue.shift();
@@ -40,16 +40,16 @@ const processQueue = () => {
 
   // Crucial: cancel any ongoing speech to prevent getting stuck
   window.speechSynthesis.cancel();
-  
+
   // Actually speak
   window.speechSynthesis.speak(utterance);
 };
 
 export const announceQueue = (
-  queueNo: string, 
-  name: string, 
-  room: string, 
-  onStart?: () => void, 
+  queueNo: string,
+  name: string,
+  room: string,
+  onStart?: () => void,
   onEnd?: () => void
 ) => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -70,27 +70,27 @@ export const announceQueue = (
     : '';
 
   // Better phrasing with natural pauses
-  const text = queueNo 
-    ? `Nomor antrean, ${formattedQueueNo}. Atas nama, ${cleanName}. Silakan menuju, ${room}.`
+  const text = queueNo
+    ? `Nomor antrean ${formattedQueueNo}, atas nama ${cleanName}, silakan menuju ${room}.`
     : name;
-  
+
   const utterance = new SpeechSynthesisUtterance(text);
-  
+
   // 🎙️ IMPROVED VOICE SELECTION
   const loadVoices = () => {
     const voices = window.speechSynthesis.getVoices();
-    
+
     // Priority: 
     // 1. Google Indonesian (Best for Chrome)
     // 2. Microsoft Natural/Online Indonesian (Best for Edge)
     // 3. Known female Indonesian voices
     // 4. Any Indonesian voice
-    const bestVoice = 
+    const bestVoice =
       voices.find(v => v.lang.startsWith('id') && v.name.includes('Google')) ||
       voices.find(v => v.lang.startsWith('id') && v.name.includes('Natural')) ||
       voices.find(v => v.lang.startsWith('id') && (v.name.includes('Gadis') || v.name.includes('Andini') || v.name.toLowerCase().includes('female'))) ||
       voices.find(v => v.lang.startsWith('id'));
-    
+
     if (bestVoice) {
       utterance.voice = bestVoice;
       console.log(`[Speech] Using voice: ${bestVoice.name}`);
@@ -101,12 +101,12 @@ export const announceQueue = (
   if (window.speechSynthesis.onvoiceschanged !== undefined) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
-  
+
   utterance.lang = 'id-ID';
-  utterance.rate = 0.88; // Slightly slower for clarity
-  utterance.pitch = 1.0; // Natural pitch
+  utterance.rate = 2; // Fast and snappy
+  utterance.pitch = 1.0;
   utterance.volume = 1.0;
-  
+
   // Add to queue and process
   speechQueue.push({ utterance, onStart, onEnd });
   processQueue();
@@ -121,7 +121,7 @@ export const resetSpeech = () => {
     window.speechSynthesis.cancel();
     isSpeaking = false;
     speechQueue = [];
-    
+
     // Play a silent or very short utterance to "prime" the engine
     const prime = new SpeechSynthesisUtterance('');
     prime.volume = 0;

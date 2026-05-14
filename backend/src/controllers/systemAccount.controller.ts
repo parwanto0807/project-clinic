@@ -18,7 +18,58 @@ export const getSystemAccounts = async (req: Request, res: Response) => {
         coa: true
       }
     })
-    res.json(accounts)
+
+    // Define the full list of required system accounts in a logical order
+    const defaults = [
+        { key: 'ACCOUNTS_RECEIVABLE', name: 'Piutang Usaha (AR)' },
+        { key: 'SALES_REVENUE', name: 'Pendapatan Penjualan Obat' },
+        { key: 'SERVICE_REVENUE', name: 'Pendapatan Jasa Medis' },
+        { key: 'LAB_REVENUE', name: 'Pendapatan Laboratorium / Diagnostik' },
+        { key: 'SALES_DISCOUNT', name: 'Potongan Penjualan (Diskon)' },
+        { key: 'CASH_ACCOUNT', name: 'Kas Utama / Teller' },
+        { key: 'BANK_ACCOUNT', name: 'Bank (Transfer/EDC)' },
+        { key: 'PETTY_CASH', name: 'Kas Kecil (Petty Cash)' },
+        { key: 'INVENTORY_ACCOUNT', name: 'Persediaan Obat & BHP' },
+        { key: 'TAX_PAYABLE', name: 'Hutang Pajak (PPN)' },
+        { key: 'ACCOUNTS_PAYABLE', name: 'Hutang Usaha (Supplier)' },
+        { key: 'COGS', name: 'Harga Pokok Penjualan (HPP)' },
+        { key: 'PURCHASE_DISCOUNT', name: 'Potongan Pembelian' },
+        { key: 'EXPENSE_SALARY', name: 'Beban Gaji Karyawan' },
+        { key: 'EXPENSE_UTILITY', name: 'Beban Listrik/Air/Internet' },
+        { key: 'MAINTENANCE_EXPENSE', name: 'Beban Maintenance Alat' },
+        { key: 'INTER_BRANCH_CLEARING', name: 'Kliring Antar Cabang' },
+        { key: 'ASSET_EQUIPMENT', name: 'Aset Tetap: Peralatan Medis' },
+        { key: 'ASSET_INVENTORY', name: 'Aset Tetap: Inventaris & Furnitur' },
+        { key: 'ASSET_LAND_BUILDING', name: 'Aset Tetap: Tanah & Bangunan' },
+        { key: 'ACCUM_DEP_GENERAL', name: 'Akumulasi Penyusutan (General)' },
+        { key: 'RETAINED_EARNINGS', name: 'Laba Ditahan' },
+        { key: 'COMPOUND_SERVICE_REVENUE', name: 'Pendapatan Jasa Racik / Tuslah' },
+        { key: 'DOCTOR_FEE_PAYABLE', name: 'Hutang Jasa Medik / Doctor Fee' },
+        { key: 'DOCTOR_FEE_EXPENSE', name: 'Beban Jasa Medik / Doctor Fee Expense' },
+    ]
+
+    // Merge database accounts with defaults to ensure everything is visible
+    const mergedResults = defaults.map(def => {
+        const existing = accounts.find(a => a.key === def.key)
+        if (existing) {
+            return {
+                ...existing,
+                coaId: existing.coaId || ""
+            }
+        }
+        
+        return {
+            id: `temp-${def.key}`,
+            key: def.key,
+            name: def.name,
+            coaId: "",
+            clinicId: currentClinicId,
+            coa: null,
+            isNew: true
+        }
+    })
+
+    res.json(mergedResults)
   } catch (e) {
     res.status(500).json({ message: (e as Error).message })
   }
@@ -116,6 +167,7 @@ export const seedSystemAccounts = async (req: Request, res: Response) => {
             { key: 'COMPOUND_SERVICE_REVENUE', name: 'Pendapatan Jasa Racik / Tuslah' },
             { key: 'DOCTOR_FEE_PAYABLE', name: 'Hutang Jasa Medik / Doctor Fee' },
             { key: 'DOCTOR_FEE_EXPENSE', name: 'Beban Jasa Medik / Doctor Fee Expense' },
+            { key: 'LAB_REVENUE', name: 'Pendapatan Laboratorium / Diagnostik' },
         ]
 
         const results = []
@@ -132,26 +184,46 @@ export const seedSystemAccounts = async (req: Request, res: Response) => {
                 const fallbackCodes: Record<string, string> = {
                     'MAINTENANCE_EXPENSE': '6-1401',
                     'CASH_ACCOUNT': '1-1101',
-                    'SERVICE_REVENUE': '4-1301'
+                    'SERVICE_REVENUE': '4-1301',
+                    'LAB_REVENUE': '4-1401'
                 }
                 
                 let autoCoaId = null
                 if (fallbackCodes[item.key]) {
-                    const coa = await prisma.chartOfAccount.findFirst({
-                        where: { code: fallbackCodes[item.key], OR: [{ clinicId: currentClinicId }, { clinicId: null }] }
-                    })
-                    if (coa) autoCoaId = coa.id
+                    const baseCode = fallbackCodes[item.key]
+                    const clinic = await prisma.clinic.findUnique({ where: { id: currentClinicId || '' }, select: { code: true } })
+                    
+                    // Try clinic-specific code first (e.g. 4-1401-K001)
+                    if (clinic?.code) {
+                        const specificCode = `${baseCode}-${clinic.code}`
+                        const specificCoa = await prisma.chartOfAccount.findFirst({
+                            where: { code: specificCode, OR: [{ clinicId: currentClinicId }, { clinicId: null }] }
+                        })
+                        if (specificCoa) autoCoaId = specificCoa.id
+                    }
+
+                    // Fallback to generic code (e.g. 4-1401)
+                    if (!autoCoaId) {
+                        const coa = await prisma.chartOfAccount.findFirst({
+                            where: { code: baseCode, OR: [{ clinicId: currentClinicId }, { clinicId: null }] }
+                        })
+                        if (coa) autoCoaId = coa.id
+                    }
                 }
 
-                const created = await prisma.systemAccount.create({
-                    data: {
-                        key: item.key,
-                        name: item.name,
-                        clinicId: currentClinicId,
-                        coaId: autoCoaId || '' // coaId is required in schema? Let me check
-                    }
-                })
-                results.push({ key: item.key, status: 'created', coaId: autoCoaId })
+                if (autoCoaId) {
+                    const created = await prisma.systemAccount.create({
+                        data: {
+                            key: item.key,
+                            name: item.name,
+                            clinicId: currentClinicId,
+                            coaId: autoCoaId
+                        }
+                    })
+                    results.push({ key: item.key, status: 'created', coaId: autoCoaId })
+                } else {
+                    results.push({ key: item.key, status: 'skipped', reason: 'COA not found' })
+                }
             } else {
                 results.push({ key: item.key, status: 'exists' })
             }

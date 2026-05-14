@@ -695,18 +695,47 @@ export default function LabInputPage() {
                   {/* Ordered Lab Tests — specific test masters chosen by doctor */}
                   {(() => {
                     const ordered: any[] = orderDetails.doctorInstructions?.orderedTests || []
-                    // Also check consultationDraft as fallback
                     const draftLab = orderDetails.medicalRecord?.consultationDraft?.services?.filter((s: any) => s.isLab) || []
                     const finalServiceLab = orderDetails.medicalRecord?.services?.filter((s: any) =>
                       s.service?.serviceName?.toLowerCase().includes('lab') ||
                       s.service?.serviceCategory?.categoryName?.toLowerCase().includes('lab')
                     ) || []
 
-                    const hasOrdered = ordered.length > 0
-                    const hasDraft = draftLab.length > 0
-                    const hasFinal = finalServiceLab.length > 0
+                    // Merge and Deduplicate Instructions
+                    const mergedInstructions: any[] = []
+                    const seenNames = new Set()
 
-                    if (!hasOrdered && !hasDraft && !hasFinal) return null
+                    // Priority 1: Specific ordered tests from doctor instructions
+                    ordered.forEach(t => {
+                      const nameLower = t.name?.toLowerCase()
+                      if (nameLower && !seenNames.has(nameLower)) {
+                        mergedInstructions.push({ name: t.name, source: 'ordered' })
+                        seenNames.add(nameLower)
+                      }
+                    })
+
+                    // Priority 2: Finalized services in medical record
+                    finalServiceLab.forEach(s => {
+                      const name = s.service?.serviceName
+                      const nameLower = name?.toLowerCase()
+                      if (nameLower && !seenNames.has(nameLower)) {
+                        mergedInstructions.push({ name, source: 'final' })
+                        seenNames.add(nameLower)
+                      }
+                    })
+
+                    // Priority 3: Draft services if no final services exist
+                    if (finalServiceLab.length === 0) {
+                      draftLab.forEach(s => {
+                        const nameLower = s.name?.toLowerCase()
+                        if (nameLower && !seenNames.has(nameLower)) {
+                          mergedInstructions.push({ name: s.name, source: 'draft' })
+                          seenNames.add(nameLower)
+                        }
+                      })
+                    }
+
+                    if (mergedInstructions.length === 0) return null
 
                     return (
                       <div>
@@ -714,23 +743,24 @@ export default function LabInputPage() {
                           <HiOutlineBeaker className="w-3 h-3" /> Pemeriksaan Yang Diminta
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {/* From doctorInstructions (specific test masters, most accurate) */}
-                          {ordered.map((t: any, i: number) => {
+                          {mergedInstructions.map((t: any, i: number) => {
                             const testMaster = testMasters.find((m: any) => m.name?.toLowerCase() === t.name?.toLowerCase())
+                            const isAdded = testMaster && results.find(r => r.testMasterId === testMaster.id)
+                            
                             return (
                               <button
-                                key={`ordered-${i}`}
-                                onClick={() => testMaster && !isReadOnly && addTest(testMaster)}
-                                title={testMaster && !isReadOnly ? `Klik untuk tambah parameter "${testMaster.name}" ke hasil` : t.name}
+                                key={`instr-${i}`}
+                                onClick={() => testMaster && !isReadOnly && !isAdded && addTest(testMaster)}
+                                title={testMaster && !isReadOnly ? `Klik untuk tambah parameter "${t.name}" ke hasil` : t.name}
                                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase border transition-all shadow-sm
                                   ${testMaster && !isReadOnly
-                                    ? results.find(r => r.testMasterId === testMaster.id)
+                                    ? isAdded
                                       ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
                                       : 'bg-white border-sky-200 text-sky-700 hover:bg-sky-500 hover:text-white hover:border-sky-500 cursor-pointer'
                                     : 'bg-white border-slate-200 text-slate-600 cursor-default'
                                   }`}
                               >
-                                {testMaster && results.find(r => r.testMasterId === testMaster.id)
+                                {isAdded
                                   ? <FiCheckCircle className="w-3 h-3 text-emerald-500" />
                                   : testMaster && !isReadOnly
                                     ? <FiPlus className="w-3 h-3" />
@@ -740,43 +770,8 @@ export default function LabInputPage() {
                               </button>
                             )
                           })}
-
-                          {/* From final services */}
-                          {hasFinal && finalServiceLab.map((s: any) => (
-                            <span key={s.id} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold uppercase shadow-sm">
-                              <FiCheckCircle className="w-3 h-3 text-indigo-400" /> {s.service?.serviceName}
-                            </span>
-                          ))}
-
-                          {/* From draft services */}
-                          {!hasFinal && hasDraft && draftLab.map((s: any, idx: number) => {
-                            const testMaster = testMasters.find((m: any) =>
-                              m.name?.toLowerCase() === s.name?.toLowerCase() ||
-                              m.code?.toLowerCase() === s.code?.toLowerCase()
-                            )
-                            return (
-                              <button
-                                key={`draft-${idx}`}
-                                onClick={() => testMaster && !isReadOnly && addTest(testMaster)}
-                                title={testMaster && !isReadOnly ? `Klik untuk tambah parameter "${s.name}"` : s.name}
-                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase border transition-all shadow-sm
-                                  ${testMaster && !isReadOnly
-                                    ? results.find(r => r.testMasterId === testMaster.id)
-                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
-                                      : 'bg-white border-sky-200 text-sky-700 hover:bg-sky-500 hover:text-white hover:border-sky-500 cursor-pointer'
-                                    : 'bg-white border-amber-200 text-amber-700 cursor-default'
-                                  }`}
-                              >
-                                {testMaster && results.find(r => r.testMasterId === testMaster.id)
-                                  ? <FiCheckCircle className="w-3 h-3 text-emerald-500" />
-                                  : testMaster && !isReadOnly ? <FiPlus className="w-3 h-3" /> : <HiOutlineBeaker className="w-3 h-3" />
-                                }
-                                {s.name}
-                              </button>
-                            )
-                          })}
                         </div>
-                        {!isReadOnly && ordered.length > 0 && (
+                        {!isReadOnly && mergedInstructions.length > 0 && (
                           <p className="mt-3 text-[9px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1">
                             <FiPlus className="w-3 h-3" /> Klik badge biru untuk langsung tambah parameter ke tabel hasil
                           </p>
