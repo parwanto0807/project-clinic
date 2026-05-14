@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { toast } from 'react-hot-toast'
-import { FiUpload, FiFileText, FiCheckCircle, FiAlertCircle, FiChevronLeft, FiLoader } from 'react-icons/fi'
+import { FiUpload, FiFileText, FiCheckCircle, FiAlertCircle, FiChevronLeft, FiLoader, FiUserPlus, FiRefreshCw } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function ImportPatientsPage() {
@@ -153,21 +153,49 @@ export default function ImportPatientsPage() {
               animate={{ opacity: 1, x: 0 }}
               className="space-y-6"
             >
-              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-                <h3 className="font-black text-slate-900 uppercase text-sm tracking-widest mb-6">Hasil Import</h3>
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500" />
                 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-emerald-50 rounded-2xl">
-                    <span className="text-sm font-bold text-emerald-700">Pasien Baru</span>
-                    <span className="text-xl font-black text-emerald-800">{result.summary.totalImported}</span>
+                <div className="flex flex-col items-center text-center mb-8">
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3 animate-bounce">
+                    <FiCheckCircle className="w-10 h-10" />
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl">
-                    <span className="text-sm font-bold text-blue-700">Data Diupdate</span>
-                    <span className="text-xl font-black text-blue-800">{result.summary.totalUpdated}</span>
+                  <h3 className="font-black text-slate-900 uppercase text-lg tracking-tight">Import Selesai!</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Data Berhasil Disinkronisasi</p>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-rose-50 rounded-2xl">
-                    <span className="text-sm font-bold text-rose-700">Error / Gagal</span>
-                    <span className="text-xl font-black text-rose-800">{result.summary.totalErrors}</span>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl group hover:bg-emerald-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-500 shadow-sm">
+                        <FiUserPlus className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">Pasien Baru</span>
+                    </div>
+                    <span className="text-xl font-black text-emerald-600">{result.summary.totalImported}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center p-4 bg-blue-50/50 border border-blue-100 rounded-2xl group hover:bg-blue-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-blue-500 shadow-sm">
+                        <FiRefreshCw className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">Data Diupdate</span>
+                    </div>
+                    <span className="text-xl font-black text-blue-600">{result.summary.totalUpdated}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-rose-50/50 border border-rose-100 rounded-2xl group hover:bg-rose-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-rose-500 shadow-sm">
+                        <FiAlertCircle className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">Error / Gagal</span>
+                    </div>
+                    <span className="text-xl font-black text-rose-600">{result.summary.totalErrors}</span>
                   </div>
                 </div>
 
