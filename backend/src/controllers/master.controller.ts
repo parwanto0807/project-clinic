@@ -1100,6 +1100,8 @@ export const createProductMaster = async (req: Request, res: Response) => {
     // 1. Handle Image
     if (req.file) {
       data.image = `/uploads/${req.file.filename}`
+    } else if (data.image === 'undefined' || data.image === 'null' || data.image === '/uploads/undefined') {
+      delete data.image
     }
 
     // 2. Parse Numbers
@@ -1141,6 +1143,8 @@ export const updateProductMaster = async (req: Request, res: Response) => {
     // 1. Handle Image
     if (req.file) {
       data.image = `/uploads/${req.file.filename}`
+    } else if (data.image === 'undefined' || data.image === 'null' || data.image === '/uploads/undefined') {
+      delete data.image
     }
 
     // 2. Parse Numbers

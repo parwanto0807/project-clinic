@@ -206,7 +206,7 @@ export default function ProductsPage() {
       qtyPerStorageUnit: r.qtyPerStorageUnit || 1
     })
     const img = getProductImage(r)
-    setImagePreview(img ? process.env.NEXT_PUBLIC_API_URL + img : null)
+    setImagePreview(img ? (process.env.NEXT_PUBLIC_API_URL || '') + img : null)
     setError('')
     setModalOpen(true)
   }
@@ -285,13 +285,15 @@ export default function ProductsPage() {
   }
 
   const getProductImage = (r: ProductInventory) => {
-    return r.image || r.medicine?.image || null
+    const img = r.image || r.medicine?.image
+    if (!img || img === 'null' || img === 'undefined' || img.includes('undefined') || img.includes('/null')) return null
+    return img
   }
 
   const columns: Column<ProductInventory>[] = [
     { key: 'image', label: '', render: (r: ProductInventory) => {
       const img = getProductImage(r)
-      const apiBase = process.env.NEXT_PUBLIC_API_URL
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
       return (
         <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center shadow-sm">
           {img ? (
