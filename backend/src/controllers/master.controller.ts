@@ -1137,13 +1137,14 @@ export const getProductMasters = async (req: Request, res: Response) => {
       const primaryProduct = branchProducts[0]
 
       const primaryReserved = primaryProduct ? (reservedByProduct[primaryProduct.id] || 0) : 0
+      const stock = targetClinicId && primaryProduct ? Math.max(0, primaryProduct.quantity - primaryReserved) : totalAvailable
       
       return {
         ...p,
-        compoundFormulaId: p.compoundFormulaId || null, // Explicitly include for frontend
+        compoundFormulaId: p.compoundFormulaId || null, 
         totalStock: physicalStock,
-        stock: targetClinicId && primaryProduct ? Math.max(0, primaryProduct.quantity - primaryReserved) : totalAvailable,
-        availableStock: totalAvailable,
+        stock: stock,
+        availableStock: stock, // Ensure consistency between field names
         unit: primaryProduct?.usedUnit || primaryProduct?.unit || p.usedUnit || p.defaultUnit || 'Unit'
       }
     })

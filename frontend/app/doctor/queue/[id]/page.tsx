@@ -145,6 +145,7 @@ export default function DoctorConsultationPage() {
   const [isRMEInfoOpen, setIsRMEInfoOpen] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
   const [isPrescriptionRedirect, setIsPrescriptionRedirect] = useState(false)
+  const [isSearchingMed, setIsSearchingMed] = useState(false)
   const hasFetchedRef = useRef<string | null>(null)
   const labDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -320,9 +321,11 @@ export default function DoctorConsultationPage() {
       // Tampilkan dropdown jika sedang dibuka, tidak peduli panjang search text
       if (!isMedDropdownOpen && !isMedDialogOpen) {
         setSearchMedicines([])
+        setIsSearchingMed(false)
         return
       }
       try {
+        setIsSearchingMed(true)
         const medRes = await api.get('master/products', { 
           headers: queue?.clinicId ? { 'x-clinic-id': queue.clinicId } : undefined,
           params: { 
@@ -344,11 +347,10 @@ export default function DoctorConsultationPage() {
           : []
         setSearchMedicines(processedList)
       } catch (e: any) {
-        if (e.name === 'CanceledError' || e.name === 'AbortError') {
-          // Silently ignore aborted requests
-          return
-        }
+        if (e.name === 'CanceledError' || e.name === 'AbortError') return
         console.error('Medicine search failed:', e)
+      } finally {
+        setIsSearchingMed(false)
       }
     }, 300)
 
@@ -1783,11 +1785,14 @@ export default function DoctorConsultationPage() {
                         </button>
                       )
                     })}
-                    {searchMedicines.length === 0 && searchMed && (
+                    {searchMedicines.length === 0 && searchMed && !isSearchingMed && (
                       <div className="text-center py-10 text-slate-400 text-xs font-bold">Obat tidak ditemukan (atau stok kosong)</div>
                     )}
-                    {searchMedicines.length === 0 && !searchMed && (
-                      <div className="text-center py-10 text-slate-400 text-xs font-bold animate-pulse">Memuat daftar obat tersedia...</div>
+                    {isSearchingMed && (
+                      <div className="text-center py-10 text-slate-400 text-xs font-bold animate-pulse">Mencari obat tersedia...</div>
+                    )}
+                    {searchMedicines.length === 0 && !searchMed && !isSearchingMed && (
+                      <div className="text-center py-10 text-slate-400 text-xs font-bold">Tidak ada daftar obat dengan stok tersedia.</div>
                     )}
                   </div>
                 </div>
