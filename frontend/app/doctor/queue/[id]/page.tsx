@@ -143,6 +143,8 @@ export default function DoctorConsultationPage() {
   const [currentPrintLab, setCurrentPrintLab] = useState<any>(null)
   
   const [isRMEInfoOpen, setIsRMEInfoOpen] = useState(false)
+  const [showFinalConfirm, setShowFinalConfirm] = useState(false)
+  const [isPrescriptionRedirect, setIsPrescriptionRedirect] = useState(false)
   const hasFetchedRef = useRef<string | null>(null)
   const labDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -440,15 +442,15 @@ export default function DoctorConsultationPage() {
 
     // Confirmation dialog for final saving
     if (isFinal) {
-      const confirmSave = window.confirm(
-        "Konfirmasi Penyelesaian Pemeriksaan\n\n" +
-        "Apakah Anda yakin ingin menyelesaikan pemeriksaan ini? \n" +
-        "Setelah disimpan, rekam medis akan dikunci secara permanen untuk keperluan arsip (Archive) dan tidak dapat dibuka kembali untuk pengeditan. \n\n" +
-        "Pastikan semua diagnosis, tindakan, dan resep obat sudah benar."
-      );
-      if (!confirmSave) return;
+      setIsPrescriptionRedirect(goToPrescription)
+      setShowFinalConfirm(true)
+      return
     }
 
+    await executeSave(false, goToPrescription)
+  }
+
+  const executeSave = async (isFinal: boolean, goToPrescription: boolean) => {
     setSaving(true)
     const toastId = toast.loading(isFinal ? 'Menyimpan hasil konsultasi...' : 'Menyimpan draft...')
     try {
@@ -465,7 +467,7 @@ export default function DoctorConsultationPage() {
       }
 
       await api.post('transactions/medical-records/doctor', {
-        queueId: queue.id,
+        queueId: queue!.id,
         medicalRecordId: medicalRecord.id,
         subjective,
         objective,
@@ -502,8 +504,7 @@ export default function DoctorConsultationPage() {
       toast.success(isFinal ? 'Pemeriksaan selesai!' : 'Draft disimpan!', { id: toastId })
       
       if (goToPrescription) {
-        // Asumsi format route pasien: /doctor/patients/[id]?tab=prescriptions
-        router.push(`/doctor/patients/${queue.patientId}?tab=prescriptions`)
+        router.push(`/doctor/patients/${queue!.patientId}?tab=prescriptions`)
       } else if (isFinal) {
         router.push('/doctor/queue')
       }
@@ -511,6 +512,7 @@ export default function DoctorConsultationPage() {
       toast.error('Gagal menyimpan data', { id: toastId })
     } finally {
       setSaving(false)
+      setShowFinalConfirm(false)
     }
   }
 
@@ -2328,6 +2330,68 @@ export default function DoctorConsultationPage() {
                 >
                   SAYA MENGERTI
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Premium Final Confirmation Modal */}
+      <AnimatePresence>
+        {showFinalConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFinalConfirm(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100"
+            >
+              <div className="p-10 text-center">
+                <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8 relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping opacity-20" />
+                  <FiCheckCircle className="w-12 h-12 text-primary relative z-10" />
+                </div>
+                
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-widest mb-4">Selesaikan Pemeriksaan?</h3>
+                
+                <div className="space-y-4 mb-10">
+                   <p className="text-sm font-medium text-slate-500 leading-relaxed">
+                     Apakah Anda yakin ingin menyelesaikan pemeriksaan ini? Setelah disimpan, **Rekam Medis akan dikunci secara permanen** untuk keperluan arsip dan tidak dapat diubah kembali.
+                   </p>
+                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3 text-left">
+                     <FiAlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                     <p className="text-[11px] font-bold text-amber-800 leading-tight uppercase tracking-tight">
+                       Pastikan semua Diagnosis (ICD-10), Tindakan Medis, dan Resep Obat sudah benar dan lengkap sebelum melanjutkan.
+                     </p>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => setShowFinalConfirm(false)}
+                    className="py-4 px-6 bg-slate-50 text-slate-500 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:bg-slate-100 transition-all active:scale-95"
+                  >
+                    Tinjau Kembali
+                  </button>
+                  <button 
+                    onClick={() => executeSave(true, isPrescriptionRedirect)}
+                    disabled={saving}
+                    className="py-4 px-6 bg-primary text-white font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+                  >
+                    {saving ? 'MEMPROSES...' : 'YA, SELESAIKAN & KUNCI'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border-t border-slate-100 p-4 text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Integrasi Rekam Medis Elektronik (RME) Yasfina</p>
               </div>
             </motion.div>
           </div>

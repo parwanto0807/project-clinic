@@ -363,7 +363,17 @@ export default function FinanceDashboard() {
               <FiDollarSign className="w-6 h-6 md:w-8 md:h-8 text-primary" />
            </div>
            <div>
-              <h1 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight uppercase leading-none">Finance Center</h1>
+              <div className="flex items-center gap-4">
+                <h1 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight uppercase leading-none">Finance Center</h1>
+                <button 
+                  onClick={() => fetchData()}
+                  disabled={loading}
+                  className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-primary hover:border-primary/30 hover:shadow-lg hover:shadow-primary/10 transition-all active:scale-90 group"
+                  title="Refresh Data Keuangan"
+                >
+                  <FiRefreshCw className={`w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin text-primary' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                </button>
+              </div>
               <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Billing & Invoicing Revenue</p>
            </div>
         </div>

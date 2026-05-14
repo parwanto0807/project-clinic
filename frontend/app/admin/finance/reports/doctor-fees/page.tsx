@@ -353,7 +353,101 @@ export default function DoctorFeeReportPage() {
         )}
       </AnimatePresence>
 
-      {/* ... EXISTING MANUAL MODAL CODE ... */}
+      {/* MANUAL INPUT MODAL */}
+      <AnimatePresence>
+        {isManualModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsManualModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-8">
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-16 h-16 rounded-3xl bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-200 mb-4">
+                  <FiPlus className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Input Jasa Medik Manual</h3>
+                <p className="text-sm font-bold text-slate-400 mt-1">Tambahkan penyesuaian jasa medik (misal: Uang Duduk/Insentif)</p>
+              </div>
+
+              <form onSubmit={handleManualSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Dokter</label>
+                  <select 
+                    required 
+                    value={manualForm.doctorId} 
+                    onChange={(e) => setManualForm({...manualForm, doctorId: e.target.value})} 
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-800"
+                  >
+                    <option value="">-- Pilih Dokter --</option>
+                    {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Layanan (Opsional - Untuk Auto Fill)</label>
+                  <select 
+                    value={manualForm.serviceId} 
+                    onChange={(e) => {
+                      const service = services.find(s => s.id === e.target.value)
+                      if (service) {
+                        setManualForm({
+                          ...manualForm, 
+                          serviceId: e.target.value,
+                          amount: service.doctorFee.toString(),
+                          description: service.serviceName
+                        })
+                      } else {
+                        setManualForm({...manualForm, serviceId: e.target.value})
+                      }
+                    }} 
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-800"
+                  >
+                    <option value="">-- Pilih Layanan (Custom) --</option>
+                    {services.map(s => <option key={s.id} value={s.id}>{s.serviceName} ({formatCurrency(s.doctorFee)})</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Deskripsi / Keterangan</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={manualForm.description} 
+                    onChange={(e) => setManualForm({...manualForm, description: e.target.value})} 
+                    placeholder="Contoh: Uang Duduk Shift Malam"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nominal (Rp)</label>
+                    <input 
+                      type="number" 
+                      required 
+                      value={manualForm.amount} 
+                      onChange={(e) => setManualForm({...manualForm, amount: e.target.value})} 
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tanggal</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={manualForm.date} 
+                      onChange={(e) => setManualForm({...manualForm, date: e.target.value})} 
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={submitting} className="w-full py-5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100 mt-4">
+                  {submitting ? 'Menyimpan...' : 'Tambahkan Jasa'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

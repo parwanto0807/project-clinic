@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '../lib/prisma'
 import { getPaginationOptions, PaginatedResult } from '../utils/pagination'
+import { parseLocalDate } from '../utils/date'
 
 /**
  * Get Doctor Commission / Fee Report
@@ -16,12 +17,10 @@ export const getDoctorFeeReport = async (req: Request, res: Response) => {
 
     const dateWhere: any = {}
     if (startDate) {
-      dateWhere.gte = new Date(String(startDate))
-      dateWhere.gte.setHours(0, 0, 0, 0)
+      dateWhere.gte = parseLocalDate(String(startDate))
     }
     if (endDate) {
-      dateWhere.lte = new Date(String(endDate))
-      dateWhere.lte.setHours(23, 59, 59, 999)
+      dateWhere.lte = parseLocalDate(String(endDate), true)
     }
 
     const where: any = {
@@ -105,7 +104,7 @@ export const createManualCommission = async (req: Request, res: Response) => {
           clinicId,
           amount: parseFloat(amount),
           description,
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseLocalDate(String(date)) : new Date(),
           type: 'MANUAL',
           status: 'unpaid'
         },
@@ -182,7 +181,7 @@ export const payCommissions = async (req: Request, res: Response) => {
       // 2. Mark as Paid
       await (tx as any).doctorCommission.updateMany({
         where: { id: { in: commissionIds } },
-        data: { status: 'paid', paidAt: date ? new Date(date) : new Date() }
+        data: { status: 'paid', paidAt: date ? parseLocalDate(String(date)) : new Date() }
       })
 
       // 3. Create Journal Entry
@@ -196,7 +195,7 @@ export const payCommissions = async (req: Request, res: Response) => {
 
       await tx.journalEntry.create({
         data: {
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseLocalDate(String(date)) : new Date(),
           description: `Pembayaran Jasa Medik: ${doctorName} (${displayDesc})`,
           referenceNo: `PAY-${Date.now().toString().slice(-6)}`,
           entryType: 'SYSTEM',
