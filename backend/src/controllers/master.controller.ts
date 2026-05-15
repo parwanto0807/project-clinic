@@ -2252,4 +2252,42 @@ export const importPatients = async (req: Request, res: Response) => {
   }
 }
 
+// ==================== ICD-10 ====================
+export const getIcd10 = async (req: Request, res: Response) => {
+  try {
+    const { search } = req.query
+    const { skip, take, page, limit } = getPaginationOptions(req.query)
+
+    const where: any = search ? {
+      OR: [
+        { code: { contains: String(search), mode: 'insensitive' } },
+        { nameEn: { contains: String(search), mode: 'insensitive' } },
+        { nameId: { contains: String(search), mode: 'insensitive' } },
+      ]
+    } : {}
+
+    const [total, data] = await Promise.all([
+      prisma.icd10.count({ where }),
+      prisma.icd10.findMany({
+        where,
+        orderBy: { code: 'asc' },
+        skip: skip || 0,
+        take: limit || 50
+      })
+    ])
+
+    res.json({
+      data,
+      meta: {
+        total,
+        page: page || 1,
+        limit: limit || 50,
+        totalPages: Math.ceil(total / (limit || 50))
+      }
+    })
+  } catch (e) {
+    res.status(500).json({ message: (e as Error).message })
+  }
+}
+
 

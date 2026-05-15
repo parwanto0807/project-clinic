@@ -310,6 +310,8 @@ model MedicalRecord {
   doctorId           String?
   chiefComplaint     String
   diagnosis          String?
+  icd10Id            String?
+  icd10              Icd10?                    @relation(fields: [icd10Id], references: [id])
   treatmentPlan      String?
   notes              String?
   recordDate         DateTime                  @default(now())
@@ -1585,4 +1587,20 @@ model DoctorCommission {
   @@index([clinicId])
   @@index([date])
   @@map("doctor_commissions")
+}
+model Icd10 {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  nameEn     String?
+  nameId     String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  medicalRecords MedicalRecord[]
+
+  @@index([code])
+  @@index([nameEn])
+  @@index([nameId])
+  @@map("icd10")
 }

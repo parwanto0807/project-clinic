@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import {
-  FiHome, FiMenu, FiX, FiUsers, FiClock, FiLogOut
+  FiHome, FiMenu, FiX, FiUsers, FiClock, FiLogOut, FiBookOpen
 } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 
@@ -13,6 +13,7 @@ const DOCTOR_MENU = [
   { icon: FiHome, label: 'Dashboard', href: '/doctor' },
   { icon: FiClock, label: 'Antrian Hari Ini', href: '/doctor/queue' },
   { icon: FiUsers, label: 'Riwayat Pasien', href: '/doctor/patients' },
+  { icon: FiBookOpen, label: 'Master ICD-10', href: '/doctor/icd10' },
 ]
 
 const DoctorSidebarItem = ({ 

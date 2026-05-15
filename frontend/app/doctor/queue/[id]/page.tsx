@@ -100,6 +100,13 @@ export default function DoctorConsultationPage() {
   const [subjective, setSubjective] = useState('')
   const [objective, setObjective] = useState('')
   const [diagnosis, setDiagnosis] = useState('')
+  const [icd10Id, setIcd10Id] = useState<string | null>(null)
+  const [selectedIcd10, setSelectedIcd10] = useState<any>(null)
+  const [searchIcd, setSearchIcd] = useState('')
+  const [icdResults, setIcdResults] = useState<any[]>([])
+  const [isSearchingIcd, setIsSearchingIcd] = useState(false)
+  const [isIcdDropdownOpen, setIsIcdDropdownOpen] = useState(false)
+  const [highlightedIcdIndex, setHighlightedIcdIndex] = useState(-1)
   const [treatmentPlan, setTreatmentPlan] = useState('')
   const [labNotes, setLabNotes] = useState('')
   const [labResults, setLabResults] = useState('')
@@ -148,6 +155,8 @@ export default function DoctorConsultationPage() {
   const [isSearchingMed, setIsSearchingMed] = useState(false)
   const hasFetchedRef = useRef<string | null>(null)
   const labDropdownRef = useRef<HTMLDivElement>(null)
+  const icdContainerRef = useRef<HTMLDivElement>(null)
+  const icdItemRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const isReadOnly = useMemo(() => queue?.status === 'completed', [queue])
 
@@ -194,6 +203,8 @@ export default function DoctorConsultationPage() {
           setSubjective(data.subjective || '')
           setObjective(data.objective || '')
           setDiagnosis(data.diagnosis || '')
+          setIcd10Id(data.icd10Id || null)
+          setSelectedIcd10(data.icd10 || null)
           setTreatmentPlan(data.treatmentPlan || '')
           setLabNotes(data.labNotes || '')
           setLabResults(data.labResults || '')
@@ -370,6 +381,44 @@ export default function DoctorConsultationPage() {
     }
   }, [searchMed, isMedDropdownOpen, isMedDialogOpen, isReadOnly, queue?.clinicId])
 
+  // ICD-10 Search Logic
+  useEffect(() => {
+    if (isReadOnly || !isIcdDropdownOpen) return
+    const controller = new AbortController()
+    
+    const searchTimeout = setTimeout(async () => {
+      try {
+        setIsSearchingIcd(true)
+        const res = await api.get('master/icd10', {
+          params: { search: searchIcd, limit: 10 },
+          signal: controller.signal
+        })
+        setIcdResults(res.data.data || [])
+        setHighlightedIcdIndex(-1) // Reset highlight on new results
+      } catch (e: any) {
+        if (e.name === 'CanceledError' || e.name === 'AbortError') return
+        console.error('ICD10 search failed:', e)
+      } finally {
+        setIsSearchingIcd(false)
+      }
+    }, 300)
+
+    return () => {
+      clearTimeout(searchTimeout)
+      controller.abort()
+    }
+  }, [searchIcd, isIcdDropdownOpen, isReadOnly])
+
+  // Auto-scroll highlighted ICD item into view
+  useEffect(() => {
+    if (highlightedIcdIndex >= 0 && icdItemRefs.current[highlightedIcdIndex]) {
+      icdItemRefs.current[highlightedIcdIndex]?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth'
+      })
+    }
+  }, [highlightedIcdIndex])
+
   // Service Search Logic
   useEffect(() => {
     if (isReadOnly || (!searchService && !isServiceDropdownOpen)) {
@@ -484,6 +533,7 @@ export default function DoctorConsultationPage() {
         subjective,
         objective,
         diagnosis,
+        icd10Id,
         treatmentPlan,
         labNotes,
         labResults,
@@ -1016,9 +1066,106 @@ export default function DoctorConsultationPage() {
                     <div className="space-y-3 group">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-black">A</div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-focus-within:text-primary transition-colors">Assessment (Diagnosa)</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-focus-within:text-primary transition-colors">Assessment (Diagnosa ICD-10)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={`w-full p-6 border border-slate-200 rounded-3xl min-h-[160px] text-sm font-bold focus:bg-white focus:border-primary outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-slate-50'}`} placeholder="Diagnosa medis, ICD-10..." />
+                      
+                      {/* ICD-10 Search */}
+                      {!isReadOnly && (
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                          <div className="relative group">
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <input 
+                              value={searchIcd}
+                              onChange={(e) => {
+                                setSearchIcd(e.target.value)
+                                if (!isIcdDropdownOpen) setIsIcdDropdownOpen(true)
+                              }}
+                              onFocus={() => setIsIcdDropdownOpen(true)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'ArrowDown') {
+                                  e.preventDefault()
+                                  setHighlightedIcdIndex(prev => (prev < icdResults.length - 1 ? prev + 1 : prev))
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault()
+                                  setHighlightedIcdIndex(prev => (prev > 0 ? prev - 1 : prev))
+                                } else if (e.key === 'Enter') {
+                                  if (highlightedIcdIndex >= 0 && icdResults[highlightedIcdIndex]) {
+                                    e.preventDefault()
+                                    const item = icdResults[highlightedIcdIndex]
+                                    setIcd10Id(item.id)
+                                    setSelectedIcd10(item)
+                                    if (!diagnosis) setDiagnosis(item.nameId || item.nameEn)
+                                    setIsIcdDropdownOpen(false)
+                                    setSearchIcd('')
+                                    setHighlightedIcdIndex(-1)
+                                  }
+                                } else if (e.key === 'Escape') {
+                                  setIsIcdDropdownOpen(false)
+                                  setHighlightedIcdIndex(-1)
+                                }
+                              }}
+                              placeholder="Cari kode atau nama penyakit ICD-10..."
+                              className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:bg-white focus:border-primary shadow-inner transition-all"
+                            />
+                            {isSearchingIcd && <FiRefreshCw className="absolute right-4 top-1/2 -translate-y-1/2 text-primary animate-spin" />}
+                          </div>
+                          
+                          <AnimatePresence>
+                            {isIcdDropdownOpen && icdResults.length > 0 && (
+                              <motion.div 
+                                ref={icdContainerRef}
+                                initial={{ opacity: 0, y: 5 }} 
+                                animate={{ opacity: 1, y: 0 }} 
+                                exit={{ opacity: 0 }} 
+                                className="absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-[300px] overflow-y-auto p-2"
+                              >
+                                {icdResults.map((item, idx) => (
+                                  <button 
+                                    key={item.id} 
+                                    ref={el => { icdItemRefs.current[idx] = el }}
+                                    onMouseEnter={() => setHighlightedIcdIndex(idx)}
+                                    onClick={() => {
+                                      setIcd10Id(item.id)
+                                      setSelectedIcd10(item)
+                                      if (!diagnosis) setDiagnosis(item.nameId || item.nameEn)
+                                      setIsIcdDropdownOpen(false)
+                                      setSearchIcd('')
+                                      setHighlightedIcdIndex(-1)
+                                    }}
+                                    className={`w-full p-4 text-left rounded-xl transition-all border-b border-slate-50 last:border-0 ${highlightedIcdIndex === idx ? 'bg-primary/10' : 'hover:bg-slate-50'}`}
+                                  >
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="text-[10px] font-black bg-primary/5 text-primary px-2 py-0.5 rounded border border-primary/10">{item.code}</span>
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-700">{item.nameId || item.nameEn}</p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* Selected ICD-10 Display */}
+                      {selectedIcd10 && (
+                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded">{selectedIcd10.code}</span>
+                            <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{selectedIcd10.nameId || selectedIcd10.nameEn}</span>
+                          </div>
+                          {!isReadOnly && (
+                            <button onClick={() => { setIcd10Id(null); setSelectedIcd10(null); }} className="text-rose-400 hover:text-rose-600 p-1 transition-colors">
+                              <FiTrash2 />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      <textarea disabled={isReadOnly} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={`w-full p-6 border border-slate-200 rounded-3xl min-h-[120px] text-sm font-bold focus:bg-white focus:border-primary outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-slate-50'}`} placeholder="Diagnosa spesifik atau catatan tambahan..." />
                     </div>
 
                     {/* P Quadrant */}
@@ -1707,7 +1854,15 @@ export default function DoctorConsultationPage() {
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-0 md:pl-14">
                               <div className="space-y-2">
                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Diagnosa</p>
-                                 <p className="text-sm font-bold text-slate-800 leading-relaxed italic">"{h.diagnosis || '-'}"</p>
+                                 <div className="flex flex-col gap-1">
+                                   {h.icd10 && (
+                                     <div className="flex items-center gap-2">
+                                       <span className="text-[8px] font-black bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">{h.icd10.code}</span>
+                                       <span className="text-[10px] font-bold text-slate-700">{h.icd10.nameId || h.icd10.nameEn}</span>
+                                     </div>
+                                   )}
+                                   <p className="text-sm font-bold text-slate-800 leading-relaxed italic">"{h.diagnosis || '-'}"</p>
+                                 </div>
                               </div>
                               <div className="space-y-2">
                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rencana Terapi</p>

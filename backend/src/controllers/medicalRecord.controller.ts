@@ -137,12 +137,13 @@ export const saveNurseVitals = async (req: Request, res: Response) => {
  */
 export const saveDoctorConsultation = async (req: Request, res: Response) => {
   try {
-    const { 
+        const { 
         queueId,
         medicalRecordId,
         subjective,
         objective,
         diagnosis,
+        icd10Id,
         treatmentPlan,
         labNotes,
         labResults,
@@ -163,16 +164,17 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
           subjective,
           objective,
           diagnosis,
+          icd10Id,
           treatmentPlan,
           labNotes,
           labResults,
           notes,
           hasInformedConsent: !!hasInformedConsent,
-          consultationDraft: !isFinal ? { subjective, objective, diagnosis, treatmentPlan, services, prescriptions } : Prisma.DbNull,
+          consultationDraft: !isFinal ? { subjective, objective, diagnosis, icd10Id, treatmentPlan, services, prescriptions } : Prisma.DbNull,
           // Only update doctorId if we have a valid doctor account
           ...( (req as any).user.doctor?.id ? { doctorId: (req as any).user.doctor.id } : {} )
         },
-        include: { patient: true, services: true }
+        include: { patient: true, services: true, icd10: true }
       })
 
       // 1.1 Handle Clinical Services (Tindakan)
@@ -651,7 +653,8 @@ export const getMedicalRecordsByPatient = async (req: Request, res: Response) =>
                     id: true,
                     name: true
                   }
-                }
+                },
+                icd10: true
             },
             orderBy: { recordDate: 'desc' }
         })
