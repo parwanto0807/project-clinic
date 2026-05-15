@@ -9,7 +9,8 @@ import { getPaginationOptions, PaginatedResult } from '../utils/pagination';
  */
 export const getBranchStocks = async (req: Request, res: Response) => {
   try {
-    const { branchId, search, productId } = req.query;
+    const { search, productId } = req.query;
+    const branchId = req.query.branchId || req.headers['x-clinic-id'];
 
     if (!branchId) {
       return res.status(400).json({ message: 'branchId is required' });
@@ -87,7 +88,8 @@ export const getBranchStocks = async (req: Request, res: Response) => {
           productName: p.productName,
           productCode: p.productCode,
           isMedicine: (p.masterProduct?.productCategory?.categoryName || '').toLowerCase().includes('obat') || (p.masterProduct?.productCategory?.categoryName || '').toLowerCase().includes('medicine'),
-          purchasePrice: p.purchasePrice
+          purchasePrice: p.purchasePrice,
+          sellingPrice: p.sellingPrice
         }
       };
     });
@@ -118,7 +120,8 @@ export const getBranchStocks = async (req: Request, res: Response) => {
  */
 export const getBranchProducts = async (req: Request, res: Response) => {
   try {
-    const { branchId, search, lowStock } = req.query;
+    const { search, lowStock } = req.query;
+    const branchId = req.query.branchId || req.headers['x-clinic-id'];
     if (!branchId) return res.status(400).json({ message: 'branchId is required' });
 
     const products = await prisma.product.findMany({
@@ -152,7 +155,8 @@ export const getBranchProducts = async (req: Request, res: Response) => {
  */
 export const getStockMutations = async (req: Request, res: Response) => {
   try {
-    const { branchId, productId, startDate, endDate } = req.query;
+    const { productId, startDate, endDate } = req.query;
+    const branchId = req.query.branchId || req.headers['x-clinic-id'];
 
     if (!branchId) {
       return res.status(400).json({ message: 'branchId is required' });

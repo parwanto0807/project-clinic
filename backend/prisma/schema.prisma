@@ -8,55 +8,56 @@ datasource db {
 }
 
 model Clinic {
-  id                  String                @id @default(uuid())
-  name                String
-  code                String                @unique
-  address             String?
-  phone               String?
-  email               String?
-  logo                String?
-  isActive            Boolean               @default(true)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  isMain              Boolean               @default(false)
-  deletedAt           DateTime?
-  appointments        Appointment[]
-  assetTransfersFrom  AssetTransfer[]       @relation("AssetTransferFrom")
-  assetTransfersTo    AssetTransfer[]       @relation("AssetTransferTo")
-  assets              Asset[]
-  banks               Bank[]
-  branchProductPrices BranchProductPrice[]
-  chartOfAccounts     ChartOfAccount[]
-  compoundFormulas    CompoundFormula[]
-  departments         Department[]
-  doctorSchedules     DoctorSchedule[]
-  expenses            Expense[]
-  financialReports    FinancialReport[]
-  transfersReceived   InterBranchTransfer[] @relation("TransferDest")
-  transfersSent       InterBranchTransfer[] @relation("TransferSource")
-  inventoryAuditLogs  InventoryAuditLog[]
-  inventoryBatches    InventoryBatch[]
-  inventoryMutations  InventoryMutation[]
-  inventoryReturns    InventoryReturn[]
-  inventoryStocks     InventoryStock[]
-  invoices            Invoice[]
-  journalEntries      JournalEntry[]
-  medicalRecords      MedicalRecord[]
-  medicines           Medicine[]
-  openingBalances     OpeningBalance[]
-  procurementPayments ProcurementPayment[]
-  procurements        Procurement[]
-  products            Product[]
-  queueNumbers        QueueNumber[]
-  referrals           Referral[]
-  registrations       Registration[]
-  services            Service[]
-  siteSettings        SiteSetting[]
-  stockOpnames        StockOpnameSession[]
-  systemAccounts      SystemAccount[]
-  users               UserClinic[]
-  doctorCommissions   DoctorCommission[]
-  cashTransfers       CashTransfer[]
+  id                      String                   @id @default(uuid())
+  name                    String
+  code                    String                   @unique
+  address                 String?
+  phone                   String?
+  email                   String?
+  logo                    String?
+  isActive                Boolean                  @default(true)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  isMain                  Boolean                  @default(false)
+  deletedAt               DateTime?
+  appointments            Appointment[]
+  assetTransfersFrom      AssetTransfer[]          @relation("AssetTransferFrom")
+  assetTransfersTo        AssetTransfer[]          @relation("AssetTransferTo")
+  assets                  Asset[]
+  banks                   Bank[]
+  branchProductPrices     BranchProductPrice[]
+  chartOfAccounts         ChartOfAccount[]
+  compoundFormulas        CompoundFormula[]
+  departments             Department[]
+  doctorSchedules         DoctorSchedule[]
+  expenses                Expense[]
+  financialReports        FinancialReport[]
+  transfersReceived       InterBranchTransfer[]    @relation("TransferDest")
+  transfersSent           InterBranchTransfer[]    @relation("TransferSource")
+  inventoryAuditLogs      InventoryAuditLog[]
+  inventoryBatches        InventoryBatch[]
+  inventoryMutations      InventoryMutation[]
+  inventoryReturns        InventoryReturn[]
+  inventoryStocks         InventoryStock[]
+  invoices                Invoice[]
+  journalEntries          JournalEntry[]
+  medicalRecords          MedicalRecord[]
+  medicines               Medicine[]
+  openingBalances         OpeningBalance[]
+  procurementPayments     ProcurementPayment[]
+  procurements            Procurement[]
+  products                Product[]
+  queueNumbers            QueueNumber[]
+  referrals               Referral[]
+  registrations           Registration[]
+  services                Service[]
+  siteSettings            SiteSetting[]
+  stockOpnames            StockOpnameSession[]
+  systemAccounts          SystemAccount[]
+  users                   UserClinic[]
+  doctorCommissions       DoctorCommission[]
+  cashTransfers           CashTransfer[]
+  directMedicinePurchases DirectMedicinePurchase[]
 
   @@map("clinics")
 }
@@ -666,43 +667,44 @@ model ProductCategory {
 }
 
 model Product {
-  id                 String                  @id @default(uuid())
-  masterProductId    String
-  productCode        String
-  sku                String
-  productName        String
-  productType        String?
-  description        String?
-  unit               String
-  purchaseUnit       String
-  storageUnit        String
-  usedUnit           String
-  qtyPerPurchaseUnit Float?                  @default(1)
-  qtyPerStorageUnit  Float?                  @default(1)
-  quantity           Float                   @default(0)
-  minimumStock       Int
-  reorderQuantity    Int
-  purchasePrice      Float
-  sellingPrice       Float
-  supplier           String?
-  lastPurchaseDate   DateTime?
-  expiryDate         DateTime?
-  isActive           Boolean                 @default(true)
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  clinicId           String?
-  deletedAt          DateTime?
-  branchPrices       BranchProductPrice[]
-  transferItems      InterBranchTransfer[]
-  inventoryBatches   InventoryBatch[]
-  inventoryMutations InventoryMutation[]
-  returnItems        InventoryReturn[]
-  inventoryStocks    InventoryStock[]
-  procurementItems   ProcurementItem[]
-  conversionRules    ProductUnitConversion[]
-  clinic             Clinic?                 @relation(fields: [clinicId], references: [id])
-  masterProduct      ProductMaster           @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
-  stockOpnameItems   StockOpnameItem[]
+  id                          String                       @id @default(uuid())
+  masterProductId             String
+  productCode                 String
+  sku                         String
+  productName                 String
+  productType                 String?
+  description                 String?
+  unit                        String
+  purchaseUnit                String
+  storageUnit                 String
+  usedUnit                    String
+  qtyPerPurchaseUnit          Float?                       @default(1)
+  qtyPerStorageUnit           Float?                       @default(1)
+  quantity                    Float                        @default(0)
+  minimumStock                Int
+  reorderQuantity             Int
+  purchasePrice               Float
+  sellingPrice                Float
+  supplier                    String?
+  lastPurchaseDate            DateTime?
+  expiryDate                  DateTime?
+  isActive                    Boolean                      @default(true)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  clinicId                    String?
+  deletedAt                   DateTime?
+  branchPrices                BranchProductPrice[]
+  transferItems               InterBranchTransfer[]
+  inventoryBatches            InventoryBatch[]
+  inventoryMutations          InventoryMutation[]
+  returnItems                 InventoryReturn[]
+  inventoryStocks             InventoryStock[]
+  procurementItems            ProcurementItem[]
+  conversionRules             ProductUnitConversion[]
+  clinic                      Clinic?                      @relation(fields: [clinicId], references: [id])
+  masterProduct               ProductMaster                @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  stockOpnameItems            StockOpnameItem[]
+  directMedicinePurchaseItems DirectMedicinePurchaseItem[]
 
   @@unique([productCode, clinicId])
   @@unique([sku, clinicId])
@@ -1151,23 +1153,24 @@ model InventoryStock {
 }
 
 model InventoryBatch {
-  id               String                @id @default(uuid())
-  branchId         String
-  productId        String
-  batchNumber      String
-  expiryDate       DateTime
-  purchasePrice    Float                 @default(0)
-  initialQty       Float                 @default(0)
-  currentQty       Float                 @default(0)
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  transfers        InterBranchTransfer[]
-  branch           Clinic                @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  product          Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
-  mutations        InventoryMutation[]
-  returns          InventoryReturn[]
-  stocks           InventoryStock[]
-  stockOpnameItems StockOpnameItem[]
+  id                          String                       @id @default(uuid())
+  branchId                    String
+  productId                   String
+  batchNumber                 String
+  expiryDate                  DateTime
+  purchasePrice               Float                        @default(0)
+  initialQty                  Float                        @default(0)
+  currentQty                  Float                        @default(0)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  transfers                   InterBranchTransfer[]
+  branch                      Clinic                       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product                     Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mutations                   InventoryMutation[]
+  returns                     InventoryReturn[]
+  stocks                      InventoryStock[]
+  stockOpnameItems            StockOpnameItem[]
+  directMedicinePurchaseItems DirectMedicinePurchaseItem[]
 
   @@unique([branchId, productId, batchNumber])
   @@map("inventory_batches")
@@ -1593,16 +1596,17 @@ model DoctorCommission {
   @@index([date])
   @@map("doctor_commissions")
 }
+
 model Icd10 {
-  id         String   @id @default(uuid())
-  code       String   @unique
-  nameEn     String?
-  nameId     String?
+  id          String   @id @default(uuid())
+  code        String   @unique
+  nameEn      String?
+  nameId      String?
   description String?
   version     String?
   isActive    Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   medicalRecords MedicalRecord[]
 
@@ -1610,4 +1614,41 @@ model Icd10 {
   @@index([nameEn])
   @@index([nameId])
   @@map("icd10")
+}
+
+model DirectMedicinePurchase {
+  id           String                       @id @default(uuid())
+  purchaseNo   String                       @unique
+  employeeName String
+  purchaseDate DateTime                     @default(now())
+  status       String                       @default("DRAFT")
+  notes        String?
+  totalAmount  Float                        @default(0)
+  discount     Float                        @default(0)
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+  clinicId     String
+  items        DirectMedicinePurchaseItem[]
+  clinic       Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@index([status])
+  @@map("direct_medicine_purchases")
+}
+
+model DirectMedicinePurchaseItem {
+  id                       String                 @id @default(uuid())
+  directMedicinePurchaseId String
+  productId                String
+  batchId                  String?
+  quantity                 Float
+  unitPrice                Float
+  subtotal                 Float
+  directMedicinePurchase   DirectMedicinePurchase @relation(fields: [directMedicinePurchaseId], references: [id], onDelete: Cascade)
+  product                  Product                @relation(fields: [productId], references: [id])
+  batch                    InventoryBatch?        @relation(fields: [batchId], references: [id])
+
+  @@index([directMedicinePurchaseId])
+  @@index([productId])
+  @@map("direct_medicine_purchase_items")
 }

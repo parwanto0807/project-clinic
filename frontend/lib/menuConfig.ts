@@ -40,6 +40,7 @@ export const LAYANAN_UTAMA_GROUPS = [
     items: [
       { icon: FiBox,      label: 'Antrian Farmasi',       href: '/admin/transactions/pharmacy' },
       { icon: FiLayers,   label: 'Master Formula Racikan', href: '/admin/farmasi/formula-racikan' },
+      { icon: FiShoppingBag, label: 'Pembelian Obat (Karyawan)', href: '/admin/farmasi/pembelian-karyawan' },
       { icon: FiMenu,     label: 'Data Obat & Alkes',      href: '/admin/master/medicines' },
     ]
   },

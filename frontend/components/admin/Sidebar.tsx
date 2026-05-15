@@ -350,6 +350,7 @@ const SidebarContent = ({
     { icon: FiHome,    label: 'Dashboard',              href: '/admin/farmasi' },
     { icon: FiBox,     label: 'Antrian Farmasi',        href: '/admin/transactions/pharmacy' },
     { icon: FiLayers,  label: 'Formula Racikan',        href: '/admin/farmasi/formula-racikan' },
+    { icon: FiShoppingBag, label: 'Pembelian Karyawan', href: '/admin/farmasi/pembelian-karyawan' },
     { icon: FiPackage, label: 'Stok Obat',              href: '/admin/inventory' },
     { icon: FiRepeat,  label: 'Mutasi Stok',            href: '/admin/inventory/mutations' },
     { icon: FiMenu,    label: 'Data Obat & Alkes',      href: '/admin/master/medicines' },

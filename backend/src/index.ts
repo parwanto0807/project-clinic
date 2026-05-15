@@ -24,6 +24,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import systemRoutes from './routes/system.routes';
 import labRoutes from './routes/lab.routes';
 import reportRoutes from './routes/report.routes';
+import directPurchaseRoutes from './routes/directPurchase.routes';
 
 // Load environment variables
 dotenv.config();
@@ -103,6 +104,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/lab', labRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/direct-purchases', directPurchaseRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
