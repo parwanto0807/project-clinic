@@ -1593,6 +1593,7 @@ model Icd10 {
   code       String   @unique
   nameEn     String?
   nameId     String?
+  description String?
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

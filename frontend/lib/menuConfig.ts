@@ -63,6 +63,7 @@ export const FINANCE_GROUPS = [
       { icon: FiFileText, label: 'Invoice & Bayar', href: '/admin/finance' },
       { icon: FiDollarSign, label: 'Pengeluaran Operasional', href: '/admin/finance/expenses' },
       { icon: FiRepeat, label: 'Transfer Antar Kas', href: '/admin/finance/cash-transfer' },
+      { icon: FiDollarSign, label: 'Laporan Jasa Medik', href: '/admin/finance/reports/doctor-fees', roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTING', 'STAFF', 'RECEPTIONIST'] },
       { icon: FiClock, label: 'Tutup Buku (Closing)', href: '/admin/finance/closing', roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTING'] },
     ]
   },
@@ -75,7 +76,6 @@ export const FINANCE_GROUPS = [
       { icon: FiActivity, label: 'Neraca Saldo (Trial Balance)', href: '/admin/finance/reports/trial-balance' },
       { icon: FiTrendingUp, label: 'Laba Rugi (P&L)', href: '/admin/finance/reports/profit-loss' },
       { icon: FiDatabase, label: 'Neraca (Balance Sheet)', href: '/admin/finance/reports/balance-sheet' },
-      { icon: FiDollarSign, label: 'Laporan Jasa Medik', href: '/admin/finance/reports/doctor-fees' },
     ]
   },
   {

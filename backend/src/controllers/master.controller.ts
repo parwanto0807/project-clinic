@@ -2263,6 +2263,7 @@ export const getIcd10 = async (req: Request, res: Response) => {
         { code: { contains: String(search), mode: 'insensitive' } },
         { nameEn: { contains: String(search), mode: 'insensitive' } },
         { nameId: { contains: String(search), mode: 'insensitive' } },
+        { description: { contains: String(search), mode: 'insensitive' } },
       ]
     } : {}
 

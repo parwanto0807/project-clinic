@@ -373,9 +373,22 @@ export default function PatientDetailPage() {
                               <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                  <span className="w-6 h-6 rounded-lg bg-emerald-400 text-slate-900 flex items-center justify-center text-[9px] font-black">A</span> Assessment (Diagnosa)
                               </h5>
-                              <p className="text-md font-black text-white leading-relaxed">
-                                {record.diagnosis || 'Observasi Klinis'}
-                              </p>
+                               <div className="space-y-3">
+                                 {record.icd10 && (
+                                   <div className="flex flex-col gap-1.5 p-3 bg-white/5 rounded-xl border border-white/5">
+                                      <div className="flex items-center gap-2">
+                                         <span className="text-[10px] font-black bg-emerald-400 text-slate-900 px-2 py-0.5 rounded">{record.icd10.code}</span>
+                                         <span className="text-xs font-black text-emerald-400 uppercase tracking-tight">{record.icd10.nameId || record.icd10.nameEn}</span>
+                                      </div>
+                                      {record.icd10.description && (
+                                         <p className="text-[10px] font-medium text-slate-400 italic leading-relaxed">{record.icd10.description}</p>
+                                      )}
+                                   </div>
+                                 )}
+                                 <p className="text-md font-black text-white leading-relaxed">
+                                   {record.diagnosis || (record.icd10 ? '' : 'Observasi Klinis')}
+                                 </p>
+                               </div>
                            </div>
 
                            <div>

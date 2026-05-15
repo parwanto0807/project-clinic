@@ -1147,6 +1147,9 @@ export default function DoctorConsultationPage() {
                                           <span className="text-[10px] font-black bg-primary/5 text-primary px-2 py-0.5 rounded border border-primary/10">{item.code}</span>
                                         </div>
                                         <p className="text-xs font-bold text-slate-700">{item.nameId || item.nameEn}</p>
+                                        {item.description && (
+                                          <p className="text-[10px] text-slate-400 mt-1 italic leading-relaxed line-clamp-2">{item.description}</p>
+                                        )}
                                       </div>
                                     </div>
                                   </button>
@@ -1160,9 +1163,19 @@ export default function DoctorConsultationPage() {
                       {/* Selected ICD-10 Display */}
                       {selectedIcd10 && (
                         <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded">{selectedIcd10.code}</span>
-                            <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{selectedIcd10.nameId || selectedIcd10.nameEn}</span>
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/5 shrink-0">
+                               <FiCheckCircle />
+                            </div>
+                            <div>
+                               <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded">{selectedIcd10.code}</span>
+                                  <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{selectedIcd10.nameId || selectedIcd10.nameEn}</span>
+                               </div>
+                               {selectedIcd10.description && (
+                                  <p className="text-[10px] font-medium text-slate-500 italic leading-relaxed">{selectedIcd10.description}</p>
+                               )}
+                            </div>
                           </div>
                           {!isReadOnly && (
                             <button onClick={() => { setIcd10Id(null); setSelectedIcd10(null); }} className="text-rose-400 hover:text-rose-600 p-1 transition-colors">
