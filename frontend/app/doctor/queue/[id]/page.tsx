@@ -394,7 +394,8 @@ export default function DoctorConsultationPage() {
           signal: controller.signal
         })
         setIcdResults(res.data.data || [])
-        setHighlightedIcdIndex(-1) // Reset highlight on new results
+        // Auto-highlight first result for better UX
+        setHighlightedIcdIndex(res.data.data?.length > 0 ? 0 : -1)
       } catch (e: any) {
         if (e.name === 'CanceledError' || e.name === 'AbortError') return
         console.error('ICD10 search failed:', e)
@@ -1084,14 +1085,20 @@ export default function DoctorConsultationPage() {
                               onKeyDown={(e) => {
                                 if (e.key === 'ArrowDown') {
                                   e.preventDefault()
-                                  setHighlightedIcdIndex(prev => (prev < icdResults.length - 1 ? prev + 1 : prev))
+                                  if (!isIcdDropdownOpen) setIsIcdDropdownOpen(true)
+                                  setHighlightedIcdIndex(prev => {
+                                    const next = prev + 1
+                                    return next < icdResults.length ? next : prev
+                                  })
                                 } else if (e.key === 'ArrowUp') {
                                   e.preventDefault()
-                                  setHighlightedIcdIndex(prev => (prev > 0 ? prev - 1 : prev))
+                                  setHighlightedIcdIndex(prev => (prev > -1 ? prev - 1 : -1))
                                 } else if (e.key === 'Enter') {
-                                  if (highlightedIcdIndex >= 0 && icdResults[highlightedIcdIndex]) {
-                                    e.preventDefault()
-                                    const item = icdResults[highlightedIcdIndex]
+                                  e.preventDefault()
+                                  const indexToSelect = highlightedIcdIndex >= 0 ? highlightedIcdIndex : (icdResults.length > 0 ? 0 : -1)
+                                  
+                                  if (indexToSelect >= 0 && icdResults[indexToSelect]) {
+                                    const item = icdResults[indexToSelect]
                                     setIcd10Id(item.id)
                                     setSelectedIcd10(item)
                                     if (!diagnosis) setDiagnosis(item.nameId || item.nameEn)
