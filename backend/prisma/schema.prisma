@@ -1628,6 +1628,7 @@ model DirectMedicinePurchase {
   createdAt    DateTime                     @default(now())
   updatedAt    DateTime                     @updatedAt
   clinicId     String
+  paymentMethod String                     @default("CASH")
   items        DirectMedicinePurchaseItem[]
   clinic       Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 

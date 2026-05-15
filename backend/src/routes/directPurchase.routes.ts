@@ -4,7 +4,8 @@ import {
   getDirectPurchases,
   createDirectPurchase,
   postDirectPurchase,
-  updateDirectPurchase
+  updateDirectPurchase,
+  payDirectPurchase
 } from '../controllers/directPurchase.controller';
 
 const router = Router();
@@ -15,5 +16,6 @@ router.get('/', getDirectPurchases);
 router.post('/', createDirectPurchase);
 router.put('/:id', updateDirectPurchase);
 router.post('/:id/post', postDirectPurchase);
+router.post('/:id/pay', payDirectPurchase);
 
 export default router;

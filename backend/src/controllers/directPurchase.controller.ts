@@ -36,7 +36,7 @@ export const createDirectPurchase = async (req: Request, res: Response) => {
   try {
     const clinicId = (req as any).clinicId;
     console.log('[createDirectPurchase] req.body:', req.body);
-    const { employeeName, notes, items, discount = 0 } = req.body;
+    const { employeeName, notes, items, discount = 0, paymentMethod = 'CASH' } = req.body;
 
     if (!employeeName || !items || items.length === 0) {
       console.log('[createDirectPurchase] 400 error: Missing fields');
@@ -56,6 +56,7 @@ export const createDirectPurchase = async (req: Request, res: Response) => {
         totalAmount,
         discount,
         clinicId,
+        paymentMethod,
         status: 'DRAFT',
         items: {
           create: items.map((item: any) => ({
@@ -88,7 +89,7 @@ export const updateDirectPurchase = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const clinicId = (req as any).clinicId;
-    const { employeeName, notes, items, discount = 0 } = req.body;
+    const { employeeName, notes, items, discount = 0, paymentMethod } = req.body;
 
     if (!employeeName || !items || items.length === 0) {
       return res.status(400).json({ status: 'error', message: 'Employee name and items are required' });
@@ -114,6 +115,7 @@ export const updateDirectPurchase = async (req: Request, res: Response) => {
           notes,
           totalAmount,
           discount,
+          paymentMethod,
           items: {
             create: items.map((item: any) => ({
               productId: item.productId,
@@ -163,7 +165,7 @@ export const postDirectPurchase = async (req: Request, res: Response) => {
     // Start transaction to reduce stock and update status
     await prisma.$transaction(async (tx) => {
       // 1. Resolve Accounts for Revenue Journal
-      const sysAccountKeys = ['ACCOUNTS_RECEIVABLE', 'SALES_REVENUE', 'SALES_DISCOUNT'];
+      const sysAccountKeys = ['ACCOUNTS_RECEIVABLE', 'CASH_ACCOUNT', 'SALES_REVENUE', 'SALES_DISCOUNT'];
       const sysAccounts = await tx.systemAccount.findMany({
         where: { key: { in: sysAccountKeys }, OR: [{ clinicId }, { clinicId: null }] },
         include: { coa: true },
@@ -309,5 +311,98 @@ export const postDirectPurchase = async (req: Request, res: Response) => {
       status: 'error',
       message: error.message || 'Failed to post purchase'
     });
+  }
+};
+
+// Pay/Settle a direct purchase (Cash in, Piutang out)
+export const payDirectPurchase = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const clinicId = (req as any).clinicId;
+
+    const purchase = await prisma.directMedicinePurchase.findFirst({
+      where: { id, clinicId }
+    });
+
+    if (!purchase) return res.status(404).json({ status: 'error', message: 'Purchase not found' });
+    if (purchase.status !== 'POSTED') return res.status(400).json({ status: 'error', message: 'Only posted purchases can be paid' });
+
+    const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { code: true } });
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Resolve Accounts
+      const sysAccountKeys = ['ACCOUNTS_RECEIVABLE', 'CASH_ACCOUNT'];
+      const sysAccounts = await tx.systemAccount.findMany({
+        where: { key: { in: sysAccountKeys }, OR: [{ clinicId }, { clinicId: null }] },
+        include: { coa: true },
+        orderBy: { clinicId: 'desc' }
+      });
+
+      const resolveSpecificCoa = async (key: string, fallbackCode: string) => {
+        const sys = sysAccounts.find(s => s.key === key);
+        let coa: any = sys?.coa;
+        if (!coa) {
+          coa = await tx.chartOfAccount.findFirst({
+            where: { code: fallbackCode, OR: [{ clinicId }, { clinicId: null }] }
+          });
+        }
+        if (!coa) return null;
+        if (clinic?.code) {
+          const baseCode = coa.code.split('-').length > 2 ? coa.code.split('-').slice(0, 2).join('-') : coa.code;
+          const specificCode = `${baseCode}-${clinic.code}`;
+          const specificCoa = await tx.chartOfAccount.findFirst({ where: { code: specificCode, OR: [{ clinicId }, { clinicId: null }] } });
+          return specificCoa || coa;
+        }
+        return coa;
+      };
+
+      const arAccount = await resolveSpecificCoa('ACCOUNTS_RECEIVABLE', '1-1201');
+      const cashAccount = await resolveSpecificCoa('CASH_ACCOUNT', '1-1101');
+
+      if (!arAccount || !cashAccount) {
+        throw new Error('Gagal pelunasan: Akun Piutang atau Kas tidak ditemukan.');
+      }
+
+      // 2. Create Journal Entry
+      const description = `Pelunasan Pembelian Obat Karyawan - ${purchase.purchaseNo} (${purchase.employeeName})`;
+      
+      await tx.journalEntry.create({
+        data: {
+          date: new Date(),
+          description,
+          referenceNo: `PAY-${purchase.purchaseNo}`,
+          entryType: 'SYSTEM',
+          clinicId,
+          details: {
+            create: [
+              // Debit: Kas Kecil
+              {
+                coaId: cashAccount.id,
+                debit: purchase.totalAmount,
+                credit: 0,
+                description: `${description} - Kas Kecil`
+              },
+              // Credit: Piutang
+              {
+                coaId: arAccount.id,
+                debit: 0,
+                credit: purchase.totalAmount,
+                description: `${description} - Piutang`
+              }
+            ]
+          }
+        }
+      });
+
+      // 3. Update Status
+      await tx.directMedicinePurchase.update({
+        where: { id: purchase.id },
+        data: { status: 'PAID' }
+      });
+    }, { timeout: 30000 });
+
+    res.json({ status: 'success', message: 'Pembelian berhasil dilunasi' });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message || 'Gagal melakukan pembayaran' });
   }
 };

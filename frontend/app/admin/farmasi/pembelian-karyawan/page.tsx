@@ -189,16 +189,30 @@ export default function PembelianKaryawanPage() {
   }
 
   const handlePosting = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin memposting pembelian ini? Stok akan dikurangi dan tidak dapat dibatalkan.')) return
+    if (!confirm('Apakah Anda yakin ingin memposting pembelian ini? Stok akan dikurangi dan diakui sebagai piutang.')) return
 
     try {
       setLoading(true)
       await api.post(`/direct-purchases/${id}/post`)
-      toast.success('Pembelian berhasil diposting')
+      toast.success('Pembelian berhasil diposting sebagai piutang')
       fetchPurchases()
-      fetchStocks() // Refresh stocks since they were reduced
+      fetchStocks()
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Gagal memposting pembelian')
+      setLoading(false)
+    }
+  }
+
+  const handlePayment = async (id: string) => {
+    if (!confirm('Apakah Anda yakin ingin melakukan pelunasan tunai untuk pembelian ini?')) return
+
+    try {
+      setLoading(true)
+      await api.post(`/direct-purchases/${id}/pay`)
+      toast.success('Pembelian berhasil dilunasi')
+      fetchPurchases()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal melakukan pelunasan')
       setLoading(false)
     }
   }
@@ -394,9 +408,11 @@ export default function PembelianKaryawanPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                        purchase.status === 'POSTED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                        purchase.status === 'PAID' ? 'bg-green-100 text-green-700' : 
+                        purchase.status === 'POSTED' ? 'bg-blue-100 text-blue-700' : 
+                        'bg-amber-100 text-amber-700'
                       }`}>
-                        {purchase.status}
+                        {purchase.status === 'PAID' ? 'LUNAS' : purchase.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 flex justify-center gap-2">
@@ -411,11 +427,30 @@ export default function PembelianKaryawanPage() {
                           </button>
                           <button
                             onClick={() => handlePosting(purchase.id)}
-                            className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white p-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm border border-emerald-200 hover:border-transparent group"
+                            className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm border border-emerald-200 hover:border-transparent"
                             title="Posting & Kurangi Stok"
                           >
                             <FiCheck className="w-4 h-4" /> 
-                            <span className="text-xs font-bold truncate transition-all overflow-hidden max-w-[0px] group-hover:max-w-[60px] opacity-0 group-hover:opacity-100 whitespace-nowrap">Posting</span>
+                            <span className="text-xs font-bold">Posting</span>
+                          </button>
+                        </>
+                      ) : purchase.status === 'POSTED' ? (
+                        <>
+                          <button
+                            onClick={() => handlePayment(purchase.id)}
+                            className="bg-green-50 hover:bg-green-600 text-green-600 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm border border-green-200 hover:border-transparent"
+                            title="Bayar Tunai (Petty Cash)"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span className="text-xs font-bold">Bayar Tunai</span>
+                          </button>
+                          <button
+                            onClick={() => handlePrintInvoice(purchase)}
+                            className="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm border border-indigo-200 hover:border-transparent"
+                            title="Cetak Invoice (PDF)"
+                          >
+                            <FiPrinter className="w-4 h-4" />
+                            <span className="text-xs font-bold">Cetak Struk</span>
                           </button>
                         </>
                       ) : (
@@ -423,11 +458,11 @@ export default function PembelianKaryawanPage() {
                           <span className="text-gray-400 text-xs font-medium italic mt-2 mr-2">Selesai</span>
                           <button
                             onClick={() => handlePrintInvoice(purchase)}
-                            className="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white p-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm border border-indigo-200 hover:border-transparent group"
+                            className="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm border border-indigo-200 hover:border-transparent"
                             title="Cetak Invoice (PDF)"
                           >
                             <FiPrinter className="w-4 h-4" />
-                            <span className="text-xs font-bold truncate transition-all overflow-hidden max-w-[0px] group-hover:max-w-[100px] opacity-0 group-hover:opacity-100 whitespace-nowrap">Cetak Struk</span>
+                            <span className="text-xs font-bold">Cetak Struk</span>
                           </button>
                         </>
                       )}
