@@ -35,17 +35,15 @@ export const createRegistration = async (req: Request, res: Response) => {
       })
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const { getJakartaDateString } = require('../utils/date')
+    const jakartaTodayStr = getJakartaDateString()
+    const today = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
     const nextDay = new Date(today)
     nextDay.setDate(today.getDate() + 1)
 
     // 4. Create Transaction
     const result = await prisma.$transaction(async (tx) => {
-      const y = today.getFullYear()
-      const m = (today.getMonth() + 1).toString().padStart(2, '0')
-      const d = today.getDate().toString().padStart(2, '0')
-      const dateStr = `${y}${m}${d}`
+      const dateStr = jakartaTodayStr.replace(/-/g, '')
 
       let nextRegNum = 1
       const lastReg = await tx.registration.findFirst({
@@ -175,9 +173,10 @@ export const createRegistration = async (req: Request, res: Response) => {
         })
       }
 
-      const todayInv = new Date()
-      const dateStrInv = todayInv.toISOString().split('T')[0].replace(/-/g, '')
-      todayInv.setHours(0, 0, 0, 0)
+      const { getJakartaDateString } = require('../utils/date')
+      const jakartaTodayStrInv = getJakartaDateString()
+      const dateStrInv = jakartaTodayStrInv.replace(/-/g, '')
+      const todayInv = new Date(`${jakartaTodayStrInv}T00:00:00+07:00`)
       
       let nextInvNum = 1
       const lastInv = await tx.invoice.findFirst({
@@ -262,8 +261,8 @@ export const getQueues = async (req: Request, res: Response) => {
     const currentClinicId = (req as any).clinicId
     const isAdminView = (req as any).isAdminView
 
-    const targetDate = date ? new Date(date as string) : new Date()
-    targetDate.setHours(0, 0, 0, 0)
+    const { getJakartaDateString, parseLocalDate } = require('../utils/date')
+    const targetDate = date ? parseLocalDate(date as string) : new Date(`${getJakartaDateString()}T00:00:00+07:00`)
     const nextDay = new Date(targetDate)
     nextDay.setDate(targetDate.getDate() + 1)
 

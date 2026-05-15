@@ -13,12 +13,23 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const clinicId = (req as any).clinicId
     const isAdminView = (req as any).isAdminView
     const range = (req.query.range as string) || 'week'
-    const today = new Date()
-    const todayStart = startOfDay(today)
-    const todayEnd = endOfDay(today)
-    const yesterdayStart = startOfDay(subDays(today, 1))
-    const yesterdayEnd = endOfDay(subDays(today, 1))
-    const dayName = format(today, 'EEEE')
+    const { getJakartaDateString } = require('../utils/date')
+    const jakartaTodayStr = getJakartaDateString()
+    
+    const today = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
+    const todayStart = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
+    const todayEnd = new Date(`${jakartaTodayStr}T23:59:59+07:00`)
+    
+    // Calculate Yesterday based on Jakarta Date
+    const yesterdayDate = new Date(todayStart)
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterdayStr = yesterdayDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+    
+    const yesterdayStart = new Date(`${yesterdayStr}T00:00:00+07:00`)
+    const yesterdayEnd = new Date(`${yesterdayStr}T23:59:59+07:00`)
+    
+    // Day Name for schedule
+    const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Asia/Jakarta' }).format(today)
 
     // Clinic filter — SUPER_ADMIN / isMain sees all, others see their clinic
     const clinicFilter = isAdminView ? {} : (clinicId ? { clinicId } : {})
@@ -111,8 +122,10 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const totalDebt = (supplierDebt._sum.totalAmount || 0) - (supplierDebt._sum.paidAmount || 0)
 
     // ─── 3. STOCK ALERTS ────────────────────────────────────────────────────
-    const thirtyDaysFromNow = addDays(today, 30)
-    const sixtyDaysFromNow = addDays(today, 60)
+    const thirtyDaysFromNow = new Date(today)
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+    const sixtyDaysFromNow = new Date(today)
+    sixtyDaysFromNow.setDate(sixtyDaysFromNow.getDate() + 60)
 
     const [criticalStocks, expiringBatches] = await Promise.all([
       // Products below minimum stock
@@ -173,16 +186,24 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       select: { id: true, name: true, code: true },
     })
 
-    const [totalPatients, totalRevenue, totalExpense, totalAssetValue, totalStock] =
+    const [totalPatients, totalRevenueAgg, totalExpenseAgg, totalAssetValue, totalStock] =
       await Promise.all([
         prisma.patient.count(),
-        prisma.invoice.aggregate({
-          _sum: { total: true },
-          where: { status: 'paid', ...clinicFilter },
+        // Get Total Revenue from Journal Details (Category 4-xxxx)
+        prisma.journalDetail.aggregate({
+          where: {
+            coa: { category: 'REVENUE' },
+            journalEntry: { ...clinicFilter }
+          },
+          _sum: { debit: true, credit: true }
         }),
-        prisma.expense.aggregate({
-          _sum: { amount: true },
-          where: { status: 'approved', ...clinicFilter },
+        // Get Total Expense from Journal Details (Category 5-xxxx & 6-xxxx)
+        prisma.journalDetail.aggregate({
+          where: {
+            coa: { category: 'EXPENSE' },
+            journalEntry: { ...clinicFilter }
+          },
+          _sum: { debit: true, credit: true }
         }),
         prisma.asset.aggregate({
           _sum: { purchasePrice: true },
@@ -194,8 +215,10 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         }),
       ])
 
-    const globalNetProfit =
-      (totalRevenue._sum.total || 0) - (totalExpense._sum.amount || 0)
+    const totalRevValue = (totalRevenueAgg._sum.credit || 0) - (totalRevenueAgg._sum.debit || 0)
+    const totalExpValue = (totalExpenseAgg._sum.debit || 0) - (totalExpenseAgg._sum.credit || 0)
+
+    const globalNetProfit = totalRevValue - totalExpValue
 
     // Real trend: compare today vs yesterday for registrations & revenue
     const regTrend =
@@ -214,15 +237,21 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // Branch breakdown - Optimized to avoid connection bomb
     const branchAnalytics = []
     for (const c of clinics) {
-      const [pats, rev, exp, assets, stocks] = await Promise.all([
+      const [pats, revAgg, expAgg, assets, stocks] = await Promise.all([
         prisma.registration.groupBy({ by: ['patientId'], where: { clinicId: c.id } }),
-        prisma.invoice.aggregate({
-          _sum: { total: true },
-          where: { status: 'paid', clinicId: c.id },
+        prisma.journalDetail.aggregate({
+          where: {
+            coa: { category: 'REVENUE' },
+            journalEntry: { clinicId: c.id }
+          },
+          _sum: { debit: true, credit: true }
         }),
-        prisma.expense.aggregate({
-          _sum: { amount: true },
-          where: { status: 'approved', clinicId: c.id },
+        prisma.journalDetail.aggregate({
+          where: {
+            coa: { category: 'EXPENSE' },
+            journalEntry: { clinicId: c.id }
+          },
+          _sum: { debit: true, credit: true }
         }),
         prisma.asset.aggregate({
           _sum: { purchasePrice: true },
@@ -233,8 +262,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
           where: { branchId: c.id },
         }),
       ])
-      const r = rev._sum.total || 0
-      const ex = exp._sum.amount || 0
+      const r = (revAgg._sum.credit || 0) - (revAgg._sum.debit || 0)
+      const ex = (expAgg._sum.debit || 0) - (expAgg._sum.credit || 0)
       branchAnalytics.push({
         id: c.id,
         name: c.name,
@@ -249,62 +278,94 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // ─── 5. FINANCIAL TREND ─────────────────────────────────────────────────
     let financialTrend: any[] = []
     if (range === 'month') {
-      const days = eachDayOfInterval({ start: subDays(today, 29), end: today })
-      for (const date of days) {
-        const s = startOfDay(date)
-        const e = endOfDay(date)
-        const [rev, exp] = await Promise.all([
-          prisma.invoice.aggregate({
-            _sum: { total: true },
-            where: { status: 'paid', invoiceDate: { gte: s, lte: e }, ...clinicFilter },
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(todayStart)
+        d.setDate(d.getDate() - i)
+        const dStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+        const s = new Date(`${dStr}T00:00:00+07:00`)
+        const e = new Date(`${dStr}T23:59:59+07:00`)
+        
+        const [revAgg, expAgg] = await Promise.all([
+          prisma.journalDetail.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              coa: { category: 'REVENUE' },
+              journalEntry: { date: { gte: s, lte: e }, ...clinicFilter }
+            },
           }),
-          prisma.expense.aggregate({
-            _sum: { amount: true },
-            where: { status: 'approved', expenseDate: { gte: s, lte: e }, ...clinicFilter },
+          prisma.journalDetail.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              coa: { category: 'EXPENSE' },
+              journalEntry: { date: { gte: s, lte: e }, ...clinicFilter }
+            },
           }),
         ])
-        const r = rev._sum.total || 0
-        const ex = exp._sum.amount || 0
-        financialTrend.push({ label: format(date, 'dd/MM'), revenue: r, expense: ex, profit: r - ex })
+        const r = (revAgg._sum.credit || 0) - (revAgg._sum.debit || 0)
+        const ex = (expAgg._sum.debit || 0) - (expAgg._sum.credit || 0)
+        financialTrend.push({ label, revenue: r, expense: ex, profit: r - ex })
       }
     } else if (range === 'year') {
-      const months = eachMonthOfInterval({ start: startOfYear(today), end: today })
-      for (const date of months) {
-        const s = startOfMonth(date)
-        const e = endOfMonth(date)
-        const [rev, exp] = await Promise.all([
-          prisma.invoice.aggregate({
-            _sum: { total: true },
-            where: { status: 'paid', invoiceDate: { gte: s, lte: e }, ...clinicFilter },
+      const currentYear = today.getFullYear()
+      for (let m = 0; m <= today.getMonth(); m++) {
+        const monthStart = new Date(currentYear, m, 1)
+        const monthEnd = new Date(currentYear, m + 1, 0)
+        
+        // Convert to Jakarta ISO string for query
+        const s = new Date(monthStart.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+        const e = new Date(monthEnd.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+        e.setHours(23, 59, 59, 999)
+
+        const [revAgg, expAgg] = await Promise.all([
+          prisma.journalDetail.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              coa: { category: 'REVENUE' },
+              journalEntry: { date: { gte: s, lte: e }, ...clinicFilter }
+            },
           }),
-          prisma.expense.aggregate({
-            _sum: { amount: true },
-            where: { status: 'approved', expenseDate: { gte: s, lte: e }, ...clinicFilter },
+          prisma.journalDetail.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              coa: { category: 'EXPENSE' },
+              journalEntry: { date: { gte: s, lte: e }, ...clinicFilter }
+            },
           }),
         ])
-        const r = rev._sum.total || 0
-        const ex = exp._sum.amount || 0
-        financialTrend.push({ label: format(date, 'MMM'), revenue: r, expense: ex, profit: r - ex })
+        const r = (revAgg._sum.credit || 0) - (revAgg._sum.debit || 0)
+        const ex = (expAgg._sum.debit || 0) - (expAgg._sum.credit || 0)
+        const label = new Intl.DateTimeFormat('id-ID', { month: 'short', timeZone: 'Asia/Jakarta' }).format(monthStart)
+        financialTrend.push({ label, revenue: r, expense: ex, profit: r - ex })
       }
     } else {
       // week (default)
-      const days = eachDayOfInterval({ start: subDays(today, 6), end: today })
-      for (const date of days) {
-        const s = startOfDay(date)
-        const e = endOfDay(date)
-        const [rev, exp] = await Promise.all([
-          prisma.invoice.aggregate({
-            _sum: { total: true },
-            where: { status: 'paid', invoiceDate: { gte: s, lte: e }, ...clinicFilter },
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(todayStart)
+        d.setDate(d.getDate() - i)
+        const dStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+        const s = new Date(`${dStr}T00:00:00+07:00`)
+        const e = new Date(`${dStr}T23:59:59+07:00`)
+
+        const [revAgg, expAgg] = await Promise.all([
+          prisma.journalDetail.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              coa: { category: 'REVENUE' },
+              journalEntry: { date: { gte: s, lte: e }, ...clinicFilter }
+            },
           }),
-          prisma.expense.aggregate({
-            _sum: { amount: true },
-            where: { status: 'approved', expenseDate: { gte: s, lte: e }, ...clinicFilter },
+          prisma.journalDetail.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              coa: { category: 'EXPENSE' },
+              journalEntry: { date: { gte: s, lte: e }, ...clinicFilter }
+            },
           }),
         ])
-        const r = rev._sum.total || 0
-        const ex = exp._sum.amount || 0
-        financialTrend.push({ label: format(date, 'EEE'), revenue: r, expense: ex, profit: r - ex })
+        const r = (revAgg._sum.credit || 0) - (revAgg._sum.debit || 0)
+        const ex = (expAgg._sum.debit || 0) - (expAgg._sum.credit || 0)
+        const label = new Intl.DateTimeFormat('id-ID', { weekday: 'short', timeZone: 'Asia/Jakarta' }).format(d)
+        financialTrend.push({ label, revenue: r, expense: ex, profit: r - ex })
       }
     }
 

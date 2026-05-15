@@ -30,15 +30,13 @@ export const saveNurseVitals = async (req: Request, res: Response) => {
       })
 
       if (!medicalRecord) {
-        // Fix for Midnight Bug: Use Local Date instead of UTC ISOString
-        const now = new Date()
-        const year = now.getFullYear()
-        const month = (now.getMonth() + 1).toString().padStart(2, '0')
-        const day = now.getDate().toString().padStart(2, '0')
-        const dateStr = `${year}${month}${day}`
+        const { getJakartaDateString } = require('../utils/date')
+        const dateStr = getJakartaDateString().replace(/-/g, '')
         
-        const today = new Date(year, now.getMonth(), now.getDate())
-        const nextDay = new Date(year, now.getMonth(), now.getDate() + 1)
+        const jakartaTodayStr = getJakartaDateString()
+        const today = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
+        const nextDay = new Date(today)
+        nextDay.setDate(nextDay.getDate() + 1)
 
         const count = await tx.medicalRecord.count({
           where: { recordDate: { gte: today, lt: nextDay } }

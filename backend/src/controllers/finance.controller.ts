@@ -572,13 +572,15 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
         const currentClinicId = (req as any).clinicId
         const isAdminView = (req as any).isAdminView
 
-        const today = new Date()
-        today.setHours(0,0,0,0)
+        const { getJakartaDateString } = require('../utils/date')
+        const jakartaTodayStr = getJakartaDateString()
+        const today = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
 
         console.log('[Finance] getFinancialSummary filters:', { 
           currentClinicId, 
           isAdminView,
-          today: today.toISOString()
+          today: today.toISOString(),
+          jakartaDate: jakartaTodayStr
         })
 
         const [revenueToday, totalUnpaid] = await Promise.all([

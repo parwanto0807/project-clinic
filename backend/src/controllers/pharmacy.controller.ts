@@ -21,8 +21,8 @@ export const getPharmacyQueues = async (req: Request, res: Response) => {
     }
 
     if (date) {
-      const targetDate = new Date(date as string)
-      targetDate.setHours(0, 0, 0, 0)
+      const { parseLocalDate } = require('../utils/date')
+      const targetDate = parseLocalDate(date as string)
       const nextDate = new Date(targetDate)
       nextDate.setDate(nextDate.getDate() + 1)
       
@@ -34,8 +34,9 @@ export const getPharmacyQueues = async (req: Request, res: Response) => {
       // Default behavior when no specific date is requested:
       // Show ALL items that are still in process (pending/preparing/ready) 
       // AND items that were already dispensed but occurred today.
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const { getJakartaDateString } = require('../utils/date')
+      const jakartaTodayStr = getJakartaDateString()
+      const today = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
       
       whereClause.OR = [
         // Show everything that is NOT yet fully dispensed (regardless of date)

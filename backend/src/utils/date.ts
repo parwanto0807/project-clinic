@@ -4,10 +4,10 @@
 
 export const parseLocalDate = (dateStr: string, isEnd: boolean = false): Date => {
   if (!dateStr || dateStr.trim() === '') {
-     // Default to now but start/end of day
-     const d = new Date();
+     // Default to TODAY in Jakarta
+     const jakartaToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+     const d = new Date(`${jakartaToday}T00:00:00+07:00`);
      if (isEnd) d.setHours(23, 59, 59, 999);
-     else d.setHours(0, 0, 0, 0);
      return d;
   }
   

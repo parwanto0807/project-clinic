@@ -532,7 +532,7 @@ export const createJournalEntry = async (req: Request, res: Response) => {
 
     const journal = await prisma.journalEntry.create({
       data: {
-        date: new Date(date),
+        date: parseLocalDate(String(date)),
         description,
         referenceNo,
         clinicId: targetClinicId,
@@ -566,8 +566,8 @@ export const postYearEndClosing = async (req: Request, res: Response) => {
 
         if (!year) return res.status(400).json({ message: 'Tahun (Year) wajib diisi' })
 
-        const start = new Date(Number(year), 0, 1)
-        const end = new Date(Number(year), 11, 31, 23, 59, 59)
+        const start = new Date(`${year}-01-01T00:00:00+07:00`)
+        const end = new Date(`${year}-12-31T23:59:59+07:00`)
 
         // 1. Check if already closed
         const existingClosing = await prisma.journalEntry.findFirst({
