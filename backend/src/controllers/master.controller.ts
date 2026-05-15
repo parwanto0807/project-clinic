@@ -2211,7 +2211,7 @@ export const importPatients = async (req: Request, res: Response) => {
           })
 
           if (existing) {
-            await prisma.patient.update({
+            await (prisma.patient as any).update({
               where: { id: existing.id },
               data: {
                 address: data.address,
@@ -2268,8 +2268,8 @@ export const getIcd10 = async (req: Request, res: Response) => {
     } : {}
 
     const [total, data] = await Promise.all([
-      prisma.icd10.count({ where }),
-      prisma.icd10.findMany({
+      (prisma as any).icd10.count({ where }),
+      (prisma as any).icd10.findMany({
         where,
         orderBy: { code: 'asc' },
         skip: skip || 0,
@@ -2290,5 +2290,87 @@ export const getIcd10 = async (req: Request, res: Response) => {
     res.status(500).json({ message: (e as Error).message })
   }
 }
+export const importIcd10 = async (req: Request, res: Response) => {
+  try {
+    console.log('[ImportICD10] Request received');
+    if (!req.file) {
+      console.log('[ImportICD10] No file found in request');
+      return res.status(400).json({ message: 'File tidak ditemukan' })
+    }
 
+    console.log('[ImportICD10] Loading workbook from buffer, size:', req.file.size);
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(req.file.buffer as any)
+    const worksheet = workbook.getWorksheet(1)
+    
+    if (!worksheet) {
+      console.log('[ImportICD10] Worksheet not found in workbook');
+      return res.status(400).json({ message: 'Sheet tidak ditemukan' })
+    }
 
+    const rows: any[] = []
+    console.log('[ImportICD10] Parsing rows...');
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return // Skip header
+      
+      const code = row.getCell(1).text?.trim()
+      const display = row.getCell(2).text?.trim()
+      const version = row.getCell(3).text?.trim()
+
+      if (code && display) {
+        rows.push({
+          code,
+          nameEn: display,
+          nameId: display,
+          version: version || 'ICD10_2010'
+        })
+      }
+    });
+
+    console.log(`[ImportICD10] Found ${rows.length} valid rows to process`);
+    if (rows.length === 0) return res.status(400).json({ message: 'Tidak ada data valid di excel' })
+
+    let created = 0
+    let updated = 0
+
+    // Process in chunks to avoid blocking
+    const chunkSize = 20 // Smaller chunk size for stability
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize)
+      console.log(`[ImportICD10] Processing chunk ${i / chunkSize + 1}...`);
+      await Promise.all(chunk.map(async (item) => {
+        try {
+          const existing = await (prisma as any).icd10.findUnique({ where: { code: item.code } })
+          if (existing) {
+            await (prisma as any).icd10.update({
+              where: { id: existing.id },
+              data: { 
+                nameEn: item.nameEn,
+                nameId: item.nameId,
+                version: item.version,
+                updatedAt: new Date()
+              }
+            })
+            updated++
+          } else {
+            await (prisma as any).icd10.create({ data: item })
+            created++
+          }
+        } catch (dbErr: any) {
+          console.error(`[ImportICD10] Error processing item ${item.code}:`, dbErr.message);
+        }
+      }))
+    }
+
+    console.log(`[ImportICD10] Success: ${created} created, ${updated} updated`);
+    res.json({ 
+      message: 'Import ICD-10 berhasil', 
+      created, 
+      updated, 
+      total: rows.length 
+    })
+  } catch (e: any) {
+    console.error('[ImportICD10] Fatal Error:', e.message);
+    res.status(500).json({ message: e.message })
+  }
+}

@@ -73,11 +73,43 @@ export default function Icd10MasterPage() {
             <p className="text-[10px] font-bold text-emerald-500">Last Sync: {lastSync}</p>
           </div>
 
+          <input 
+            type="file" 
+            id="import-icd-excel" 
+            className="hidden" 
+            accept=".xlsx, .xls"
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              
+              const formData = new FormData()
+              formData.append('file', file)
+
+              const loadingToast = toast.loading('Mengimpor data ICD-10...')
+              try {
+                const res = await api.post('master/icd10/import', formData, {
+                  headers: { 'Content-Type': 'multipart/form-data' }
+                })
+                toast.success(`Berhasil! ${res.data.created} baru, ${res.data.updated} diperbarui.`, { id: loadingToast, duration: 5000 })
+                fetchData(search, page)
+              } catch (err: any) {
+                toast.error(err.response?.data?.message || 'Gagal impor data', { id: loadingToast })
+              } finally {
+                e.target.value = ''
+              }
+            }}
+          />
+          <label 
+            htmlFor="import-icd-excel"
+            className="px-6 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-xl shadow-gray-900/20"
+          >
+            <FiRefreshCw className="w-4 h-4" /> Import Excel
+          </label>
           <button 
             disabled
-            className="px-6 py-4 bg-gray-100 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center justify-center gap-2"
+            className="px-6 py-4 bg-gray-100 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center justify-center gap-2 hidden md:flex"
           >
-            <FiRefreshCw className="w-4 h-4" /> Sinkronkan SatuSehat
+            SatuSehat Sync
           </button>
           <button 
             onClick={() => setIsInfoModalOpen(true)}

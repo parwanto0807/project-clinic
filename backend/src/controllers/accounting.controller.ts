@@ -376,7 +376,7 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
     const account = await prisma.chartOfAccount.findUnique({ where: { id: coaId as string } })
     if (!account) return res.status(404).json({ message: 'Account not found' })
 
-    // 1. Saldo awal (sebelum startDate)
+    // 1. Saldo awal absolut (sebelum periode dimulai)
     const beforeStartAgg = await prisma.journalDetail.aggregate({
       where: {
         coaId: account.id,
@@ -387,18 +387,36 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
       },
       _sum: { debit: true, credit: true }
     })
-
     const prevDebit = beforeStartAgg._sum.debit || 0
     const prevCredit = beforeStartAgg._sum.credit || 0
-
-    let initialBalance = account.openingBalance
+    let openingBalance = account.openingBalance
     if (account.category === 'ASSET' || account.category === 'EXPENSE') {
-      initialBalance += (prevDebit - prevCredit)
+      openingBalance += (prevDebit - prevCredit)
     } else {
-      initialBalance += (prevCredit - prevDebit)
+      openingBalance += (prevCredit - prevDebit)
     }
 
-    // 2. Total transaksi dalam periode
+    // 2. Saldo Akhir Periode (untuk menghitung running balance mundur dari atas)
+    const periodAgg = await prisma.journalDetail.aggregate({
+      where: {
+        coaId: account.id,
+        journalEntry: {
+          date: { gte: start, lte: end },
+          ...(targetClinicId ? { clinicId: targetClinicId } : {})
+        }
+      },
+      _sum: { debit: true, credit: true }
+    })
+    const periodDebit = periodAgg._sum.debit || 0
+    const periodCredit = periodAgg._sum.credit || 0
+    let finalBalance = openingBalance
+    if (account.category === 'ASSET' || account.category === 'EXPENSE') {
+      finalBalance += (periodDebit - periodCredit)
+    } else {
+      finalBalance += (periodCredit - periodDebit)
+    }
+
+    // 3. Total transaksi dalam periode (untuk pagination)
     const totalTransactions = await prisma.journalDetail.count({
       where: {
         coaId: account.id,
@@ -409,8 +427,9 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
       }
     })
 
-    // 3. Saldo sebelum halaman ini (untuk running balance yang benar)
-    const previousInPeriod = await prisma.journalDetail.findMany({
+    // 4. Saldo di baris paling atas halaman ini
+    // Kita cari total mutasi dari transaksi yang "lebih baru" dari halaman ini
+    const newerTransactions = await prisma.journalDetail.findMany({
       where: {
         coaId: account.id,
         journalEntry: {
@@ -418,22 +437,24 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
           ...(targetClinicId ? { clinicId: targetClinicId } : {})
         }
       },
+      orderBy: [
+        { journalEntry: { date: 'desc' } },
+        { journalEntry: { createdAt: 'desc' } }
+      ],
       take: skip,
-      orderBy: [{ journalEntry: { date: 'asc' } }, { id: 'asc' }],
       select: { debit: true, credit: true }
     })
+    const newerDebit = newerTransactions.reduce((sum, d) => sum + d.debit, 0)
+    const newerCredit = newerTransactions.reduce((sum, d) => sum + d.credit, 0)
 
-    const inPeriodPrevDebit = previousInPeriod.reduce((sum, d) => sum + d.debit, 0)
-    const inPeriodPrevCredit = previousInPeriod.reduce((sum, d) => sum + d.credit, 0)
-
-    let pageInitialBalance = initialBalance
+    let pageStartBalance = finalBalance
     if (account.category === 'ASSET' || account.category === 'EXPENSE') {
-      pageInitialBalance += (inPeriodPrevDebit - inPeriodPrevCredit)
+      pageStartBalance -= (newerDebit - newerCredit)
     } else {
-      pageInitialBalance += (inPeriodPrevCredit - inPeriodPrevDebit)
+      pageStartBalance -= (newerCredit - newerDebit)
     }
 
-    // 4. Ambil transaksi halaman ini — urutan ASC untuk running balance yang benar
+    // 5. Ambil transaksi halaman ini (Urutan DESC: Terbaru di atas)
     const details = await prisma.journalDetail.findMany({
       where: {
         coaId: account.id,
@@ -443,18 +464,23 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
         }
       },
       include: { journalEntry: true },
-      orderBy: [{ journalEntry: { date: 'asc' } }, { id: 'asc' }],
+      orderBy: [
+        { journalEntry: { date: 'desc' } },
+        { journalEntry: { createdAt: 'desc' } }
+      ],
       skip,
       take: l
     })
 
-    // 5. Hitung running balance ASC dulu, lalu balik urutan untuk tampilan DESC
-    let currentBalance = pageInitialBalance
-    const transactionsAsc = details.map(d => {
+    // 6. Hitung running balance dari atas ke bawah (Mundur)
+    let currentBalance = pageStartBalance
+    const transactions = details.map(d => {
+      const rowBalance = currentBalance
+      // Kurangi efek transaksi ini untuk mendapatkan saldo baris berikutnya (yang lebih lama)
       if (account.category === 'ASSET' || account.category === 'EXPENSE') {
-        currentBalance += (d.debit - d.credit)
+        currentBalance -= (d.debit - d.credit)
       } else {
-        currentBalance += (d.credit - d.debit)
+        currentBalance -= (d.credit - d.debit)
       }
       return {
         id: d.id,
@@ -464,40 +490,16 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
         entryType: d.journalEntry.entryType,
         debit: d.debit,
         credit: d.credit,
-        balance: currentBalance
+        balance: rowBalance
       }
     })
-
-    // Tampilkan terbaru di atas (DESC) — saldo sudah dihitung dengan benar
-    const transactions = [...transactionsAsc].reverse()
-
-    // 6. Saldo akhir keseluruhan periode
-    const afterStartAgg = await prisma.journalDetail.aggregate({
-      where: {
-        coaId: account.id,
-        journalEntry: {
-          date: { gte: start, lte: end },
-          ...(targetClinicId ? { clinicId: targetClinicId } : {})
-        }
-      },
-      _sum: { debit: true, credit: true }
-    })
-    const inPeriodDebit = afterStartAgg._sum.debit || 0
-    const inPeriodCredit = afterStartAgg._sum.credit || 0
-    let finalBalance = initialBalance
-    if (account.category === 'ASSET' || account.category === 'EXPENSE') {
-      finalBalance += (inPeriodDebit - inPeriodCredit)
-    } else {
-      finalBalance += (inPeriodCredit - inPeriodDebit)
-    }
 
     res.json({
       account: { code: account.code, name: account.name, category: account.category },
       period: { start, end },
-      initialBalance: pageInitialBalance,
-      openingBalance: initialBalance, // Saldo awal periode (bukan per halaman)
+      initialBalance: openingBalance, // Saldo awal periode
+      finalBalance: finalBalance,     // Saldo akhir periode
       transactions,
-      finalBalance,
       meta: {
         total: totalTransactions,
         page: p,
