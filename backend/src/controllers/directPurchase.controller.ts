@@ -172,7 +172,7 @@ export const postDirectPurchase = async (req: Request, res: Response) => {
       
       const resolveSpecificCoa = async (key: string, fallbackCode: string) => {
         const sys = sysAccounts.find(s => s.key === key);
-        let coa = sys?.coa;
+        let coa: any = sys?.coa;
         
         if (!coa) {
           coa = await tx.chartOfAccount.findFirst({
