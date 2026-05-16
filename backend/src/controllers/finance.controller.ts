@@ -48,7 +48,7 @@ export const getInvoices = async (req: Request, res: Response) => {
             }
           },
           bank: true,
-          items: true,
+          items: { include: { service: true } },
           payments: true
         },
         orderBy: { createdAt: 'desc' },
@@ -226,6 +226,10 @@ export const processPayment = async (req: Request, res: Response) => {
           status: newStatus,
           discount: updatedDiscount,
           total: currentTotal
+        },
+        include: {
+          items: { include: { service: true } },
+          patient: { select: { id: true, name: true, medicalRecordNo: true } }
         }
       })
 
@@ -685,7 +689,11 @@ export const updateInvoiceBank = async (req: Request, res: Response) => {
     const updated = await prisma.invoice.update({
       where: { id: invoiceId },
       data: { bankId: bankId || null },
-      include: { bank: true, patient: true }
+      include: { 
+        bank: true, 
+        patient: true,
+        items: { include: { service: true } }
+      }
     })
 
     res.json(updated)

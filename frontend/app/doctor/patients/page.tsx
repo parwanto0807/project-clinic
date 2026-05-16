@@ -72,12 +72,12 @@ export default function DoctorPatients() {
   }, [searchTerm])
 
   return (
-    <div className="space-y-6 pb-20 bg-gray-50/30 min-h-screen">
+    <div className="space-y-6 pb-24 bg-gray-50/30 min-h-screen">
       {/* Dynamic Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-slate-200"
+        className="relative overflow-hidden bg-slate-900 rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl shadow-slate-200"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full -mr-32 -mt-32 animate-pulse" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -85,8 +85,8 @@ export default function DoctorPatients() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/20 text-[10px] font-black tracking-[0.2em] uppercase text-emerald-400">
               <FiUser className="w-3 h-3" /> Database Pasien Saya
             </div>
-            <h1 className="text-3xl font-black tracking-tight">Pasien Terkait <span className="text-emerald-400">Anda</span></h1>
-            <p className="text-slate-400 font-medium text-sm max-w-md">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight">Pasien Terkait <span className="text-emerald-400">Anda</span></h1>
+            <p className="text-slate-400 font-medium text-xs md:text-sm max-w-md">
               Akses cepat ke riwayat medis dan profil pasien yang pernah Anda tangani di Yasfina.
             </p>
           </div>
@@ -108,7 +108,7 @@ export default function DoctorPatients() {
             placeholder="Cari nama pasien, no. RM, atau identitas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-4 bg-white border border-slate-100 rounded-3xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 transition-all font-bold text-sm shadow-sm placeholder:text-slate-300"
+            className="w-full pl-14 pr-6 py-3 md:py-4 bg-white border border-slate-100 rounded-2xl md:rounded-3xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 transition-all font-bold text-xs md:text-sm shadow-sm placeholder:text-slate-300"
           />
         </div>
         <div className="flex items-center gap-2 bg-white p-2 rounded-3xl border border-slate-100 shadow-sm">
@@ -119,8 +119,9 @@ export default function DoctorPatients() {
       </div>
 
       {/* Compact High-Density Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-3xl md:rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+        {/* Compact High-Density Table (Desktop) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="bg-slate-50/50">
@@ -201,9 +202,62 @@ export default function DoctorPatients() {
           </table>
         </div>
 
+        {/* Mobile View Card Layout */}
+        <div className="md:hidden divide-y divide-slate-50">
+          {loading ? (
+             Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-6 animate-pulse space-y-3">
+                <div className="h-4 bg-slate-100 rounded w-1/2" />
+                <div className="h-3 bg-slate-50 rounded w-3/4" />
+              </div>
+            ))
+          ) : patients.length > 0 ? (
+            patients.map((patient) => (
+              <div 
+                key={patient.id}
+                onClick={() => router.push(`/doctor/patients/${patient.id}`)}
+                className="p-5 active:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-3">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-sm">
+                        {patient.name[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-800 leading-none">{patient.name}</p>
+                        <p className="text-[10px] font-black text-indigo-600 mt-1 uppercase tracking-widest">{patient.medicalRecordNo}</p>
+                      </div>
+                   </div>
+                   <FiExternalLink className="text-slate-300 w-5 h-5" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Gender & Lahir</p>
+                    <p className="text-[10px] font-bold text-slate-600">
+                      {patient.gender === 'M' ? 'Laki-laki' : 'Perempuan'} • {new Date(patient.dateOfBirth).getFullYear()}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Kunjungan Terakhir</p>
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                      <FiCalendar className="w-3 h-3 text-emerald-400" />
+                      {new Date(patient.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-20 text-center">
+              <FiUser className="w-12 h-12 text-slate-100 mx-auto mb-4" />
+              <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Kosong</p>
+            </div>
+          )}
+        </div>
+
         {/* Professional Pagination Footer */}
-        <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-6">
-          <p className="text-xs font-bold text-slate-400 capitalize">
+        <div className="px-6 md:px-8 py-6 bg-slate-50/50 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-6">
+          <p className="text-[10px] md:text-xs font-bold text-slate-400 capitalize text-center md:text-left">
             Menampilkan <span className="text-slate-900">{meta.total > 0 ? (page - 1) * meta.limit + 1 : 0}</span> sampai <span className="text-slate-900">{Math.min(page * meta.limit, meta.total)}</span> dari <span className="text-slate-900">{meta.total}</span> pasien
           </p>
           

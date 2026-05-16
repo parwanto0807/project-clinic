@@ -200,12 +200,12 @@ export default function DoctorQueue() {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-4 md:space-y-6 pb-24 bg-gray-50/30 min-h-screen w-full max-w-full overflow-x-hidden">
       {/* Premium Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 rounded-[2.5rem] p-8 text-white shadow-xl shadow-indigo-900/20"
+        className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 rounded-3xl md:rounded-[2.5rem] p-6 md:p-8 text-white shadow-xl shadow-indigo-900/20"
       >
         <div className="absolute top-0 right-0 w-80 h-80 bg-primary/20 blur-[120px] rounded-full -mr-40 -mt-40"></div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -214,10 +214,10 @@ export default function DoctorQueue() {
               <FiZap className="w-3 h-3 text-amber-400 fill-amber-400" />
               Doctor Workstation
             </div>
-            <h1 className="text-3xl font-black tracking-tight">
+            <h1 className="text-xl md:text-3xl font-black tracking-tight leading-tight">
               Dashboard <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-white">Antrian Pasien & Lab</span>
             </h1>
-            <p className="text-indigo-100/60 font-medium max-w-md text-sm">
+            <p className="text-indigo-100/60 font-medium max-w-md text-xs md:text-sm">
               Kelola sesi konsultasi Anda secara efisien dengan pemantauan antrian real-time.
             </p>
           </div>
@@ -250,23 +250,23 @@ export default function DoctorQueue() {
       </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 w-full">
         {statCards.map((stat, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.05 }}
-            className={`bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative`}
+            className={`bg-white p-4 md:p-6 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative w-full`}
           >
              <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-all opacity-40" />
-            <div className="flex items-center gap-4 relative z-10">
-              <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform`}>
-                <stat.icon className="w-6 h-6" />
+            <div className="flex items-center gap-3 md:gap-4 relative z-10">
+              <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform shrink-0`}>
+                <stat.icon className="w-5 h-5 md:w-6 md:h-6" />
               </div>
-              <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{stat.label}</p>
-                <p className="text-2xl font-black text-slate-900 tracking-tight">{stat.value}</p>
+              <div className="min-w-0">
+                <p className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{stat.label}</p>
+                <p className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">{stat.value}</p>
               </div>
             </div>
           </motion.div>
@@ -274,10 +274,11 @@ export default function DoctorQueue() {
       </div>
 
       {/* Active Work Area */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-3xl md:rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col w-full max-w-full">
         {/* Table Filters & Search */}
-        <div className="p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-slate-50/20">
-          <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm min-w-fit self-start">
+        <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 bg-slate-50/20 w-full">
+          <div className="flex p-1.5 bg-white border border-slate-200 rounded-xl md:rounded-2xl shadow-sm w-full lg:w-auto overflow-x-auto no-scrollbar">
+            <div className="flex flex-nowrap min-w-max">
             {[
               { id: 'ready', label: 'Antrian', color: 'bg-amber-500' },
               { id: 'triage', label: 'Vital Sign / Triage', color: 'bg-indigo-600' },
@@ -298,8 +299,9 @@ export default function DoctorQueue() {
               </button>
             ))}
           </div>
+          </div>
 
-          <div className="relative group max-w-md w-full">
+          <div className="relative group w-full">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-primary transition-colors" />
             <input
               type="text"
@@ -311,8 +313,8 @@ export default function DoctorQueue() {
           </div>
         </div>
 
-        {/* High-Density Table */}
-        <div className="overflow-x-auto">
+        {/* High-Density Table (Desktop) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 bg-white">
@@ -472,6 +474,98 @@ export default function DoctorQueue() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View Card Layout */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {loading ? (
+            <div className="px-6 py-20 text-center">
+              <FiRefreshCw className="w-10 h-10 text-slate-200 animate-spin mx-auto mb-4" />
+              <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Memuat Data Antrian...</p>
+            </div>
+          ) : filteredQueues.length > 0 ? (
+            filteredQueues.map((q) => {
+              const isLocked = ['waiting', 'called', 'triage', 'no-show'].includes(q.status)
+              return (
+                <div 
+                  key={q.id}
+                  onClick={() => {
+                    if (filter === 'triage' && q.status === 'ready') return;
+                    if (q.status === 'completed') {
+                      router.push(`/doctor/queue/${q.id}`);
+                    } else if (!isLocked) {
+                      handleStartConsultation(q);
+                    } else {
+                      handleNavigation(q);
+                    }
+                  }}
+                  className={`p-5 space-y-4 active:bg-slate-50 transition-colors ${isLocked ? 'bg-slate-50/30 opacity-80' : 'bg-white'}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg border ${
+                        q.status === 'ongoing' ? 'bg-indigo-600 text-white border-transparent shadow-lg shadow-indigo-200' : 
+                        isLocked ? 'bg-white text-slate-300 border-slate-100' : 'bg-slate-50 text-slate-700 border-slate-100'
+                      }`}>
+                        {q.queueNo}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-black transition-colors ${isLocked ? 'text-slate-400' : 'text-slate-900'}`}>{q.patient.name}</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isLocked ? 'text-slate-300' : 'text-slate-400'}`}>
+                          {q.patient.medicalRecordNo} • {['Laki-laki', 'L', 'M'].includes(q.patient.gender) ? 'PRIA' : 'WANITA'}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusPill status={q.status} hasMedicalRecord={q.hasMedicalRecord} />
+                  </div>
+
+                  {filter === 'triage' && (
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="text-center">
+                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Tensi</p>
+                        <p className="text-[10px] font-black text-indigo-600">{q.medicalRecord?.vitals?.bloodPressure || '-'}</p>
+                      </div>
+                      <div className="text-center border-x border-slate-200">
+                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Suhu</p>
+                        <p className="text-[10px] font-black text-amber-600">{q.medicalRecord?.vitals?.temperature || '-'}°C</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">BB/TB</p>
+                        <p className="text-[10px] font-black text-slate-700">{q.medicalRecord?.vitals?.weight || '-'}/{q.medicalRecord?.vitals?.height || '-'}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-4 pt-1">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
+                      <FiClock className="w-3.5 h-3.5" /> {format(new Date(q.createdAt), 'HH:mm')} • {q.department?.name || 'UMUM'}
+                    </div>
+                    {filter !== 'triage' && (
+                       <button
+                        disabled={isLocked}
+                        className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${
+                          q.status === 'ongoing' || q.status === 'called'
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : q.status === 'completed'
+                            ? 'bg-slate-100 text-slate-500'
+                            : isLocked
+                            ? 'bg-slate-50 text-slate-300'
+                            : 'bg-primary text-white shadow-sm'
+                        }`}
+                      >
+                        {q.status === 'completed' ? 'Riwayat' : q.status === 'ongoing' ? 'Lanjut' : isLocked ? 'Tunggu' : 'Detail'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <div className="py-20 text-center bg-slate-50/10">
+              <FiUsers className="w-10 h-10 text-slate-200 mx-auto mb-4" />
+              <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Tidak Ada Pasien</p>
+            </div>
+          )}
         </div>
         
         {/* Footer Guidance */}

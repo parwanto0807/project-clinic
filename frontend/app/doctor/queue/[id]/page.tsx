@@ -968,9 +968,9 @@ export default function DoctorConsultationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50/60 via-slate-50 to-white flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Professional Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 p-4">
+      <div className="backdrop-blur-xl bg-white/80 border-b border-white/50 shadow-[0_4px_30px_rgba(0,0,0,0.03)] sticky top-0 z-30 p-4 transition-all">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-4">
             <button onClick={() => router.back()} className="p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-200">
@@ -978,30 +978,30 @@ export default function DoctorConsultationPage() {
             </button>
             <div className="h-8 w-px bg-slate-200" />
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">{queue.patient.name}</h1>
-                <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 uppercase tracking-wider">{queue.patient.medicalRecordNo}</span>
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">{queue.patient.name}</h1>
+                <span className="text-[9px] md:text-[10px] font-black px-2 md:px-2.5 py-0.5 md:py-1 bg-indigo-50 text-indigo-600 rounded-lg md:rounded-xl border border-indigo-100 uppercase tracking-wider">{queue.patient.medicalRecordNo}</span>
                 {queue.patient.gender && (
-                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-xl border uppercase tracking-wider ${['L', 'M', 'Laki-laki'].includes(queue.patient.gender) ? 'bg-sky-50 text-sky-600 border-sky-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                  <span className={`text-[9px] md:text-[10px] font-black px-2 md:px-2.5 py-0.5 md:py-1 rounded-lg md:rounded-xl border uppercase tracking-wider ${['L', 'M', 'Laki-laki'].includes(queue.patient.gender) ? 'bg-sky-50 text-sky-600 border-sky-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
                     {['L', 'M', 'Laki-laki'].includes(queue.patient.gender) ? 'Laki-laki' : 'Perempuan'}
                   </span>
                 )}
                 <button 
                   onClick={() => setIsRMEInfoOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-amber-400 text-white rounded-xl text-[9px] font-black hover:bg-amber-500 transition-all shadow-lg shadow-amber-200 animate-pulse"
+                  className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 bg-amber-400 text-white rounded-lg md:rounded-xl text-[9px] font-black hover:bg-amber-500 transition-all shadow-lg shadow-amber-200 animate-pulse"
                 >
                   <FiInfo className="w-3 h-3" /> PANDUAN RME
                 </button>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-1">
+                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
                   {queue.department?.name || 'UMUM'} • No. Antrean: <span className="text-slate-900">{queue.queueNo}</span>
                 </p>
                 {queue.patient.allergies && (
                   <motion.div 
                     animate={{ scale: [1, 1.05, 1] }} 
                     transition={{ repeat: Infinity, duration: 2 }}
-                    className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-200"
+                    className="flex items-center gap-1 md:gap-1.5 px-2 py-0.5 bg-rose-500 text-white rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-200"
                   >
                     <FiAlertCircle className="w-3 h-3" /> ALERGI: {queue.patient.allergies}
                   </motion.div>
@@ -1011,32 +1011,36 @@ export default function DoctorConsultationPage() {
           </div>
           
           <div className="flex items-center gap-2">
-            {isReadOnly ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-3 px-6 py-3 bg-slate-100 text-slate-500 rounded-xl border border-slate-200 cursor-default">
-                   <FiLock className="w-4 h-4" />
-                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">REKAM MEDIS TERKUNCI</span>
-                </div>
-                {/* Buka Kembali hidden per request to maintain record integrity once locked */}
-              </div>
-            ) : (
-              <>
-                <button onClick={() => handleSaveConsultation(false)} disabled={saving} className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-50 transition-all shadow-sm">
-                  <span className="flex items-center gap-2"><FiSave /> SIMPAN DRAFT</span>
-                </button>
-                <button onClick={() => handleSaveConsultation(true)} disabled={saving} className="px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20">
-                  <span className="flex items-center gap-2"><FiCheckCircle /> SELESAI PEMERIKSAAN</span>
-                </button>
-              </>
-            )}
+            {/* Action buttons moved to floating bottom bar */}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 p-6 grid grid-cols-12 gap-6 items-start">
+      {/* Floating Action Buttons */}
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-[64px] left-0 right-0 lg:top-28 lg:bottom-auto lg:left-auto lg:right-8 z-[60] flex items-center justify-between lg:justify-end gap-2 lg:gap-3 p-4 lg:p-3 bg-white/95 lg:bg-white/60 backdrop-blur-2xl lg:rounded-[2rem] border-t lg:border border-slate-200 lg:border-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] lg:shadow-[0_20px_40px_rgba(0,0,0,0.1)]">
+        {isReadOnly ? (
+          <div className="w-full lg:w-auto flex items-center justify-center gap-3 px-6 py-3 lg:py-4 bg-slate-100 text-slate-500 rounded-xl lg:rounded-2xl border border-slate-200 cursor-default shadow-inner">
+             <FiLock className="w-4 h-4 lg:w-5 lg:h-5" />
+             <span className="text-[10px] lg:text-xs font-black uppercase tracking-widest leading-none">REKAM MEDIS TERKUNCI</span>
+          </div>
+        ) : (
+          <>
+            <button onClick={() => handleSaveConsultation(false)} disabled={saving} className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 lg:px-6 py-3 lg:py-4 bg-white/80 backdrop-blur-md border border-slate-200 text-slate-600 rounded-xl lg:rounded-2xl text-[9px] lg:text-[10px] font-black uppercase tracking-widest hover:bg-white hover:border-slate-300 hover:shadow-md disabled:opacity-50 transition-all duration-300 shadow-sm">
+              <FiSave className="w-4 h-4 lg:w-5 lg:h-5" /> <span className="hidden sm:inline">SIMPAN DRAFT</span><span className="sm:hidden">SIMPAN</span>
+            </button>
+            <button onClick={() => handleSaveConsultation(true)} disabled={saving} className="flex-1 lg:flex-none flex items-center justify-center gap-2 lg:gap-3 px-4 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-primary to-indigo-600 text-white rounded-xl lg:rounded-2xl text-[9px] lg:text-xs font-black uppercase tracking-widest hover:shadow-[0_8px_30px_rgba(79,70,229,0.4)] hover:-translate-y-1 disabled:opacity-50 transition-all duration-300 shadow-xl shadow-primary/30 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+              <FiCheckCircle className="w-4 h-4 lg:w-5 lg:h-5 relative z-10" /> <span className="relative z-10 hidden sm:inline">SELESAI PEMERIKSAAN</span><span className="relative z-10 sm:hidden">SELESAI</span>
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="flex-1 p-6 grid grid-cols-12 gap-6 items-start pb-32">
         {/* Navigation Segments */}
         <div className="col-span-12 lg:col-span-3 space-y-6 lg:sticky lg:top-28">
-          <div className="bg-white p-2 rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white/60 backdrop-blur-xl p-2 lg:p-3 rounded-2xl lg:rounded-[2rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden flex lg:flex-col overflow-x-auto lg:overflow-visible snap-x hidden-scrollbar">
             {[
               { id: 'nurse', label: 'Nurse Handover', icon: <FiClipboard /> },
               { id: 'diag', label: 'SOAP & Diagnosa', icon: <FiActivity /> },
@@ -1051,14 +1055,17 @@ export default function DoctorConsultationPage() {
               <button
                 key={s.id}
                 onClick={() => setActiveSegment(s.id as any)}
-                className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black transition-all mb-1 ${
+                className={`flex-shrink-0 lg:w-full flex items-center gap-2 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 rounded-xl lg:rounded-2xl text-[9px] lg:text-[10px] font-black transition-all duration-300 mr-2 lg:mr-0 lg:mb-1 relative overflow-hidden group snap-center ${
                   activeSegment === s.id 
-                  ? 'bg-primary text-white shadow-md' 
-                  : 'text-slate-400 hover:bg-slate-50'
+                  ? 'text-white shadow-lg shadow-indigo-500/20 lg:translate-x-1' 
+                  : 'text-slate-500 hover:bg-white/80 hover:shadow-sm lg:hover:translate-x-1'
                 }`}
               >
-                <span className="text-lg">{s.icon}</span>
-                <span className="uppercase tracking-widest">{s.label}</span>
+                {activeSegment === s.id && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-indigo-500 opacity-100 transition-opacity" />
+                )}
+                <span className="text-base lg:text-lg relative z-10 lg:group-hover:scale-110 transition-transform">{s.icon}</span>
+                <span className="uppercase tracking-widest relative z-10">{s.label}</span>
               </button>
             ))}
           </div>
@@ -1102,9 +1109,9 @@ export default function DoctorConsultationPage() {
           <AnimatePresence mode="wait">
             {activeSegment === 'nurse' && (
               <motion.div key="nurse" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[400px]">
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-8 border-b border-slate-50 pb-6">Keluhan Utama (Handover Perawat)</h3>
-                  <div className="p-10 bg-slate-50/50 rounded-3xl italic text-xl text-slate-600 font-medium leading-relaxed border border-slate-100">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[400px]">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 lg:mb-8 border-b border-slate-50 pb-4 lg:pb-6">Keluhan Utama (Handover Perawat)</h3>
+                  <div className="p-6 lg:p-10 bg-slate-50/50 rounded-2xl lg:rounded-3xl italic text-lg lg:text-xl text-slate-600 font-medium leading-relaxed border border-slate-100">
                     "{medicalRecord?.chiefComplaint || 'Tidak ada catatan keluhan.'}"
                   </div>
                 </div>
@@ -1113,8 +1120,8 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'diag' && (
               <motion.div key="diag" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[400px]">
-                  <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[400px]">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 lg:mb-8 pb-6 border-b border-slate-50">
                      <div className="flex items-center gap-3">
                         <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Documentation (S-O-A-P)</h3>
                      </div>
@@ -1148,27 +1155,27 @@ export default function DoctorConsultationPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* S Quadrant */}
                     <div className="space-y-3 group">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">S</div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-focus-within:text-slate-900 transition-colors">Subjective (Anamnesa)</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-indigo-500/20 transform group-hover:rotate-6 transition-transform">S</div>
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] group-focus-within:text-indigo-600 transition-colors">Subjective (Anamnesa)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={subjective} onChange={(e) => setSubjective(e.target.value)} className={`w-full p-6 border border-slate-200 rounded-3xl min-h-[160px] text-sm font-bold focus:bg-white focus:border-slate-900 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-slate-50'}`} placeholder="Keluhan utama, riwayat penyakit..." />
+                      <textarea disabled={isReadOnly} value={subjective} onChange={(e) => setSubjective(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-indigo-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] lg:min-h-[160px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-indigo-50/30 hover:bg-indigo-50/50'}`} placeholder="Keluhan utama, riwayat penyakit..." />
                     </div>
 
                     {/* O Quadrant */}
                     <div className="space-y-3 group">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">O</div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-focus-within:text-slate-900 transition-colors">Objective (Pemeriksaan)</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-emerald-500/20 transform group-hover:-rotate-6 transition-transform">O</div>
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] group-focus-within:text-emerald-600 transition-colors">Objective (Pemeriksaan)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={objective} onChange={(e) => setObjective(e.target.value)} className={`w-full p-6 border border-slate-200 rounded-3xl min-h-[160px] text-sm font-bold focus:bg-white focus:border-slate-900 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-slate-50'}`} placeholder="Pemeriksaan fisik, tanda klinis..." />
+                      <textarea disabled={isReadOnly} value={objective} onChange={(e) => setObjective(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-emerald-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] lg:min-h-[160px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-emerald-50/30 hover:bg-emerald-50/50'}`} placeholder="Pemeriksaan fisik, tanda klinis..." />
                     </div>
 
                     {/* A Quadrant */}
                     <div className="space-y-3 group">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-black">A</div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-focus-within:text-primary transition-colors">Assessment (Diagnosa ICD-10)</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-violet-500/20 transform group-hover:rotate-6 transition-transform">A</div>
+                        <label className="text-[10px] font-black text-violet-400 uppercase tracking-[0.2em] group-focus-within:text-violet-600 transition-colors">Assessment (Diagnosa ICD-10)</label>
                       </div>
                       
                       {/* ICD-10 Search */}
@@ -1286,16 +1293,16 @@ export default function DoctorConsultationPage() {
                         </div>
                       )}
 
-                      <textarea disabled={isReadOnly} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={`w-full p-6 border border-slate-200 rounded-3xl min-h-[120px] text-sm font-bold focus:bg-white focus:border-primary outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-slate-50'}`} placeholder="Diagnosa spesifik atau catatan tambahan..." />
+                      <textarea disabled={isReadOnly} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-violet-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-violet-50/30 hover:bg-violet-50/50'}`} placeholder="Diagnosa spesifik atau catatan tambahan..." />
                     </div>
 
                     {/* P Quadrant */}
                     <div className="space-y-3 group">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black">P</div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-focus-within:text-emerald-500 transition-colors">Plan (Terapi/Rencana)</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-amber-500/20 transform group-hover:-rotate-6 transition-transform">P</div>
+                        <label className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] group-focus-within:text-amber-600 transition-colors">Plan (Terapi/Rencana)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} className={`w-full p-6 border border-slate-200 rounded-3xl min-h-[160px] text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-slate-50'}`} placeholder="Rencana pengobatan, edukasi..." />
+                      <textarea disabled={isReadOnly} value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-amber-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] lg:min-h-[160px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-amber-50/30 hover:bg-amber-50/50'}`} placeholder="Rencana pengobatan, edukasi..." />
                     </div>
                   </div>
                 </div>
@@ -1304,14 +1311,14 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'rx' && (
               <motion.div key="rx" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[500px]">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 pb-8 border-b border-slate-50">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 lg:mb-10 pb-6 lg:pb-8 border-b border-slate-50">
                     <div className="space-y-1">
                       <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Resep Obat (Rx)</h3>
                       <p className="text-[10px] font-bold text-slate-400">Daftar obat yang diberikan kepada pasien</p>
                     </div>
                     {!isReadOnly && (
-                      <div className="flex gap-4">
+                      <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
                          <button 
                            onClick={() => {
                              setIsMedDialogOpen(true)
@@ -1338,9 +1345,9 @@ export default function DoctorConsultationPage() {
                         initial={{ opacity: 0, x: -10 }} 
                         animate={{ opacity: 1, x: 0 }} 
                         key={idx} 
-                        className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 hover:border-slate-300 transition-all"
+                        className="bg-slate-50/50 p-4 lg:p-6 rounded-2xl lg:rounded-3xl border border-slate-100 hover:border-slate-300 transition-all"
                       >
-                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 xl:gap-6">
                           <div className="flex-1 min-w-[300px]">
                             <div className="flex items-center gap-3">
                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-slate-100">
@@ -1455,8 +1462,8 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'tindakan' && (
               <motion.div key="tindakan" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[500px]">
-                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 pb-8 border-b border-slate-50">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 lg:gap-6 mb-6 lg:mb-10 pb-6 lg:pb-8 border-b border-slate-50">
                     <div className="space-y-1">
                       <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Tindakan Medis</h3>
                       <p className="text-[10px] font-bold text-slate-400">Daftar layanan atau tindakan yang diberikan</p>
@@ -1501,9 +1508,9 @@ export default function DoctorConsultationPage() {
 
                   <div className="space-y-3">
                     {serviceItems.map((s, idx) => (
-                      <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} key={idx} className="bg-emerald-50/30 p-6 rounded-3xl border border-emerald-100 flex items-center justify-between gap-6">
-                        <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
+                      <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} key={idx} className="bg-emerald-50/30 p-4 lg:p-6 rounded-2xl lg:rounded-3xl border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 lg:gap-6">
+                        <div className="flex items-center gap-3 lg:gap-4">
+                           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100 shrink-0">
                               <FiCheckCircle />
                            </div>
                            <div>
@@ -1511,7 +1518,7 @@ export default function DoctorConsultationPage() {
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{s.code}</p>
                            </div>
                         </div>
-                        <div className="flex items-center gap-8">
+                        <div className="flex items-center justify-between sm:justify-end gap-4 lg:gap-8 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0">
                            <div className="text-right">
                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Biaya</p>
                               <p className="text-sm font-black text-slate-800 tracking-tight">Rp {new Intl.NumberFormat('id-ID').format(s.price * s.quantity)}</p>
@@ -1537,18 +1544,18 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'lab' && (
               <motion.div key='lab' initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className='space-y-6'>
-                <div className='bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[600px] flex flex-col'>
-                  <div className='flex items-center justify-between mb-8 pb-6 border-b border-slate-50'>
+                <div className='bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[600px] flex flex-col'>
+                  <div className='flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50'>
                      <div className='flex items-center gap-4'>
-                        <div className='w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 shadow-sm border border-rose-100'>
-                           <HiOutlineBeaker className='w-6 h-6' />
+                        <div className='w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-500/20 shrink-0'>
+                           <HiOutlineBeaker className='w-5 h-5' />
                         </div>
                         <div>
-                           <h3 className='text-xs font-black text-slate-800 uppercase tracking-widest leading-none'>Laboratory Diagnostic Center</h3>
-                           <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2'>Pilih pemeriksaan dan kelola hasil lab</p>
+                           <h3 className='text-xs font-black text-slate-800 uppercase tracking-widest leading-none'>Laboratory Diagnostic</h3>
+                           <p className='text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1.5'>Pilih pemeriksaan & kelola hasil</p>
                         </div>
                      </div>
-                     <div className='flex items-center gap-3'>
+                     <div className='flex flex-col sm:flex-row gap-2 lg:gap-3 w-full md:w-auto'>
                         <button 
                            onClick={handlePrintLabOrder}
                            className='px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2'
@@ -1567,8 +1574,8 @@ export default function DoctorConsultationPage() {
                      </div>
                   </div>
 
-                  <div className='grid grid-cols-12 gap-10 flex-1'>
-                     <div className='col-span-7 space-y-8'>
+                  <div className='grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 flex-1'>
+                     <div className='lg:col-span-7 space-y-6 lg:space-y-8'>
                         <div className='relative group' ref={labDropdownRef}>
                            <label className='text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-rose-500 transition-colors'>Cari Pemeriksaan Lab</label>
                            <div className='mt-3 relative'>
@@ -1589,8 +1596,8 @@ export default function DoctorConsultationPage() {
                                     setIsLabDropdownOpen(true);
                                  }}
                                  onFocus={() => setIsLabDropdownOpen(true)}
-                                 className='w-full pl-14 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:bg-white focus:border-rose-500 outline-none transition-all'
-                                 placeholder='Ketik nama pemeriksaan (ex: Darah Lengkap)...'
+                                 className='w-full pl-12 pr-6 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all'
+                                 placeholder='Cari panel pemeriksaan (ex: Darah Lengkap)...'
                               />
                               <AnimatePresence>
                                  {isLabDropdownOpen && (
@@ -1624,18 +1631,18 @@ export default function DoctorConsultationPage() {
                                                       setSearchLab('');
                                                       setIsLabDropdownOpen(false);
                                                    }}
-                                                   className='w-full px-6 py-4 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0'
+                                                   className='w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 transition-colors'
                                                 >
                                                    <div>
-                                                      <p className='text-sm font-bold text-slate-800 uppercase tracking-tight'>{svc.name}</p>
+                                                      <p className='text-xs font-bold text-slate-800 uppercase tracking-tight'>{svc.name}</p>
                                                       <div className="flex items-center gap-2 mt-1">
-                                                         <p className='text-[10px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
-                                                         {svc.unit && <span className="text-[9px] font-bold text-slate-400 italic">Unit: {svc.unit}</span>}
+                                                         <p className='text-[9px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
+                                                         {svc.unit && <span className="text-[9px] font-medium text-slate-400 italic">Unit: {svc.unit}</span>}
                                                       </div>
                                                    </div>
                                                    <div className="text-right">
-                                                      <p className="text-xs font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
-                                                      <FiPlus className='text-rose-500 ml-auto mt-1' />
+                                                      <p className="text-[11px] font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
+                                                      <FiPlus className='text-rose-500 ml-auto mt-0.5 w-3 h-3' />
                                                    </div>
                                                 </button>
                                              ))
@@ -1655,22 +1662,22 @@ export default function DoctorConsultationPage() {
                                  {labItems.map((item, idx) => (
                                     <motion.div 
                                        key={item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                                       className='flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-rose-200 transition-all group'
+                                       className='flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-rose-200 hover:shadow-md transition-all group'
                                     >
-                                       <div className='flex items-center gap-4'>
-                                          <div className='w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400'>
+                                       <div className='flex items-center gap-3'>
+                                          <div className='w-6 h-6 bg-slate-50 rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100'>
                                              {idx + 1}
                                           </div>
                                           <div>
-                                             <p className='text-sm font-black text-slate-800 uppercase tracking-tight'>{item.serviceName}</p>
-                                             <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest'>{item.serviceCategory?.categoryName || 'Diagnostic'}</p>
+                                             <p className='text-xs font-bold text-slate-800 uppercase tracking-tight'>{item.serviceName}</p>
+                                             <p className='text-[9px] font-medium text-slate-400 uppercase tracking-widest mt-0.5'>{item.serviceCategory?.categoryName || 'Diagnostic'}</p>
                                           </div>
                                        </div>
                                        <button 
                                           onClick={() => setLabItems(labItems.filter(i => i.id !== item.id))}
-                                          className='p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100'
+                                          className='p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100'
                                        >
-                                          <FiTrash2 />
+                                          <FiTrash2 className="w-4 h-4" />
                                        </button>
                                     </motion.div>
                                  ))}
@@ -1683,26 +1690,26 @@ export default function DoctorConsultationPage() {
                            )}
                         </div>
                      </div>
-                     <div className='col-span-5 space-y-8 border-l border-slate-100 pl-10'>
+                     <div className='lg:col-span-5 space-y-6 lg:space-y-8 border-t lg:border-t-0 lg:border-l border-slate-100 pt-6 lg:pt-0 lg:pl-10'>
                         <div className='space-y-3'>
                            <label className='text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]'>Catatan Khusus Laborat</label>
                            <textarea 
                               disabled={isReadOnly}
                               value={labNotes} 
                               onChange={(e) => setLabNotes(e.target.value)}
-                              className={`w-full p-6 bg-slate-50 border border-slate-200 rounded-2xl min-h-[120px] text-sm font-bold focus:bg-white focus:border-rose-500 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
+                              className={`w-full p-4 bg-slate-50/50 border border-slate-200 rounded-xl min-h-[100px] text-xs font-medium leading-relaxed focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
                               placeholder='Instruksi tambahan untuk tim lab...'
                            />
                         </div>
                         <div className='space-y-3'>
-                           <label className='text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] flex items-center gap-2'>
+                           <label className='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-2'>
                               <FiCheckCircle /> Ringkasan & Hasil Lab Terstruktur
                            </label>
                            <textarea 
                                disabled={isReadOnly}
                                value={labResults} 
                                onChange={(e) => setLabResults(e.target.value)}
-                               className={`w-full p-6 bg-indigo-50/30 border border-slate-200 rounded-2xl min-h-[100px] text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
+                               className={`w-full p-4 bg-indigo-50/30 border border-indigo-100/50 rounded-xl min-h-[80px] text-xs font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
                                placeholder='Kesimpulan hasil lab (jika sudah ada)...'
                            />
                         </div>
@@ -1728,23 +1735,23 @@ export default function DoctorConsultationPage() {
                                            )}
                                        </div>
                                        {order.results?.length > 0 ? (
-                                          <div className="p-4 space-y-2">
-                                             {order.results.map((res: any) => (
-                                                <div key={res.id} className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
-                                                   <div className="flex-1">
-                                                      <p className="text-[11px] font-bold text-slate-700 uppercase">{res.testMaster?.name}</p>
-                                                   </div>
-                                                   <div className="flex-1 text-center">
-                                                      <p className={`text-[11px] font-black ${res.isCritical ? 'text-rose-500' : 'text-slate-900'}`}>
-                                                        {res.resultValue} <span className="text-[9px] font-medium text-slate-400">{res.testMaster?.unit}</span>
-                                                      </p>
-                                                   </div>
-                                                   <div className="flex-1 text-right">
-                                                      <p className="text-[9px] font-medium text-slate-400 italic">Normal: {res.testMaster?.normalRangeText}</p>
-                                                   </div>
-                                                </div>
-                                             ))}
-                                          </div>
+                                           <div className="p-3 space-y-1 bg-white">
+                                              {order.results.map((res: any) => (
+                                                 <div key={res.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-2 rounded-lg transition-colors">
+                                                    <div className="flex-1">
+                                                       <p className="text-[10px] font-bold text-slate-700 uppercase">{res.testMaster?.name}</p>
+                                                    </div>
+                                                    <div className="flex-1 text-center">
+                                                       <p className={`text-[11px] font-black ${res.isCritical ? 'text-rose-500 bg-rose-50 py-0.5 px-2 rounded-full inline-block' : 'text-slate-900'}`}>
+                                                         {res.resultValue} <span className="text-[9px] font-medium text-slate-400 ml-1">{res.testMaster?.unit}</span>
+                                                       </p>
+                                                    </div>
+                                                    <div className="flex-1 text-right">
+                                                       <p className="text-[9px] font-medium text-slate-400 italic bg-slate-50 py-0.5 px-2 rounded inline-block">Normal: {res.testMaster?.normalRangeText}</p>
+                                                    </div>
+                                                 </div>
+                                              ))}
+                                           </div>
                                        ) : (
                                           <div className="p-4 text-center">
                                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum ada hasil diinput</p>
@@ -1771,15 +1778,15 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'referral' && (
               <motion.div key="referral" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[500px]">
-                  <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
+                  <div className="flex items-center justify-between mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50">
                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Digital Referral Management</h3>
-                     <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-100">Care Coordination</span>
+                     <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-100 hidden sm:inline-block">Care Coordination</span>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
                     <div className="space-y-6">
-                      <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100">
+                      <div className="p-6 lg:p-8 bg-slate-50 rounded-2xl lg:rounded-3xl border border-slate-100">
                          <div className="flex items-center justify-between mb-4">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{editingReferralId ? 'Edit Rujukan Terpilih' : 'Buat Rujukan Baru'}</p>
                             {editingReferralId && (
@@ -1841,8 +1848,8 @@ export default function DoctorConsultationPage() {
                     <div className="space-y-4">
                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">Riwayat Rujukan Kunjungan Ini</p>
                        {referrals.length === 0 ? (
-                         <div className="py-20 text-center border border-dashed border-slate-100 rounded-3xl bg-slate-50/30">
-                            <FiArrowLeft className="w-10 h-10 text-slate-100 mx-auto mb-2 rotate-180" />
+                         <div className="py-10 lg:py-20 text-center border border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
+                            <FiArrowLeft className="w-8 h-8 lg:w-10 lg:h-10 text-slate-100 mx-auto mb-2 rotate-180" />
                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Belum Ada Rujukan</p>
                          </div>
                        ) : (
@@ -1893,15 +1900,15 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'attachment' && (
               <motion.div key="attachment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[500px]">
-                  <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
+                  <div className="flex items-center justify-between mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50">
                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Media & Attachments</h3>
-                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">Clinical Photography</span>
+                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 hidden sm:inline-block">Clinical Photography</span>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {!isReadOnly && (
-                      <label className={`aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary hover:bg-slate-50 transition-all group ${isUploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className={`aspect-square border-2 border-dashed border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary hover:bg-slate-50 transition-all group ${isUploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
                          <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 group-hover:text-primary transition-all">
                             {isUploadingAttachment ? <FiRefreshCw className="w-8 h-8 animate-spin" /> : <FiPlus className="w-8 h-8" />}
                          </div>
@@ -1911,7 +1918,7 @@ export default function DoctorConsultationPage() {
                     )}
                     
                     {attachments.map((attachment) => (
-                      <div key={attachment.id} className="aspect-square border border-slate-200 rounded-[2.5rem] flex flex-col overflow-hidden group relative bg-slate-50">
+                      <div key={attachment.id} className="aspect-square border border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col overflow-hidden group relative bg-slate-50">
                         {attachment.fileType.startsWith('image/') ? (
                           <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}${attachment.fileUrl}`} alt={attachment.fileName} className="w-full h-4/5 object-cover" />
                         ) : (
@@ -1946,7 +1953,7 @@ export default function DoctorConsultationPage() {
                     ))}
                     
                     {attachments.length === 0 && isReadOnly && (
-                       <div className="aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-slate-50">
+                       <div className="aspect-square border-2 border-dashed border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-slate-50">
                           <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300">
                              <FiClipboard className="w-8 h-8" />
                           </div>
@@ -1960,15 +1967,15 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'consent' && (
               <motion.div key="consent" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[500px]">
-                  <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
+                  <div className="flex items-center justify-between mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50">
                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Informed Consent & Verification</h3>
-                     <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-full border border-rose-100">Legal & Safety</span>
+                     <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-full border border-rose-100 hidden sm:inline-block">Legal & Safety</span>
                   </div>
                   
-                  <div className="max-w-xl mx-auto py-10">
-                    <div className={`p-10 rounded-[2.5rem] border-2 transition-all ${hasInformedConsent ? 'bg-emerald-50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-slate-50 border-slate-100'}`}>
-                       <div className="flex items-center gap-6 mb-8">
+                  <div className="max-w-xl mx-auto py-6 lg:py-10">
+                    <div className={`p-6 lg:p-10 rounded-3xl lg:rounded-[2.5rem] border-2 transition-all ${hasInformedConsent ? 'bg-emerald-50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-slate-50 border-slate-100'}`}>
+                       <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 mb-6 lg:mb-8">
                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl transition-all ${hasInformedConsent ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
                              {hasInformedConsent ? <FiCheckCircle /> : <FiLock />}
                           </div>
@@ -1999,11 +2006,11 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'history' && (
               <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[500px]">
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-10 pb-6 border-b border-slate-50">Riwayat Kunjungan</h3>
-                   <div className="space-y-8">
+                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 lg:mb-10 pb-4 lg:pb-6 border-b border-slate-50">Riwayat Kunjungan</h3>
+                   <div className="space-y-6 lg:space-y-8">
                      {history.map((h, idx) => (
-                        <div key={idx} className="p-8 bg-slate-50/30 rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl hover:shadow-slate-100 transition-all">
+                        <div key={idx} className="p-6 lg:p-8 bg-slate-50/30 rounded-3xl lg:rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl hover:shadow-slate-100 transition-all">
                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                               <div className="flex items-center gap-3">
                                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-sm border border-slate-100">

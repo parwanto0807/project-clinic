@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuthStore } from '@/lib/store/useAuthStore'
+import { useUIStore } from '@/lib/store/useUIStore'
 import { useRouter, usePathname } from 'next/navigation'
 import { FiUser, FiSettings, FiLogOut, FiClock, FiActivity } from 'react-icons/fi'
 import { useState, useEffect, useMemo } from 'react'
@@ -8,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 export default function DoctorNavbar() {
   const { user, logout, activeClinicId } = useAuthStore()
+  const { isDoctorSidebarCollapsed } = useUIStore()
   const router = useRouter()
   const pathname = usePathname()
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -42,7 +44,7 @@ export default function DoctorNavbar() {
   }, [pathname])
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100/50 shadow-sm lg:left-64 transition-all duration-300">
+    <div className={`fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100/50 shadow-sm transition-all duration-300 ${isDoctorSidebarCollapsed ? 'lg:left-20' : 'lg:left-64'}`}>
       <div className="px-6 py-4 flex items-center justify-between gap-4">
         {/* Left: Dynamic Title */}
         <div className="flex-1 min-w-0">

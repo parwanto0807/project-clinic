@@ -6,8 +6,10 @@ import { motion } from 'framer-motion'
 import { FiSearch, FiBookOpen, FiChevronLeft, FiChevronRight, FiRefreshCw, FiInfo, FiX, FiCheckCircle } from 'react-icons/fi'
 import { toast } from 'react-hot-toast'
 import { AnimatePresence } from 'framer-motion'
+import { useAuthStore } from '@/lib/store/useAuthStore'
 
 export default function Icd10MasterPage() {
+  const { user } = useAuthStore()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
@@ -50,21 +52,21 @@ export default function Icd10MasterPage() {
   }, [search])
 
   return (
-    <div className="p-6 md:p-10 space-y-8 bg-gray-50/50 min-h-screen">
+    <div className="p-4 md:p-10 space-y-6 md:space-y-8 bg-gray-50/50 min-h-screen pb-24 md:pb-10">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <motion.h1 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3"
+            className="text-xl md:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3"
           >
-            <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center shadow-sm shadow-primary/5">
-              <FiBookOpen className="w-6 h-6" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-primary/10 text-primary rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm shadow-primary/5 shrink-0">
+              <FiBookOpen className="w-5 h-5 md:w-6 md:h-6" />
             </div>
             Master ICD-10
           </motion.h1>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-3 ml-15">Internasional Classification of Diseases</p>
+          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-3 ml-0 md:ml-15">Internasional Classification of Diseases</p>
         </div>
         
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -73,38 +75,42 @@ export default function Icd10MasterPage() {
             <p className="text-[10px] font-bold text-emerald-500">Last Sync: {lastSync}</p>
           </div>
 
-          <input 
-            type="file" 
-            id="import-icd-excel" 
-            className="hidden" 
-            accept=".xlsx, .xls"
-            onChange={async (e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              
-              const formData = new FormData()
-              formData.append('file', file)
+          {user?.role === 'SUPER_ADMIN' && (
+            <>
+              <input 
+                type="file" 
+                id="import-icd-excel" 
+                className="hidden" 
+                accept=".xlsx, .xls"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  
+                  const formData = new FormData()
+                  formData.append('file', file)
 
-              const loadingToast = toast.loading('Mengimpor data ICD-10...')
-              try {
-                const res = await api.post('master/icd10/import', formData, {
-                  headers: { 'Content-Type': 'multipart/form-data' }
-                })
-                toast.success(`Berhasil! ${res.data.created} baru, ${res.data.updated} diperbarui.`, { id: loadingToast, duration: 5000 })
-                fetchData(search, page)
-              } catch (err: any) {
-                toast.error(err.response?.data?.message || 'Gagal impor data', { id: loadingToast })
-              } finally {
-                e.target.value = ''
-              }
-            }}
-          />
-          <label 
-            htmlFor="import-icd-excel"
-            className="px-6 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-xl shadow-gray-900/20"
-          >
-            <FiRefreshCw className="w-4 h-4" /> Import Excel
-          </label>
+                  const loadingToast = toast.loading('Mengimpor data ICD-10...')
+                  try {
+                    const res = await api.post('master/icd10/import', formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' }
+                    })
+                    toast.success(`Berhasil! ${res.data.created} baru, ${res.data.updated} diperbarui.`, { id: loadingToast, duration: 5000 })
+                    fetchData(search, page)
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.message || 'Gagal impor data', { id: loadingToast })
+                  } finally {
+                    e.target.value = ''
+                  }
+                }}
+              />
+              <label 
+                htmlFor="import-icd-excel"
+                className="px-4 md:px-6 py-3 md:py-4 bg-gray-900 text-white rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-xl shadow-gray-900/20 w-full md:w-auto"
+              >
+                <FiRefreshCw className="w-4 h-4" /> Import Excel
+              </label>
+            </>
+          )}
           <button 
             disabled
             className="px-6 py-4 bg-gray-100 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center justify-center gap-2 hidden md:flex"
@@ -125,10 +131,10 @@ export default function Icd10MasterPage() {
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm h-full flex flex-col justify-center"
+          className="bg-white p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-gray-100 shadow-sm h-full flex flex-col justify-center"
         >
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Database Penyakit</p>
-          <p className="text-3xl font-black text-gray-900">{total.toLocaleString()} <span className="text-sm text-gray-300 font-bold ml-1">KODE</span></p>
+          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Database Penyakit</p>
+          <p className="text-2xl md:text-3xl font-black text-gray-900">{total.toLocaleString()} <span className="text-sm text-gray-300 font-bold ml-1 uppercase">Kode</span></p>
         </motion.div>
 
         <motion.div 
@@ -137,13 +143,13 @@ export default function Icd10MasterPage() {
           transition={{ delay: 0.1 }}
           className="md:col-span-2 relative group h-full"
         >
-          <FiSearch className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-6 h-6" />
+          <FiSearch className="absolute left-6 md:left-8 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 md:w-6 md:h-6" />
           <input 
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ketik kode atau nama penyakit untuk mencari..."
-            className="w-full h-full pl-20 pr-8 py-8 bg-white border border-gray-100 rounded-[2.5rem] text-sm font-black focus:border-primary outline-none shadow-sm group-focus-within:ring-8 group-focus-within:ring-primary/5 transition-all"
+            placeholder="Cari kode atau nama penyakit..."
+            className="w-full h-full pl-14 md:pl-20 pr-6 md:pr-8 py-4 md:py-8 bg-white border border-gray-100 rounded-2xl md:rounded-[2.5rem] text-xs md:text-sm font-black focus:border-primary outline-none shadow-sm group-focus-within:ring-4 md:group-focus-within:ring-8 group-focus-within:ring-primary/5 transition-all"
           />
         </motion.div>
       </div>
@@ -152,9 +158,10 @@ export default function Icd10MasterPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-[3rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden"
+        className="bg-white rounded-3xl md:rounded-[3rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden"
       >
-        <div className="overflow-x-auto">
+        {/* Table Section (Desktop) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-100">
@@ -189,6 +196,31 @@ export default function Icd10MasterPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View Card Layout */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {loading ? (
+             Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="p-6 animate-pulse space-y-3">
+                <div className="h-3 bg-gray-100 rounded w-1/4" />
+                <div className="h-4 bg-gray-50 rounded w-3/4" />
+              </div>
+            ))
+          ) : data.map((item) => (
+            <div key={item.id} className="p-5 space-y-2 active:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black bg-primary/5 text-primary px-3 py-1 rounded-lg border border-primary/10">
+                  {item.code}
+                </span>
+                <FiChevronRight className="text-gray-300 w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800 uppercase tracking-tight leading-tight">{item.nameId || '-'}</p>
+                <p className="text-[10px] font-semibold text-gray-400 italic mt-1">{item.nameEn || '-'}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         {!loading && data.length === 0 && (

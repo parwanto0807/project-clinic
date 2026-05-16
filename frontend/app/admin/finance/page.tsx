@@ -19,6 +19,12 @@ interface InvoiceItem {
   quantity: number
   price: number
   subtotal: number
+  serviceId?: string | null
+  service?: {
+    id: string
+    serviceCode: string
+    serviceName: string
+  }
 }
 
 interface Payment {
@@ -308,13 +314,76 @@ export default function FinanceDashboard() {
     const printWindow = window.open('', '_blank', 'width=420,height=900')
     if (!printWindow) return toast.error('Popup diblokir browser.')
 
-    const itemRowsHtml = receiptPreviewData.items.map((item) => `
-      <div class="item-row">
-        <div class="item-name">${item.description}</div>
-        <div class="item-meta">${item.quantity} x ${formatCurrency(item.price)}</div>
-        <div class="item-subtotal">${formatCurrency(item.subtotal)}</div>
-      </div>
-    `).join('')
+    // 1. Separate Medicine Items
+    const medicineItems = receiptPreviewData.items.filter(item => {
+      const desc = (item.description || '').toLowerCase();
+      const sName = (item.service?.serviceName || '').toLowerCase();
+      const sCode = (item.service?.serviceCode || '').toUpperCase();
+
+      const isExplicitMed = sCode === 'MED-GEN' || sName.includes('obat');
+      if (isExplicitMed) return true;
+
+      const isNonMedService = 
+        desc.includes('pendaftaran') || desc.includes('registrasi') || desc.includes('pemeriksaan') || 
+        desc.includes('konsultasi') || desc.includes('admin') || desc.includes('kartu') || 
+        desc.includes('lab') || desc.includes('darah') || desc.includes('urin') || desc.includes('feses') || 
+        desc.includes('rontgen') || desc.includes('usg') || desc.includes('ekg') || 
+        desc.includes('nebulizer') || desc.includes('injeksi') || desc.includes('suntik') || desc.includes('infus') ||
+        desc.includes('tindakan') || desc.includes('rawat') || desc.includes('jahit') || desc.includes('bedah');
+
+      const hasMedKeywords = desc.includes('obat') || desc.includes('kapsul') || desc.includes('tablet') || 
+                             desc.includes('sirup') || desc.includes('puyer') || desc.includes('salep') || 
+                             desc.includes('drop') || desc.includes('racikan') ||
+                             /\d+\s*(mg|ml|gr|tab|cap|btl|tablet|botol|pcs|tablet|strip)/.test(desc);
+      const hasParentheses = /\(.*\)/.test(desc);
+
+      return !isNonMedService && (hasMedKeywords || hasParentheses || !item.serviceId);
+    })
+
+    // 2. Separate Tindakan Items (Procedures)
+    const tindakanItems = receiptPreviewData.items.filter(item => {
+       if (medicineItems.some(med => med.id === item.id)) return false;
+       const desc = (item.description || '').toLowerCase();
+       return desc.includes('tindakan') || desc.includes('injeksi') || desc.includes('suntik') || 
+              desc.includes('infus') || desc.includes('nebulizer') || desc.includes('jahit') || 
+              desc.includes('bedah') || desc.includes('uap') || desc.includes('rawat luka') ||
+              desc.includes('khitan') || desc.includes('sirkumsisi');
+    })
+    
+    // 3. Remaining Items (Admin, Consultations, Lab, etc.)
+    const otherItems = receiptPreviewData.items.filter(item => 
+      !medicineItems.some(med => med.id === item.id) &&
+      !tindakanItems.some(tin => tin.id === item.id)
+    )
+    
+    const totalMedicineSubtotal = medicineItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
+    const totalTindakanSubtotal = tindakanItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
+
+    const itemRowsHtml = `
+      ${otherItems.map((item) => `
+        <div class="item-row">
+          <div class="item-name">${item.description}</div>
+          <div class="item-meta">${item.quantity} x ${formatCurrency(item.price)}</div>
+          <div class="item-subtotal">${formatCurrency(item.subtotal)}</div>
+        </div>
+      `).join('')}
+      
+      ${totalTindakanSubtotal > 0 ? `
+        <div class="item-row" style="border-top: 1px dashed #eee; padding-top: 4px; margin-top: 4px;">
+          <div class="item-name"><strong>TINDAKAN MEDIS</strong></div>
+          <div class="item-meta">Total Biaya Tindakan</div>
+          <div class="item-subtotal"><strong>${formatCurrency(totalTindakanSubtotal)}</strong></div>
+        </div>
+      ` : ''}
+
+      ${totalMedicineSubtotal > 0 ? `
+        <div class="item-row" style="border-top: 1px dashed #eee; padding-top: 4px; margin-top: 4px;">
+          <div class="item-name"><strong>TOTAL OBAT-OBATAN</strong></div>
+          <div class="item-meta">Akumulasi Biaya Obat</div>
+          <div class="item-subtotal"><strong>${formatCurrency(totalMedicineSubtotal)}</strong></div>
+        </div>
+      ` : ''}
+    `
 
     const receiptHtml = `
       <html>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/useAuthStore'
+import { useUIStore } from '@/lib/store/useUIStore'
 import DoctorSidebar from '../../components/doctor/DoctorSidebar'
 import DoctorNavbar from '../../components/doctor/DoctorNavbar'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,6 +14,7 @@ export default function DoctorLayout({
   children: React.ReactNode
 }) {
   const { isAuthenticated, user, checkAuth } = useAuthStore()
+  const { isDoctorSidebarCollapsed } = useUIStore()
   const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
 
@@ -53,10 +55,10 @@ export default function DoctorLayout({
       <DoctorSidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-64 transition-all duration-300">
+      <div className={`flex-1 flex flex-col min-h-screen w-full transition-all duration-300 overflow-x-hidden ${isDoctorSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         <DoctorNavbar />
         
-        <main className="p-4 flex-1 pt-24 lg:pt-28">
+        <main className="p-3 sm:p-4 flex-1 pt-24 lg:pt-28 pb-24 lg:pb-4 w-full max-w-full overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
