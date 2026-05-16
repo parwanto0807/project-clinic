@@ -587,7 +587,7 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
       jakartaDate: jakartaTodayStr
     })
 
-    const [revenueToday, totalUnpaid] = await Promise.all([
+    const [revenueToday, totalUnpaid, unpostedInvoicesCount] = await Promise.all([
       prisma.payment.aggregate({
         where: {
           paymentDate: { gte: today },
@@ -601,6 +601,13 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
           ...(!isAdminView ? { clinicId: currentClinicId } : {})
         },
         _sum: { total: true }
+      }),
+      prisma.invoice.count({
+        where: {
+          amountPaid: { gt: 0 },
+          isPosted: false,
+          ...(!isAdminView ? { clinicId: currentClinicId } : {})
+        }
       })
     ])
 
@@ -611,7 +618,8 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
 
     res.json({
       todayRevenue: revenueToday._sum.amount || 0,
-      pendingRevenue: totalUnpaid._sum.total || 0
+      pendingRevenue: totalUnpaid._sum.total || 0,
+      unpostedPaidCount: unpostedInvoicesCount
     })
   } catch (e) {
     res.status(500).json({ message: (e as Error).message })

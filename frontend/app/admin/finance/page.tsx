@@ -7,7 +7,7 @@ import {
   FiClock, FiCheckCircle, FiMoreVertical, FiEye, 
   FiCreditCard, FiCalendar, FiArrowRight, FiActivity, FiShare2, FiZap, FiSend, FiPlus, FiBriefcase, FiEdit2, FiX,
   FiRefreshCw, FiRepeat, FiShield,
-  FiUser
+  FiUser, FiAlertTriangle
 } from 'react-icons/fi'
 import { toast } from 'react-hot-toast'
 import { useAuthStore } from '@/lib/store/useAuthStore'
@@ -124,7 +124,7 @@ export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [summary, setSummary] = useState({ todayRevenue: 0, pendingRevenue: 0 })
+  const [summary, setSummary] = useState({ todayRevenue: 0, pendingRevenue: 0, unpostedPaidCount: 0 })
   
   const cashBanks = useMemo(() => banks.filter(b => 
     b.bankName.toLowerCase().includes('cash') || 
@@ -192,7 +192,7 @@ export default function FinanceDashboard() {
         setTotalItems(invoiceData.length)
       }
       
-      setSummary(sumRes.data || { todayRevenue: 0, pendingRevenue: 0 })
+      setSummary(sumRes.data || { todayRevenue: 0, pendingRevenue: 0, unpostedPaidCount: 0 })
       const clinics = Array.isArray(clinicRes.data) ? clinicRes.data : []
       const activeClinic = clinics.find((c: ClinicProfile) => c.id === activeClinicId) || null
       setActiveClinicProfile(activeClinic)
@@ -447,6 +447,42 @@ export default function FinanceDashboard() {
            </div>
         </div>
       </div>
+
+      {/* Warning Banner for Unposted Invoices */}
+      {summary.unpostedPaidCount > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-10 p-6 md:p-8 bg-rose-600 rounded-[3rem] shadow-2xl shadow-rose-200 border-4 border-white flex flex-col lg:flex-row items-center justify-between gap-6 overflow-hidden relative group"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-rose-500 to-rose-700 opacity-60 group-hover:scale-110 transition-transform duration-700" />
+          
+          {/* Blinking Animation Layer */}
+          <div className="absolute inset-0 bg-white/10 animate-pulse duration-[800ms]" />
+
+          <div className="relative flex items-center gap-6">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-3xl flex items-center justify-center text-rose-600 shadow-xl shadow-rose-900/30 shrink-0 animate-bounce duration-[3000ms]">
+               <FiAlertTriangle className="w-8 h-8 md:w-10 md:h-10" />
+            </div>
+            <div>
+               <h4 className="text-xl md:text-2xl font-black text-white uppercase tracking-tighter leading-none mb-2">Peringatan Akuntansi!</h4>
+               <p className="text-[10px] md:text-xs font-bold text-rose-100 uppercase tracking-[0.2em] leading-relaxed max-w-xl">
+                 Terdapat <span className="text-white px-2.5 py-1 bg-rose-900/40 rounded-xl border border-rose-400/40 mx-1.5 shadow-inner">{summary.unpostedPaidCount} Invoice</span> yang sudah terbayar namun belum diposting ke Buku Besar (GL). Segera lakukan posting untuk sinkronisasi laporan keuangan.
+               </p>
+            </div>
+          </div>
+
+          <div className="relative flex items-center gap-4 shrink-0">
+             <button 
+                onClick={() => { setStatusFilter('paid'); setSearch(''); }}
+                className="px-8 py-5 bg-gray-950 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-rose-900/40 hover:bg-black hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+             >
+                <FiFilter className="w-4 h-4" />
+                <span>Filter Invoice</span>
+             </button>
+          </div>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
           <div className="bg-white p-4 md:p-5 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center gap-3">
