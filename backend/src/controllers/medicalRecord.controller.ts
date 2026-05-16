@@ -130,8 +130,43 @@ export const saveNurseVitals = async (req: Request, res: Response) => {
 }
 
 /**
+ * Helper to check if a date is Sunday or a public holiday (Tanggal Merah)
+ * Now fetches values from SiteSettings for dynamic pricing
+ */
+const getConsultationPrice = async (tx: any, date: Date, visitType: string): Promise<number> => {
+  const day = date.getDay(); // 0 = Sunday
+  const isSunday = day === 0;
+  const isHoliday = isSunday; // Basic holiday check
+
+  // Fetch settings from DB
+  const settings = await tx.siteSetting.findMany({
+    where: {
+      key: { in: ['fee_doctor_regular', 'fee_doctor_holiday', 'fee_doctor_control'] }
+    }
+  })
+
+  const getVal = (key: string, fallback: number) => {
+    const s = settings.find((i: any) => i.key === key)
+    return s ? parseFloat(s.value as string) : fallback
+  }
+
+  const priceRegular = getVal('fee_doctor_regular', 70000)
+  const priceHoliday = getVal('fee_doctor_holiday', 80000)
+  const priceControl = getVal('fee_doctor_control', 35000)
+
+  if (visitType?.toUpperCase() === 'KONTROL') {
+    return priceControl;
+  }
+
+  if (isHoliday) {
+    return priceHoliday;
+  }
+
+  return priceRegular;
+}
+
+/**
  * Step 2: Doctor saves Diagnosis, Treatments, and Prescriptions
- * Updates queue status to 'completed'
  */
 export const saveDoctorConsultation = async (req: Request, res: Response) => {
   try {
@@ -338,6 +373,13 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
       })
 
       if (invoice) {
+        // Fetch Registration to check visitType for pricing
+        const registration = await tx.registration.findUnique({
+          where: { id: mr.registrationId || undefined }
+        })
+        const visitType = registration?.visitType || 'BARU'
+        const consultPrice = await getConsultationPrice(tx, new Date(), visitType)
+
         // PREVENT DUPLICATE ITEMS ON REOPEN: Remove existing items added by this medical record
         // We do this by checking if invoice items already exist for this mr's services
         // Strategy: delete all existing items from this invoice that were generated from doctor consultation
@@ -408,9 +450,81 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
               }
             })
           }
+          // Also remove existing Doctor Consultation fee to recalculate
+          const consultService = await tx.service.findFirst({
+            where: {
+              OR: [
+                { serviceCode: 'CONS-DOC' },
+                { serviceName: { contains: 'Konsultasi Dokter', mode: 'insensitive' } }
+              ],
+              AND: {
+                OR: [{ clinicId: mr.clinicId }, { clinic: { isMain: true } }]
+              }
+            }
+          })
+          if (consultService) {
+            await tx.invoiceItem.deleteMany({
+              where: { invoiceId: invoice.id, serviceId: consultService.id }
+            })
+          }
         }
 
         let additionalTotal = 0
+
+        // 3.0 Automatically record Doctor Commission & Add to Invoice
+        
+        // 3.1 Record Internal Commission for Doctor
+        await tx.doctorCommission.create({
+          data: {
+            doctorId: (mr.doctorId || (req as any).user.doctor?.id)!,
+            clinicId: mr.clinicId!,
+            date: new Date(),
+            description: `Jasa Konsultasi Dokter - Pasien: ${mr.patient.name} (${visitType})`,
+            amount: consultPrice,
+            type: 'AUTO_CONSULTATION',
+            status: 'unpaid',
+            invoiceId: invoice.id,
+            sourceId: mr.id
+          }
+        })
+
+        // 3.2 Add to Invoice as "Jasa Pemeriksaan"
+        let consultService = await tx.service.findFirst({
+          where: {
+            OR: [
+              { serviceCode: 'CONS-DOC' },
+              { serviceName: { contains: 'Konsultasi Dokter', mode: 'insensitive' } },
+              { serviceName: { contains: 'Jasa Pemeriksaan', mode: 'insensitive' } }
+            ],
+            AND: {
+              OR: [{ clinicId: mr.clinicId }, { clinic: { isMain: true } }]
+            }
+          }
+        })
+
+        if (!consultService) {
+          consultService = await tx.service.create({
+            data: {
+              serviceCode: 'CONS-DOC',
+              serviceName: 'Jasa Pemeriksaan',
+              price: 70000,
+              isActive: true,
+              clinicId: mr.clinicId
+            }
+          })
+        }
+
+        await tx.invoiceItem.create({
+          data: {
+            invoiceId: invoice.id,
+            serviceId: consultService.id,
+            description: `Jasa Pemeriksaan (${visitType})`,
+            quantity: 1,
+            price: consultPrice,
+            subtotal: consultPrice
+          }
+        })
+        additionalTotal += consultPrice
 
         // Add Services (non-lab)
         if (services && Array.isArray(services)) {

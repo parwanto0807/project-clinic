@@ -7,7 +7,7 @@ import {
   FiDatabase, FiDownload, FiUpload, FiHardDrive,
   FiAlertTriangle, FiCheckCircle, FiClock, FiFileText,
   FiInfo, FiChevronRight, FiSettings, FiShield, FiCpu, FiActivity,
-  FiMonitor, FiVideo, FiTrash2, FiPlay, FiRefreshCw, FiVolume2
+  FiMonitor, FiVideo, FiTrash2, FiPlay, FiRefreshCw, FiVolume2, FiDollarSign
 } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 import toast, { Toaster } from 'react-hot-toast'
@@ -25,6 +25,11 @@ export default function SettingsPage() {
   const [isRestoring, setIsRestoring] = useState(false)
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [feeSettings, setFeeSettings] = useState({
+    regular: '70000',
+    holiday: '80000',
+    control: '35000'
+  })
 
   const [newTemplate, setNewTemplate] = useState({
     name: '',
@@ -43,7 +48,40 @@ export default function SettingsPage() {
     }
     fetchTemplates()
     fetchDisplaySettings()
+    fetchFeeSettings()
   }, [isSuperAdmin])
+
+  const fetchFeeSettings = async () => {
+    try {
+      const { data } = await api.get('settings')
+      const regular = data.find((s: any) => s.key === 'fee_doctor_regular')?.value
+      const holiday = data.find((s: any) => s.key === 'fee_doctor_holiday')?.value
+      const control = data.find((s: any) => s.key === 'fee_doctor_control')?.value
+      
+      setFeeSettings({
+        regular: regular?.toString() || '70000',
+        holiday: holiday?.toString() || '80000',
+        control: control?.toString() || '35000'
+      })
+    } catch (e) {
+      console.error('Failed to fetch fee settings', e)
+    }
+  }
+
+  const handleSaveFee = async (key: string, value: string, label: string) => {
+    const tid = toast.loading(`Menyimpan ${label}...`)
+    try {
+      await api.post('settings', {
+        key,
+        value,
+        description: `Biaya Jasa Konsultasi Dokter (${label})`
+      })
+      toast.success(`${label} berhasil diperbarui`, { id: tid })
+      fetchFeeSettings()
+    } catch (e) {
+      toast.error(`Gagal memperbarui ${label}`, { id: tid })
+    }
+  }
 
   const fetchDisplaySettings = async () => {
     try {
@@ -248,6 +286,7 @@ export default function SettingsPage() {
             {[
               ...(isSuperAdmin ? [{ id: 'database', label: 'Database & Backup', icon: FiDatabase }] : []),
               { id: 'setup', label: 'Setup Templates', icon: FiActivity },
+              { id: 'fees', label: 'Tarif & Biaya Dokter', icon: FiDollarSign },
               { id: 'monitor', label: 'Monitor Display', icon: FiMonitor },
               ...(isSuperAdmin ? [{ id: 'security', label: 'Security & Access', icon: FiShield }] : []),
               { id: 'system', label: 'System Info', icon: FiCpu },
@@ -691,6 +730,113 @@ export default function SettingsPage() {
                       </div>
                       <div className="text-sm font-medium text-amber-800/80 leading-relaxed">
                         <strong>Tips Profesional:</strong> Gunakan video dengan aspek rasio 16:9 dan resolusi Full HD (1080p) untuk hasil terbaik di layar TV. Video akan diputar secara berurutan dan otomatis mengulang dari awal.
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+               {activeTab === 'fees' && (
+                <motion.div
+                  key="fees"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="space-y-6"
+                >
+                  <div className="bg-white p-10 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50">
+                    <div className="flex items-center justify-between mb-10 pb-6 border-b border-gray-50">
+                      <div>
+                        <h2 className="text-2xl font-black text-gray-900">Doctor Fee Configuration</h2>
+                        <p className="text-gray-400 font-medium text-sm">Kelola tarif jasa pemeriksaan dokter yang akan masuk ke tagihan dan komisi.</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 text-primary rounded-2xl">
+                        <FiDollarSign className="w-6 h-6" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      {/* Regular Fee */}
+                      <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex flex-col justify-between group hover:border-primary/30 transition-all">
+                        <div className="mb-6">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Hari Biasa</p>
+                          <h3 className="text-lg font-black text-slate-900 leading-tight">Tarif Konsultasi Reguler</h3>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">Rp</span>
+                            <input 
+                              type="number"
+                              value={feeSettings.regular}
+                              onChange={(e) => setFeeSettings({...feeSettings, regular: e.target.value})}
+                              className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-black text-lg focus:border-primary outline-none transition-all"
+                            />
+                          </div>
+                          <button 
+                            onClick={() => handleSaveFee('fee_doctor_regular', feeSettings.regular, 'Tarif Reguler')}
+                            className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-lg shadow-slate-900/10"
+                          >
+                            Simpan Tarif
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Holiday Fee */}
+                      <div className="p-8 bg-rose-50/30 rounded-[2.5rem] border border-rose-100 flex flex-col justify-between group hover:border-rose-300 transition-all">
+                        <div className="mb-6">
+                          <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2">Minggu & Tgl Merah</p>
+                          <h3 className="text-lg font-black text-slate-900 leading-tight">Tarif Hari Libur</h3>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-rose-300">Rp</span>
+                            <input 
+                              type="number"
+                              value={feeSettings.holiday}
+                              onChange={(e) => setFeeSettings({...feeSettings, holiday: e.target.value})}
+                              className="w-full pl-12 pr-4 py-4 bg-white border border-rose-200 rounded-2xl font-black text-lg focus:border-rose-400 outline-none transition-all text-rose-600"
+                            />
+                          </div>
+                          <button 
+                            onClick={() => handleSaveFee('fee_doctor_holiday', feeSettings.holiday, 'Tarif Libur')}
+                            className="w-full py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20"
+                          >
+                            Simpan Tarif
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Control Fee */}
+                      <div className="p-8 bg-indigo-50/30 rounded-[2.5rem] border border-indigo-100 flex flex-col justify-between group hover:border-indigo-300 transition-all">
+                        <div className="mb-6">
+                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Pasien Kontrol</p>
+                          <h3 className="text-lg font-black text-slate-900 leading-tight">Tarif Khusus Kontrol</h3>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-indigo-300">Rp</span>
+                            <input 
+                              type="number"
+                              value={feeSettings.control}
+                              onChange={(e) => setFeeSettings({...feeSettings, control: e.target.value})}
+                              className="w-full pl-12 pr-4 py-4 bg-white border border-indigo-200 rounded-2xl font-black text-lg focus:border-indigo-400 outline-none transition-all text-indigo-600"
+                            />
+                          </div>
+                          <button 
+                            onClick={() => handleSaveFee('fee_doctor_control', feeSettings.control, 'Tarif Kontrol')}
+                            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
+                          >
+                            Simpan Tarif
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-12 p-8 bg-blue-50 rounded-3xl border border-blue-100 flex gap-6 italic items-center">
+                      <div className="w-12 h-12 bg-blue-200 text-blue-700 rounded-2xl flex-shrink-0 flex items-center justify-center">
+                        <FiInfo className="w-6 h-6" />
+                      </div>
+                      <div className="text-sm font-medium text-blue-800/80 leading-relaxed">
+                        <strong>Catatan Keuangan:</strong> Perubahan tarif ini akan langsung berdampak pada Invoice yang dicetak dan Laporan Komisi Dokter untuk transaksi yang dilakukan <strong>setelah</strong> perubahan disimpan.
                       </div>
                     </div>
                   </div>
