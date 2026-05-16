@@ -134,8 +134,9 @@ export const saveNurseVitals = async (req: Request, res: Response) => {
  * Now fetches values from SiteSettings for dynamic pricing
  */
 const getConsultationPrice = async (tx: any, date: Date, visitType: string): Promise<number> => {
-  const day = date.getDay(); // 0 = Sunday
-  const isSunday = day === 0;
+  const { getJakartaDayName } = require('../utils/date')
+  const dayName = getJakartaDayName(date)
+  const isSunday = dayName === 'Minggu';
   const isHoliday = isSunday; // Basic holiday check
 
   // Fetch settings from DB

@@ -13,7 +13,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const clinicId = (req as any).clinicId
     const isAdminView = (req as any).isAdminView
     const range = (req.query.range as string) || 'week'
-    const { getJakartaDateString } = require('../utils/date')
+    const { getJakartaDateString, getJakartaDayName } = require('../utils/date')
     const jakartaTodayStr = getJakartaDateString()
     
     const today = new Date(`${jakartaTodayStr}T00:00:00+07:00`)
@@ -28,9 +28,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const yesterdayStart = new Date(`${yesterdayStr}T00:00:00+07:00`)
     const yesterdayEnd = new Date(`${yesterdayStr}T23:59:59+07:00`)
     
-    // Day Name for schedule
-    const daysIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-    const dayName = daysIndo[today.getDay()]
+    // Day Name for schedule (Standardized to Jakarta Time)
+    const dayName = getJakartaDayName(today)
 
     // Clinic filter — SUPER_ADMIN / isMain sees all, others see their clinic
     const clinicFilter = isAdminView ? {} : (clinicId ? { clinicId } : {})

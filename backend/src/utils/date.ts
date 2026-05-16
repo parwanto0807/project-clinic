@@ -41,3 +41,9 @@ export const getJakartaDateRef = (date: Date = new Date()): string => {
 export const getJakartaTimeString = (date: Date = new Date()): string => {
   return date.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta' });
 };
+/**
+ * Returns day name in Indonesian for Jakarta time (e.g., 'Senin', 'Selasa')
+ */
+export const getJakartaDayName = (date: Date = new Date()): string => {
+  return new Intl.DateTimeFormat('id-ID', { weekday: 'long', timeZone: 'Asia/Jakarta' }).format(date);
+};
