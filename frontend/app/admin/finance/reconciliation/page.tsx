@@ -97,7 +97,7 @@ export default function ReconciliationPage() {
 
   const fetchCoas = useCallback(async () => {
     try {
-      const { data: coaList } = await api.get('/master/coa/active')
+      const { data: coaList } = await api.get('/master/coa')
       // Filter only DETAIL accounts
       setAvailableCoas(coaList.filter((c: any) => c.accountType === 'DETAIL'))
     } catch (e) {
