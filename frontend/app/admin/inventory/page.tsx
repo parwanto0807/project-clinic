@@ -25,6 +25,7 @@ interface Stock {
     productCode: string
     isMedicine: boolean
     purchasePrice: number
+    sellingPrice?: number
   }
   batch?: {
     batchNumber: string
@@ -213,12 +214,13 @@ export default function InventoryDashboard() {
       <div className="space-y-4">
         {/* Desktop Header - Hidden on Mobile */}
         <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50/50 rounded-2xl border border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-          <div className="col-span-4">Informasi Produk</div>
+          <div className="col-span-3">Informasi Produk</div>
           <div className="col-span-1 text-center">Tipe</div>
           <div className="col-span-1 text-center">Fisik</div>
           <div className="col-span-1 text-center">Proses</div>
           <div className="col-span-1 text-center text-primary">Avail</div>
-          <div className="col-span-2 text-right">{hidePrices ? <EyeOff className="w-3.5 h-3.5 ml-auto text-gray-300" /> : 'Harga Beli'}</div>
+          <div className="col-span-1 text-right">{hidePrices ? <EyeOff className="w-3.5 h-3.5 ml-auto text-gray-300" /> : 'Harga Beli'}</div>
+          <div className="col-span-2 text-right">{hidePrices ? <EyeOff className="w-3.5 h-3.5 ml-auto text-gray-300" /> : 'Harga Jual'}</div>
           <div className="col-span-2 text-right">{hidePrices ? <EyeOff className="w-3.5 h-3.5 ml-auto text-gray-300" /> : 'Total Nilai'}</div>
         </div>
 
@@ -255,7 +257,7 @@ export default function InventoryDashboard() {
                   >
                     {/* Desktop View */}
                     <div className="hidden lg:grid grid-cols-12 gap-4 items-center px-6 py-4 bg-white border border-gray-100 rounded-3xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer" onClick={() => openMutationHistory(stock)}>
-                      <div className="col-span-4 flex items-center gap-4">
+                      <div className="col-span-3 flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black ${stock.product?.isMedicine ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
                           {stock.product?.productName?.[0]}
                         </div>
@@ -275,10 +277,15 @@ export default function InventoryDashboard() {
                       <div className="col-span-1 text-center font-black text-gray-900 text-sm">{onHand}</div>
                       <div className="col-span-1 text-center font-black text-orange-400 text-sm">{reserved}</div>
                       <div className="col-span-1 text-center font-black text-primary text-sm">{available}</div>
-                      <div className="col-span-2 text-right font-bold text-gray-600">
+                      <div className="col-span-1 text-right font-bold text-gray-600">
                         {hidePrices
                           ? <span className="tracking-[0.25em] text-gray-300 font-black">••••••</span>
                           : `Rp ${price.toLocaleString('id-ID')}`}
+                      </div>
+                      <div className="col-span-2 text-right font-bold text-emerald-600">
+                        {hidePrices
+                          ? <span className="tracking-[0.25em] text-gray-300 font-black">••••••</span>
+                          : `Rp ${(stock.product?.sellingPrice || 0).toLocaleString('id-ID')}`}
                       </div>
                       <div className="col-span-2 text-right font-black text-gray-900">
                         {hidePrices
@@ -319,6 +326,21 @@ export default function InventoryDashboard() {
                         <div className="text-center">
                           <p className="text-[8px] font-black text-primary uppercase tracking-widest mb-1">Available</p>
                           <p className="text-sm font-black text-primary">{available}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100 mb-4">
+                        <div>
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Harga Beli</p>
+                          {hidePrices
+                            ? <p className="text-xs font-black text-gray-300 tracking-[0.2em]">••••••</p>
+                            : <p className="text-xs font-black text-gray-700">Rp {price.toLocaleString('id-ID')}</p>}
+                        </div>
+                        <div>
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 text-right">Harga Jual</p>
+                          {hidePrices
+                            ? <p className="text-xs font-black text-gray-300 tracking-[0.2em] text-right">••••••</p>
+                            : <p className="text-xs font-black text-emerald-600 text-right">Rp ${(stock.product?.sellingPrice || 0).toLocaleString('id-ID')}</p>}
                         </div>
                       </div>
 
