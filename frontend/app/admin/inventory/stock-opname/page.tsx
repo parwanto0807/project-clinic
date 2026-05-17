@@ -364,7 +364,7 @@ export default function StockOpnamePage() {
     // --- Table Configuration ---
     let head = mode === 'blank' 
       ? [['NO', 'DESKRIPSI BARANG / BATCH', 'STOK SISTEM', 'STOK FISIK (ISI DI SINI)', 'CATATAN / KONDISI']]
-      : [['NO', 'DESKRIPSI BARANG', 'SISTEM', 'FISIK', 'HARGA SATUAN BELI', 'SUBTOTAL']]
+      : [['NO', 'DESKRIPSI BARANG', 'SISTEM', 'FISIK', 'HARGA SATUAN BELI TERBARU', 'SUBTOTAL']]
 
     const tableData = [...session.items]
       .sort((a, b) => a.product.productName.localeCompare(b.product.productName, undefined, { sensitivity: 'base' }))
@@ -756,7 +756,7 @@ export default function StockOpnamePage() {
                     <div className="col-span-1 text-center">Sistem</div>
                     <div className="col-span-1 text-center">Fisik</div>
                     <div className="col-span-1 text-center">Selisih</div>
-                    <div className="col-span-4 text-center">Harga Satuan Beli</div>
+                    <div className="col-span-4 text-center whitespace-normal break-words">Harga Satuan Beli Terbaru</div>
                     <div className="col-span-2 text-right">Total Fisik</div>
                  </div>
 
@@ -988,7 +988,7 @@ export default function StockOpnamePage() {
           .rounded-\\[3rem\\], .rounded-3xl, .rounded-2xl { border-radius: 1rem !important; }
           
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { background-color: #3b82f6 !important; color: white !important; padding: 12px 10px !important; font-size: 11px !important; font-weight: 900 !important; text-transform: uppercase; border: none !important; }
+          th { background-color: #3b82f6 !important; color: white !important; padding: 12px 10px !important; font-size: 11px !important; font-weight: 900 !important; text-transform: uppercase; border: none !important; white-space: normal !important; word-wrap: break-word !important; }
           td { padding: 12px 10px !important; font-size: 10px !important; border-bottom: 1px solid #f1f5f9 !important; vertical-align: middle; }
           
           .hidden.print\\:block { display: block !important; }
@@ -1019,7 +1019,7 @@ export default function StockOpnamePage() {
             <th className="text-left">Deskripsi Barang</th>
             <th className="text-center">Sistem</th>
             <th className="text-center">Fisik</th>
-            <th className="text-center">Harga Satuan Beli</th>
+            <th className="text-center whitespace-normal break-words">Harga Satuan Beli Terbaru</th>
             <th className="text-right">Subtotal</th>
           </tr>
         </thead>

@@ -55,10 +55,10 @@ export const getBranchStocks = async (req: Request, res: Response) => {
         include: {
           masterProduct: { select: { productCategory: { select: { categoryName: true } } } },
           _count: {
-             select: { inventoryStocks: { where: { onHandQty: { gt: 0 } } } }
+            select: { inventoryStocks: { where: { onHandQty: { gt: 0 } } } }
           },
           inventoryStocks: {
-             select: { reservedQty: true }
+            select: { reservedQty: true }
           }
         },
         orderBy: { productName: 'asc' },
@@ -70,7 +70,7 @@ export const getBranchStocks = async (req: Request, res: Response) => {
     // Map to a unified response format that the frontend can easily consume
     const aggregatedStocks = (products as any[]).map(p => {
       const reservedQty = p.inventoryStocks?.reduce((sum: number, is: any) => sum + (is.reservedQty || 0), 0) || 0;
-      
+
       return {
         id: p.id,
         productId: p.id,
@@ -164,7 +164,7 @@ export const getStockMutations = async (req: Request, res: Response) => {
 
     const whereClause: any = { branchId: branchId as string };
     if (productId) whereClause.productId = productId as string;
-    
+
     if (startDate || endDate) {
       whereClause.createdAt = {};
       if (startDate) whereClause.createdAt.gte = new Date(startDate as string);
@@ -242,17 +242,17 @@ export const adjustStock = async (req: Request, res: Response) => {
             onHandQty: type === 'ADJUST_ADD' ? { increment: quantity } : { decrement: quantity },
           },
         });
-        
+
         // Final safety check after decrement
         if (stock.onHandQty < 0) {
-           throw new Error(`Penyesuaian stok gagal: Saldo akhir tidak boleh negatif (${stock.onHandQty})`);
+          throw new Error(`Penyesuaian stok gagal: Saldo akhir tidak boleh negatif (${stock.onHandQty})`);
         }
       } else {
         // Create if doesn't exist
         if (type === 'ADJUST_REDUCE') {
-           throw new Error('Penyesuaian stok gagal: Record stok tidak ditemukan untuk pengurangan.');
+          throw new Error('Penyesuaian stok gagal: Record stok tidak ditemukan untuk pengurangan.');
         }
-        
+
         stock = await tx.inventoryStock.create({
           data: {
             branchId,
@@ -403,13 +403,13 @@ export const getOrCreateOpnameSession = async (req: Request, res: Response) => {
 
     let session = await prisma.stockOpnameSession.findFirst({
       where: { branchId: branchId as string, status: 'DRAFT' },
-      include: { 
-        items: { 
-          include: { 
-            product: { select: { productName: true, productCode: true, purchasePrice: true } }, 
-            batch: { select: { batchNumber: true, purchasePrice: true } } 
-          } 
-        } 
+      include: {
+        items: {
+          include: {
+            product: { select: { productName: true, productCode: true, purchasePrice: true } },
+            batch: { select: { batchNumber: true, purchasePrice: true } }
+          }
+        }
       }
     });
 
@@ -420,13 +420,13 @@ export const getOrCreateOpnameSession = async (req: Request, res: Response) => {
           createdBy: userId,
           status: 'DRAFT'
         },
-        include: { 
-          items: { 
-            include: { 
-              product: { select: { productName: true, productCode: true, purchasePrice: true } }, 
-              batch: { select: { batchNumber: true, purchasePrice: true } } 
-            } 
-          } 
+        include: {
+          items: {
+            include: {
+              product: { select: { productName: true, productCode: true, purchasePrice: true } },
+              batch: { select: { batchNumber: true, purchasePrice: true } }
+            }
+          }
         }
       });
     }
@@ -499,17 +499,17 @@ export const addOrUpdateOpnameItem = async (req: Request, res: Response) => {
 
     const systemQty = stock?.onHandQty || 0;
     const diffQty = physicalQty - systemQty;
-    
+
     // 3. Resolve price (User provided or database fallback)
     let unitPrice = req.body.unitPrice;
-    
+
     if (unitPrice === undefined || unitPrice === null) {
       if (batchId) {
-          const batch = await prisma.inventoryBatch.findUnique({ where: { id: batchId } });
-          unitPrice = batch?.purchasePrice || 0;
+        const batch = await prisma.inventoryBatch.findUnique({ where: { id: batchId } });
+        unitPrice = batch?.purchasePrice || 0;
       } else {
-          const product = await prisma.product.findUnique({ where: { id: targetProductId } });
-          unitPrice = product?.purchasePrice || 0;
+        const product = await prisma.product.findUnique({ where: { id: targetProductId } });
+        unitPrice = product?.purchasePrice || 0;
       }
     }
 
@@ -577,7 +577,7 @@ export const deleteOpnameItem = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const item = await prisma.stockOpnameItem.delete({ where: { id } });
-    
+
     // Update session total
     const allItems = await prisma.stockOpnameItem.findMany({ where: { sessionId: item.sessionId } });
     const totalValue = allItems.reduce((sum, i) => sum + i.subtotal, 0);
@@ -652,7 +652,7 @@ export const finalizeOpname = async (req: Request, res: Response) => {
         if (item.batchId) {
           await tx.inventoryBatch.update({
             where: { id: item.batchId },
-            data: { 
+            data: {
               currentQty: item.physicalQty,
               purchasePrice: item.unitPrice
             }
@@ -714,7 +714,7 @@ export const finalizeOpname = async (req: Request, res: Response) => {
       // 6. Mark Session as COMPLETED
       return await tx.stockOpnameSession.update({
         where: { id: sessionId },
-        data: { 
+        data: {
           status: 'COMPLETED',
           completedAt: new Date()
         }
@@ -752,13 +752,13 @@ export const bulkLoadInventory = async (req: Request, res: Response) => {
     // 1. Get all products registered to this branch
     const branchProducts = await prisma.product.findMany({
       where: { clinicId: branchId },
-      include: { 
+      include: {
         inventoryStocks: {
           include: { batch: true }
         }
       }
     });
-    
+
     console.log(`[InventoryController] bulkLoadInventory: Found ${branchProducts.length} products in branch ${branchId}`);
 
     // 2. Identify items already in the session to avoid duplicates
@@ -821,22 +821,22 @@ export const bulkLoadInventory = async (req: Request, res: Response) => {
     const updatedSession = await prisma.stockOpnameSession.update({
       where: { id: sessionId },
       data: { totalValue },
-      include: { 
-        items: { 
-          include: { 
-            product: { select: { productName: true, productCode: true, purchasePrice: true } }, 
-            batch: { select: { batchNumber: true, purchasePrice: true } } 
-          } 
-        } 
+      include: {
+        items: {
+          include: {
+            product: { select: { productName: true, productCode: true, purchasePrice: true } },
+            batch: { select: { batchNumber: true, purchasePrice: true } }
+          }
+        }
       }
     });
 
     res.json(updatedSession);
   } catch (error) {
     console.error('[InventoryController] bulkLoadInventory Error:', error);
-    res.status(500).json({ 
-      message: 'Internal server error during bulk load', 
-      details: (error as Error).message 
+    res.status(500).json({
+      message: 'Internal server error during bulk load',
+      details: (error as Error).message
     });
   }
 };
@@ -851,7 +851,7 @@ export const cancelOpname = async (req: Request, res: Response) => {
 
     const session = await prisma.stockOpnameSession.update({
       where: { id: sessionId },
-      data: { 
+      data: {
         status: 'CANCELLED',
         notes: reason ? `CANCELLED: ${reason}` : 'CANCELLED'
       }
