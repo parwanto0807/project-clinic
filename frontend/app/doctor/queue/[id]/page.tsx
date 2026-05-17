@@ -128,6 +128,10 @@ export default function DoctorConsultationPage() {
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false)
   const [isMedDialogOpen, setIsMedDialogOpen] = useState(false)
   const [selectedMedicines, setSelectedMedicines] = useState<Medicine[]>([])
+
+  const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
+  const [selectedServices, setSelectedServices] = useState<Service[]>([])
+  const [searchServiceDialog, setSearchServiceDialog] = useState('')
   
   // Referral State
   const [referralType, setReferralType] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL')
@@ -968,9 +972,9 @@ export default function DoctorConsultationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50/60 via-slate-50 to-white flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Top Professional Header */}
-      <div className="backdrop-blur-xl bg-white/80 border-b border-white/50 shadow-[0_4px_30px_rgba(0,0,0,0.03)] sticky top-0 z-30 p-4 transition-all">
+    <div className="-mt-[20px] lg:-mt-[30px] flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 pt-0">
+      {/* Top Professional Header (Snug below Navbar) */}
+      <div className="backdrop-blur-xl bg-white/95 border-b border-slate-200/80 shadow-sm p-3 md:py-3.5 md:px-6 mb-6 -mx-3 md:-mx-4 transition-all duration-300">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-4">
             <button onClick={() => router.back()} className="p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-200">
@@ -1010,37 +1014,40 @@ export default function DoctorConsultationPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* Action buttons moved to floating bottom bar */}
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+            {isReadOnly ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200 shadow-inner">
+                 <FiLock className="w-3.5 h-3.5" />
+                 <span className="text-[9px] font-black uppercase tracking-widest leading-none">TERKUNCI</span>
+              </div>
+            ) : (
+              <>
+                <button 
+                  onClick={() => handleSaveConsultation(false)} 
+                  disabled={saving} 
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all shadow-sm"
+                >
+                  <FiSave className="w-3.5 h-3.5" /> 
+                  <span>SIMPAN DRAFT</span>
+                </button>
+                <button 
+                  onClick={() => handleSaveConsultation(true)} 
+                  disabled={saving} 
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-primary to-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:shadow-[0_8px_20px_rgba(79,70,229,0.3)] hover:-translate-y-0.5 disabled:opacity-50 transition-all shadow-md shadow-primary/20 relative overflow-hidden group"
+                >
+                  <FiCheckCircle className="w-3.5 h-3.5" /> 
+                  <span>SELESAI PEMERIKSAAN</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Floating Action Buttons */}
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-[64px] left-0 right-0 lg:top-28 lg:bottom-auto lg:left-auto lg:right-8 z-[60] flex items-center justify-between lg:justify-end gap-2 lg:gap-3 p-4 lg:p-3 bg-white/95 lg:bg-white/60 backdrop-blur-2xl lg:rounded-[2rem] border-t lg:border border-slate-200 lg:border-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] lg:shadow-[0_20px_40px_rgba(0,0,0,0.1)]">
-        {isReadOnly ? (
-          <div className="w-full lg:w-auto flex items-center justify-center gap-3 px-6 py-3 lg:py-4 bg-slate-100 text-slate-500 rounded-xl lg:rounded-2xl border border-slate-200 cursor-default shadow-inner">
-             <FiLock className="w-4 h-4 lg:w-5 lg:h-5" />
-             <span className="text-[10px] lg:text-xs font-black uppercase tracking-widest leading-none">REKAM MEDIS TERKUNCI</span>
-          </div>
-        ) : (
-          <>
-            <button onClick={() => handleSaveConsultation(false)} disabled={saving} className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 lg:px-6 py-3 lg:py-4 bg-white/80 backdrop-blur-md border border-slate-200 text-slate-600 rounded-xl lg:rounded-2xl text-[9px] lg:text-[10px] font-black uppercase tracking-widest hover:bg-white hover:border-slate-300 hover:shadow-md disabled:opacity-50 transition-all duration-300 shadow-sm">
-              <FiSave className="w-4 h-4 lg:w-5 lg:h-5" /> <span className="hidden sm:inline">SIMPAN DRAFT</span><span className="sm:hidden">SIMPAN</span>
-            </button>
-            <button onClick={() => handleSaveConsultation(true)} disabled={saving} className="flex-1 lg:flex-none flex items-center justify-center gap-2 lg:gap-3 px-4 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-primary to-indigo-600 text-white rounded-xl lg:rounded-2xl text-[9px] lg:text-xs font-black uppercase tracking-widest hover:shadow-[0_8px_30px_rgba(79,70,229,0.4)] hover:-translate-y-1 disabled:opacity-50 transition-all duration-300 shadow-xl shadow-primary/30 relative overflow-hidden group">
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-              <FiCheckCircle className="w-4 h-4 lg:w-5 lg:h-5 relative z-10" /> <span className="relative z-10 hidden sm:inline">SELESAI PEMERIKSAAN</span><span className="relative z-10 sm:hidden">SELESAI</span>
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className="flex-1 p-6 grid grid-cols-12 gap-6 items-start pb-32">
+      <div className="flex-1 p-3 md:p-4 grid grid-cols-12 gap-4 items-start pb-6">
         {/* Navigation Segments */}
-        <div className="col-span-12 lg:col-span-3 space-y-6 lg:sticky lg:top-28">
-          <div className="bg-white/60 backdrop-blur-xl p-2 lg:p-3 rounded-2xl lg:rounded-[2rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden flex lg:flex-col overflow-x-auto lg:overflow-visible snap-x hidden-scrollbar">
+        <div className="col-span-12 lg:col-span-3 space-y-3 lg:sticky lg:top-[180px]">
+          <div className="bg-white/60 backdrop-blur-xl p-1.5 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden flex lg:flex-col overflow-x-auto lg:overflow-visible snap-x hidden-scrollbar">
             {[
               { id: 'nurse', label: 'Nurse Handover', icon: <FiClipboard /> },
               { id: 'diag', label: 'SOAP & Diagnosa', icon: <FiActivity /> },
@@ -1055,7 +1062,7 @@ export default function DoctorConsultationPage() {
               <button
                 key={s.id}
                 onClick={() => setActiveSegment(s.id as any)}
-                className={`flex-shrink-0 lg:w-full flex items-center gap-2 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 rounded-xl lg:rounded-2xl text-[9px] lg:text-[10px] font-black transition-all duration-300 mr-2 lg:mr-0 lg:mb-1 relative overflow-hidden group snap-center ${
+                className={`flex-shrink-0 lg:w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[9px] font-black transition-all duration-300 mr-2 lg:mr-0 lg:mb-1 relative overflow-hidden group snap-center ${
                   activeSegment === s.id 
                   ? 'text-white shadow-lg shadow-indigo-500/20 lg:translate-x-1' 
                   : 'text-slate-500 hover:bg-white/80 hover:shadow-sm lg:hover:translate-x-1'
@@ -1071,9 +1078,9 @@ export default function DoctorConsultationPage() {
           </div>
 
           {latestVitals && (
-            <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100/50 relative overflow-hidden group">
-               <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl -mr-12 -mt-12 transition-all group-hover:scale-110" />
-              <h4 className="text-[10px] font-black text-indigo-800 uppercase tracking-widest mb-4 flex items-center gap-2 opacity-60">
+            <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/5 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:scale-110" />
+              <h4 className="text-[10px] font-black text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2 opacity-60">
                 <FiActivity className="w-3 h-3" /> Tanda Vital Terakhir
               </h4>
               <div className="grid grid-cols-2 gap-y-4 gap-x-2">
@@ -1099,7 +1106,7 @@ export default function DoctorConsultationPage() {
         </div>
 
         {/* Content Area */}
-        <div className="col-span-12 lg:col-span-9">
+        <div className="col-span-12 lg:col-span-9 space-y-4">
           {isReadOnly && (
             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-700">
                <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -1108,9 +1115,9 @@ export default function DoctorConsultationPage() {
           )}
           <AnimatePresence mode="wait">
             {activeSegment === 'nurse' && (
-              <motion.div key="nurse" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[400px]">
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 lg:mb-8 border-b border-slate-50 pb-4 lg:pb-6">Keluhan Utama (Handover Perawat)</h3>
+              <motion.div key="nurse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-3 lg:mb-4 border-b border-slate-50 pb-2 lg:pb-3">Keluhan Utama (Handover Perawat)</h3>
                   <div className="p-6 lg:p-10 bg-slate-50/50 rounded-2xl lg:rounded-3xl italic text-lg lg:text-xl text-slate-600 font-medium leading-relaxed border border-slate-100">
                     "{medicalRecord?.chiefComplaint || 'Tidak ada catatan keluhan.'}"
                   </div>
@@ -1119,10 +1126,10 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'diag' && (
-              <motion.div key="diag" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[400px]">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 lg:mb-8 pb-6 border-b border-slate-50">
-                     <div className="flex items-center gap-3">
+              <motion.div key="diag" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
+                     <div className="flex items-center gap-2">
                         <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Documentation (S-O-A-P)</h3>
                      </div>
                      <div className="flex items-center gap-2">
@@ -1152,30 +1159,30 @@ export default function DoctorConsultationPage() {
                      </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* S Quadrant */}
-                    <div className="space-y-3 group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-indigo-500/20 transform group-hover:rotate-6 transition-transform">S</div>
-                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] group-focus-within:text-indigo-600 transition-colors">Subjective (Anamnesa)</label>
+                    <div className="space-y-1.5 group">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-indigo-500/20 transform group-hover:rotate-6 transition-transform">S</div>
+                        <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] group-focus-within:text-indigo-600 transition-colors">Subjective (Anamnesa)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={subjective} onChange={(e) => setSubjective(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-indigo-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] lg:min-h-[160px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-indigo-50/30 hover:bg-indigo-50/50'}`} placeholder="Keluhan utama, riwayat penyakit..." />
+                      <textarea disabled={isReadOnly} value={subjective} onChange={(e) => setSubjective(e.target.value)} className={`w-full p-3 border-2 border-indigo-50/80 rounded-xl min-h-[90px] lg:min-h-[110px] text-xs font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-indigo-50/30 hover:bg-indigo-50/50'}`} placeholder="Keluhan utama, riwayat penyakit..." />
                     </div>
 
                     {/* O Quadrant */}
-                    <div className="space-y-3 group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-emerald-500/20 transform group-hover:-rotate-6 transition-transform">O</div>
-                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] group-focus-within:text-emerald-600 transition-colors">Objective (Pemeriksaan)</label>
+                    <div className="space-y-1.5 group">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-emerald-500/20 transform group-hover:-rotate-6 transition-transform">O</div>
+                        <label className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] group-focus-within:text-emerald-600 transition-colors">Objective (Pemeriksaan)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={objective} onChange={(e) => setObjective(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-emerald-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] lg:min-h-[160px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-emerald-50/30 hover:bg-emerald-50/50'}`} placeholder="Pemeriksaan fisik, tanda klinis..." />
+                      <textarea disabled={isReadOnly} value={objective} onChange={(e) => setObjective(e.target.value)} className={`w-full p-3 border-2 border-emerald-50/80 rounded-xl min-h-[90px] lg:min-h-[110px] text-xs font-medium leading-relaxed focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-emerald-50/30 hover:bg-emerald-50/50'}`} placeholder="Pemeriksaan fisik, tanda klinis..." />
                     </div>
 
                     {/* A Quadrant */}
-                    <div className="space-y-3 group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-violet-500/20 transform group-hover:rotate-6 transition-transform">A</div>
-                        <label className="text-[10px] font-black text-violet-400 uppercase tracking-[0.2em] group-focus-within:text-violet-600 transition-colors">Assessment (Diagnosa ICD-10)</label>
+                    <div className="space-y-1.5 group">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-violet-500/20 transform group-hover:rotate-6 transition-transform">A</div>
+                        <label className="text-[9px] font-black text-violet-400 uppercase tracking-[0.2em] group-focus-within:text-violet-600 transition-colors">Assessment (Diagnosa ICD-10)</label>
                       </div>
                       
                       {/* ICD-10 Search */}
@@ -1220,7 +1227,7 @@ export default function DoctorConsultationPage() {
                                 }
                               }}
                               placeholder="Cari kode atau nama penyakit ICD-10..."
-                              className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:bg-white focus:border-primary shadow-inner transition-all"
+                              className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none focus:bg-white focus:border-primary shadow-inner transition-all"
                             />
                             {isSearchingIcd && <FiRefreshCw className="absolute right-4 top-1/2 -translate-y-1/2 text-primary animate-spin" />}
                           </div>
@@ -1270,9 +1277,9 @@ export default function DoctorConsultationPage() {
 
                       {/* Selected ICD-10 Display */}
                       {selectedIcd10 && (
-                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center justify-between group">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/5 shrink-0">
+                        <div className="p-2.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm border border-primary/5 shrink-0">
                                <FiCheckCircle />
                             </div>
                             <div>
@@ -1293,16 +1300,16 @@ export default function DoctorConsultationPage() {
                         </div>
                       )}
 
-                      <textarea disabled={isReadOnly} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-violet-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-violet-50/30 hover:bg-violet-50/50'}`} placeholder="Diagnosa spesifik atau catatan tambahan..." />
+                      <textarea disabled={isReadOnly} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={`w-full p-3 border-2 border-violet-50/80 rounded-xl min-h-[90px] lg:min-h-[110px] text-xs font-medium leading-relaxed focus:bg-white focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-violet-50/30 hover:bg-violet-50/50'}`} placeholder="Diagnosa spesifik atau catatan tambahan..." />
                     </div>
 
                     {/* P Quadrant */}
-                    <div className="space-y-3 group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-amber-500/20 transform group-hover:-rotate-6 transition-transform">P</div>
-                        <label className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] group-focus-within:text-amber-600 transition-colors">Plan (Terapi/Rencana)</label>
+                    <div className="space-y-1.5 group">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-amber-500/20 transform group-hover:-rotate-6 transition-transform">P</div>
+                        <label className="text-[9px] font-black text-amber-400 uppercase tracking-[0.2em] group-focus-within:text-amber-600 transition-colors">Plan (Terapi/Rencana)</label>
                       </div>
-                      <textarea disabled={isReadOnly} value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} className={`w-full p-4 lg:p-6 border-2 border-amber-50/80 rounded-2xl lg:rounded-[2rem] min-h-[120px] lg:min-h-[160px] text-xs lg:text-sm font-medium leading-relaxed focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-amber-50/30 hover:bg-amber-50/50'}`} placeholder="Rencana pengobatan, edukasi..." />
+                      <textarea disabled={isReadOnly} value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} className={`w-full p-3 border-2 border-amber-50/80 rounded-xl min-h-[90px] lg:min-h-[110px] text-xs font-medium leading-relaxed focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'bg-slate-50 opacity-60' : 'bg-amber-50/30 hover:bg-amber-50/50'}`} placeholder="Rencana pengobatan, edukasi..." />
                     </div>
                   </div>
                 </div>
@@ -1310,9 +1317,9 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'rx' && (
-              <motion.div key="rx" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 lg:mb-10 pb-6 lg:pb-8 border-b border-slate-50">
+              <motion.div key="rx" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                     <div className="space-y-1">
                       <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Resep Obat (Rx)</h3>
                       <p className="text-[10px] font-bold text-slate-400">Daftar obat yang diberikan kepada pasien</p>
@@ -1461,48 +1468,25 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'tindakan' && (
-              <motion.div key="tindakan" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
-                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 lg:gap-6 mb-6 lg:mb-10 pb-6 lg:pb-8 border-b border-slate-50">
+              <motion.div key="tindakan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                     <div className="space-y-1">
                       <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Tindakan Medis</h3>
                       <p className="text-[10px] font-bold text-slate-400">Daftar layanan atau tindakan yang diberikan</p>
                     </div>
                     {!isReadOnly && (
-                      <div className="relative w-full md:w-96 group" onClick={(e) => e.stopPropagation()}>
-                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                        <input 
-                          value={searchService} 
-                          onChange={(e) => setSearchService(e.target.value)} 
-                          onFocus={() => setIsServiceDropdownOpen(true)}
-                          placeholder="Cari tindakan atau kode layanan..." 
-                          className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:bg-white focus:border-emerald-500 shadow-sm group-focus-within:ring-4 group-focus-within:ring-emerald-500/5 transition-all" 
-                        />
-                        <button 
-                          onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors p-1"
-                        >
-                          <FiChevronDown className={`w-4 h-4 transition-transform ${isServiceDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-                        
-                        <AnimatePresence>
-                          {filteredServices.length > 0 && (
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute top-full left-0 w-full bg-white border border-slate-100 rounded-3xl shadow-2xl mt-3 z-50 p-2">
-                              {filteredServices.map(s => (
-                                <button key={s.id} onClick={() => addServiceItem(s)} className="w-full p-4 hover:bg-slate-50 text-left rounded-2xl transition-all group flex items-center justify-between gap-4 border-b border-slate-50 last:border-0 mb-1">
-                                  <div>
-                                    <p className="text-xs font-black text-slate-800 group-hover:text-emerald-600 transition-colors uppercase tracking-tight">{s.serviceName}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{s.serviceCode}</p>
-                                  </div>
-                                  <p className="text-xs font-black text-slate-600">
-                                    Rp {new Intl.NumberFormat('id-ID').format(s.price)}
-                                  </p>
-                                </button>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                      <button 
+                        onClick={() => {
+                          const initialSelected = allServices.filter(s => serviceItems.some(item => item.serviceId === s.id))
+                          setSelectedServices(initialSelected)
+                          setSearchServiceDialog('')
+                          setIsServiceDialogOpen(true)
+                        }}
+                        className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2"
+                      >
+                        <FiPlus /> Pilih Tindakan Medis
+                      </button>
                     )}
                   </div>
 
@@ -1543,9 +1527,9 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'lab' && (
-              <motion.div key='lab' initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className='space-y-6'>
-                <div className='bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[600px] flex flex-col'>
-                  <div className='flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50'>
+              <motion.div key='lab' initial={{ opacity: 0 }} animate={{ opacity: 1 }} className='space-y-4'>
+                <div className='bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px] flex flex-col'>
+                  <div className='flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3 lg:mb-4 pb-3 border-b border-slate-50'>
                      <div className='flex items-center gap-4'>
                         <div className='w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-500/20 shrink-0'>
                            <HiOutlineBeaker className='w-5 h-5' />
@@ -1574,19 +1558,19 @@ export default function DoctorConsultationPage() {
                      </div>
                   </div>
 
-                  <div className='grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 flex-1'>
-                     <div className='lg:col-span-7 space-y-6 lg:space-y-8'>
+                  <div className='grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 flex-1'>
+                     <div className='lg:col-span-7 space-y-4'>
                         <div className='relative group' ref={labDropdownRef}>
-                           <label className='text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-rose-500 transition-colors'>Cari Pemeriksaan Lab</label>
-                           <div className='mt-3 relative'>
+                           <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-rose-500 transition-colors'>Cari Pemeriksaan Lab</label>
+                           <div className='mt-1.5 relative'>
                               <button 
                                  onClick={() => setIsLabDropdownOpen(!isLabDropdownOpen)}
                                  className='absolute inset-y-0 right-4 flex items-center z-10 text-slate-400 hover:text-rose-500 transition-colors'
                               >
-                                 <FiChevronDown className={`w-5 h-5 transition-transform ${isLabDropdownOpen ? 'rotate-180' : ''}`} />
+                                 <FiChevronDown className={`w-4 h-4 transition-transform ${isLabDropdownOpen ? 'rotate-180' : ''}`} />
                               </button>
-                              <div className='absolute inset-y-0 left-6 flex items-center pointer-events-none'>
-                                 <FiSearch className='text-slate-400 group-focus-within:text-rose-500 transition-colors' />
+                              <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none'>
+                                 <FiSearch className='w-4 h-4 text-slate-400 group-focus-within:text-rose-500 transition-colors' />
                               </div>
                               <input 
                                  type='text' 
@@ -1596,7 +1580,7 @@ export default function DoctorConsultationPage() {
                                     setIsLabDropdownOpen(true);
                                  }}
                                  onFocus={() => setIsLabDropdownOpen(true)}
-                                 className='w-full pl-12 pr-6 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all'
+                                 className='w-full pl-10 pr-6 py-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all'
                                  placeholder='Cari panel pemeriksaan (ex: Darah Lengkap)...'
                               />
                               <AnimatePresence>
@@ -1614,7 +1598,7 @@ export default function DoctorConsultationPage() {
                                              if (!search) return true;
                                              return name.includes(search) || category.includes(search) || s.code.toLowerCase().includes(search);
                                           });
-
+ 
                                           return labFiltered.length > 0 ? (
                                              labFiltered.map(svc => (
                                                 <button 
@@ -1622,32 +1606,32 @@ export default function DoctorConsultationPage() {
                                                    onClick={() => {
                                                       if (!labItems.find(i => i.id === svc.id)) {
                                                          setLabItems([...labItems, {
-                                                           ...svc,
-                                                           serviceName: svc.name,
-                                                           serviceCode: svc.code,
-                                                           serviceCategory: { categoryName: svc.category }
+                                                            ...svc,
+                                                            serviceName: svc.name,
+                                                            serviceCode: svc.code,
+                                                            serviceCategory: { categoryName: svc.category }
                                                          }]);
                                                       }
                                                       setSearchLab('');
                                                       setIsLabDropdownOpen(false);
                                                    }}
-                                                   className='w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 transition-colors'
+                                                   className='w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 transition-colors'
                                                 >
                                                    <div>
                                                       <p className='text-xs font-bold text-slate-800 uppercase tracking-tight'>{svc.name}</p>
-                                                      <div className="flex items-center gap-2 mt-1">
-                                                         <p className='text-[9px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
-                                                         {svc.unit && <span className="text-[9px] font-medium text-slate-400 italic">Unit: {svc.unit}</span>}
+                                                      <div className="flex items-center gap-2 mt-0.5">
+                                                         <p className='text-[8px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-1.5 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
+                                                         {svc.unit && <span className="text-[8px] font-medium text-slate-400 italic">Unit: {svc.unit}</span>}
                                                       </div>
                                                    </div>
                                                    <div className="text-right">
-                                                      <p className="text-[11px] font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
+                                                      <p className="text-[10px] font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
                                                       <FiPlus className='text-rose-500 ml-auto mt-0.5 w-3 h-3' />
                                                    </div>
                                                 </button>
                                              ))
                                           ) : (
-                                             <div className='p-8 text-center text-slate-400 text-sm font-bold uppercase tracking-widest'>Pemeriksaan tidak ditemukan</div>
+                                             <div className='p-6 text-center text-slate-400 text-xs font-bold uppercase tracking-widest'>Pemeriksaan tidak ditemukan</div>
                                           );
                                        })()}
                                     </motion.div>
@@ -1655,106 +1639,99 @@ export default function DoctorConsultationPage() {
                               </AnimatePresence>
                            </div>
                         </div>
-                        <div className='space-y-4'>
-                           <label className='text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1'>Pemeriksaan yang Dipilih</label>
+                        <div className='space-y-2'>
+                           <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1'>Pemeriksaan yang Dipilih</label>
                            {labItems.length > 0 ? (
-                              <div className='grid grid-cols-1 gap-3'>
+                              <div className='flex flex-wrap gap-2 p-3 bg-slate-50/50 border border-slate-100 rounded-2xl'>
                                  {labItems.map((item, idx) => (
-                                    <motion.div 
-                                       key={item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                                       className='flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-rose-200 hover:shadow-md transition-all group'
+                                    <motion.span 
+                                       key={item.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                       className='inline-flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-[10px] font-black text-slate-800 uppercase tracking-tight'
                                     >
-                                       <div className='flex items-center gap-3'>
-                                          <div className='w-6 h-6 bg-slate-50 rounded-lg flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100'>
-                                             {idx + 1}
-                                          </div>
-                                          <div>
-                                             <p className='text-xs font-bold text-slate-800 uppercase tracking-tight'>{item.serviceName}</p>
-                                             <p className='text-[9px] font-medium text-slate-400 uppercase tracking-widest mt-0.5'>{item.serviceCategory?.categoryName || 'Diagnostic'}</p>
-                                          </div>
-                                       </div>
+                                       <span className="w-4 h-4 rounded bg-rose-50 text-rose-600 flex items-center justify-center text-[8px] font-bold shrink-0">{idx + 1}</span>
+                                       <span>{item.serviceName}</span>
                                        <button 
                                           onClick={() => setLabItems(labItems.filter(i => i.id !== item.id))}
-                                          className='p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100'
+                                          className='p-0.5 text-slate-300 hover:text-rose-500 rounded transition-colors ml-1'
                                        >
-                                          <FiTrash2 className="w-4 h-4" />
+                                          ✕
                                        </button>
-                                    </motion.div>
+                                    </motion.span>
                                  ))}
                               </div>
                            ) : (
-                              <div className='p-12 border-2 border-dashed border-slate-100 rounded-[2rem] text-center'>
-                                 <HiOutlineBeaker className='w-12 h-12 text-slate-200 mx-auto mb-4' />
-                                 <p className='text-sm font-bold text-slate-300 uppercase tracking-widest leading-loose'>Belum ada pemeriksaan<br/>yang dipilih</p>
+                              <div className='py-10 border border-dashed border-slate-200 rounded-2xl text-center bg-slate-50/20'>
+                                 <HiOutlineBeaker className='w-8 h-8 text-slate-200 mx-auto mb-2' />
+                                 <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest'>Belum ada pemeriksaan dipilih</p>
                               </div>
                            )}
                         </div>
                      </div>
-                     <div className='lg:col-span-5 space-y-6 lg:space-y-8 border-t lg:border-t-0 lg:border-l border-slate-100 pt-6 lg:pt-0 lg:pl-10'>
-                        <div className='space-y-3'>
-                           <label className='text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]'>Catatan Khusus Laborat</label>
+                     <div className='lg:col-span-5 space-y-4 border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6'>
+                        <div className='space-y-1.5'>
+                           <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]'>Catatan Khusus Laborat</label>
                            <textarea 
                               disabled={isReadOnly}
                               value={labNotes} 
                               onChange={(e) => setLabNotes(e.target.value)}
-                              className={`w-full p-4 bg-slate-50/50 border border-slate-200 rounded-xl min-h-[100px] text-xs font-medium leading-relaxed focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
+                              className={`w-full p-3 bg-slate-50/50 border border-slate-200 rounded-xl min-h-[60px] max-h-[120px] text-xs font-medium leading-relaxed focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
                               placeholder='Instruksi tambahan untuk tim lab...'
                            />
                         </div>
-                        <div className='space-y-3'>
-                           <label className='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-2'>
-                              <FiCheckCircle /> Ringkasan & Hasil Lab Terstruktur
+                        <div className='space-y-1.5'>
+                           <label className='text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5'>
+                              <FiCheckCircle /> Hasil Lab Terstruktur
                            </label>
                            <textarea 
                                disabled={isReadOnly}
                                value={labResults} 
                                onChange={(e) => setLabResults(e.target.value)}
-                               className={`w-full p-4 bg-indigo-50/30 border border-indigo-100/50 rounded-xl min-h-[80px] text-xs font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
+                               className={`w-full p-3 bg-indigo-50/30 border border-indigo-100/50 rounded-xl min-h-[60px] max-h-[120px] text-xs font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
                                placeholder='Kesimpulan hasil lab (jika sudah ada)...'
                            />
                         </div>
 
                         {/* Structured Lab Results */}
                         {(medicalRecord?.labOrders?.length || 0) > 0 && (
-                           <div className='space-y-4 pt-4 border-t border-slate-100'>
-                              <div className='space-y-4'>
+                           <div className='space-y-3 pt-3 border-t border-slate-100'>
+                              <div className='space-y-2.5'>
                                  {medicalRecord.labOrders.map((order: any) => (
-                                    <div key={order.id} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                                       <div className="bg-slate-100/50 px-4 py-2 flex justify-between items-center border-b border-slate-100">
-                                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{order.orderNo}</span>
-                                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${order.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    <div key={order.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                                       <div className="bg-slate-100/50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
+                                          <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{order.orderNo}</span>
+                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest ${order.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
                                              {order.status}
                                           </span>
                                            {order.status === 'completed' && (
                                               <button 
                                                  onClick={() => generateLabResultPDF(order)}
-                                                 className="text-[9px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-lg transition-colors"
+                                                 className="text-[8px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded transition-colors"
                                               >
-                                                 <FiPrinter className="w-3 h-3" /> Hasil PDF
+                                                 <FiPrinter className="w-2.5 h-2.5" /> PDF
                                               </button>
                                            )}
                                        </div>
                                        {order.results?.length > 0 ? (
-                                           <div className="p-3 space-y-1 bg-white">
+                                           <div className="p-2 space-y-0.5 bg-white">
                                               {order.results.map((res: any) => (
-                                                 <div key={res.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-2 rounded-lg transition-colors">
+                                                 <div key={res.id} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-1.5 rounded transition-colors">
                                                     <div className="flex-1">
-                                                       <p className="text-[10px] font-bold text-slate-700 uppercase">{res.testMaster?.name}</p>
+                                                       <p className="text-[9px] font-bold text-slate-700 uppercase">{res.testMaster?.name}</p>
                                                     </div>
                                                     <div className="flex-1 text-center">
-                                                       <p className={`text-[11px] font-black ${res.isCritical ? 'text-rose-500 bg-rose-50 py-0.5 px-2 rounded-full inline-block' : 'text-slate-900'}`}>
-                                                         {res.resultValue} <span className="text-[9px] font-medium text-slate-400 ml-1">{res.testMaster?.unit}</span>
+                                                       <p className={`text-[10px] font-black ${res.isCritical ? 'text-rose-500 bg-rose-50 py-0.5 px-1.5 rounded-full inline-block' : 'text-slate-900'}`}>
+                                                         {res.resultValue} <span className="text-[8px] font-medium text-slate-400 ml-0.5">{res.testMaster?.unit}</span>
                                                        </p>
                                                     </div>
                                                     <div className="flex-1 text-right">
-                                                       <p className="text-[9px] font-medium text-slate-400 italic bg-slate-50 py-0.5 px-2 rounded inline-block">Normal: {res.testMaster?.normalRangeText}</p>
+                                                       <p className="text-[8px] font-medium text-slate-400 italic bg-slate-50 py-0.5 px-1.5 rounded inline-block">Ref: {res.testMaster?.normalRangeText}</p>
                                                     </div>
                                                  </div>
                                               ))}
                                            </div>
                                        ) : (
-                                          <div className="p-4 text-center">
-                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum ada hasil diinput</p>
+                                          <div className="p-3 text-center">
+                                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Belum ada hasil</p>
                                           </div>
                                        )}
                                     </div>
@@ -1762,12 +1739,12 @@ export default function DoctorConsultationPage() {
                               </div>
                            </div>
                         )}
-                        <div className='p-6 bg-amber-50/50 rounded-2xl border border-amber-100'>
-                           <p className='text-[9px] font-black text-amber-600 uppercase tracking-[0.2em] mb-2 flex items-center gap-2'>
+                        <div className='p-3 bg-amber-50/40 rounded-xl border border-amber-100/50'>
+                           <p className='text-[8px] font-black text-amber-600 uppercase tracking-[0.2em] mb-1 flex items-center gap-1'>
                               <FiInfo /> Prosedur Digital Lab
                            </p>
-                           <p className='text-[9px] font-bold text-amber-600/70 leading-relaxed uppercase tracking-tight'>
-                              Pastikan semua item pemeriksaan sudah benar sebelum mencetak Order Lab. Order akan masuk ke sistem antrian Laboratorium secara otomatis setelah pemeriksaan disimpan.
+                           <p className='text-[8px] font-bold text-amber-600/70 leading-normal uppercase tracking-tight'>
+                              Pastikan pemeriksaan sudah benar sebelum mencetak. Order masuk ke antrian Laboratorium otomatis setelah disimpan.
                            </p>
                         </div>
                      </div>
@@ -1777,131 +1754,132 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'referral' && (
-              <motion.div key="referral" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
-                  <div className="flex items-center justify-between mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50">
+              <motion.div key="referral" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                  <div className="flex items-center justify-between mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Digital Referral Management</h3>
                      <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-100 hidden sm:inline-block">Care Coordination</span>
                   </div>
-                  
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
-                    <div className="space-y-6">
-                      <div className="p-6 lg:p-8 bg-slate-50 rounded-2xl lg:rounded-3xl border border-slate-100">
-                         <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{editingReferralId ? 'Edit Rujukan Terpilih' : 'Buat Rujukan Baru'}</p>
-                            {editingReferralId && (
-                               <button 
-                                 onClick={() => {
-                                   setEditingReferralId(null)
-                                   setReferralNotes('')
-                                   setReferralToClinicId('')
-                                   setReferralToDepartmentId('')
-                                   setReferralToHospitalName('')
-                                 }}
-                                 className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline"
-                               >
-                                 Batal Edit
-                               </button>
-                            )}
-                         </div>
-                         <div className="space-y-4">
-                             <div className="flex gap-2">
-                                {['INTERNAL', 'EXTERNAL'].map(type => (
-                                   <button 
-                                     key={type} 
-                                     onClick={() => setReferralType(type as any)} 
-                                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${referralType === type ? 'bg-slate-900 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-                                   >
-                                      {type === 'INTERNAL' ? 'Klinik / Poli Internal' : 'Rumah Sakit Luar'}
-                                   </button>
-                                ))}
-                             </div>
-
-                             {referralType === 'INTERNAL' ? (
-                               <div className="flex flex-col gap-3">
-                                  <select value={referralToClinicId} onChange={e => setReferralToClinicId(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none">
-                                     <option value="">Pilih Klinik Tujuan...</option>
-                                     {clinicsList.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                     ))}
-                                  </select>
-                                  <select value={referralToDepartmentId} onChange={e => setReferralToDepartmentId(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none">
-                                     <option value="">Pilih Poli/Unit Tujuan...</option>
-                                     {departmentsList.map(d => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
-                                     ))}
-                                  </select>
-                               </div>
-                             ) : (
-                               <input value={referralToHospitalName} onChange={e => setReferralToHospitalName(e.target.value)} placeholder="Ketik nama Rumah Sakit tujuan..." className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none" />
+                               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+                     <div className="lg:col-span-6 space-y-4">
+                       <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex items-center justify-between mb-3">
+                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{editingReferralId ? 'Edit Rujukan Terpilih' : 'Buat Rujukan Baru'}</p>
+                             {editingReferralId && (
+                                <button 
+                                  onClick={() => {
+                                    setEditingReferralId(null)
+                                    setReferralNotes('')
+                                    setReferralToClinicId('')
+                                    setReferralToDepartmentId('')
+                                    setReferralToHospitalName('')
+                                  }}
+                                  className="text-[8px] font-black text-rose-500 uppercase tracking-widest hover:underline"
+                                >
+                                  Batal Edit
+                                </button>
                              )}
-
-                             <textarea value={referralNotes} onChange={e => setReferralNotes(e.target.value)} placeholder="Catatan medis tambahan atau rincian klinis untuk rujukan..." className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:border-primary outline-none min-h-[120px]" />
-                             
-                             <button disabled={isPrinting} onClick={handleSaveAndPrintReferral} className={`w-full py-4 mt-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all disabled:opacity-50 ${editingReferralId ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'}`}>
-                                {isPrinting ? 'Memproses...' : editingReferralId ? 'Perbarui & Cetak Rujukan' : 'Cetak & Simpan Rujukan'}
-                             </button>
                           </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">Riwayat Rujukan Kunjungan Ini</p>
-                       {referrals.length === 0 ? (
-                         <div className="py-10 lg:py-20 text-center border border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
-                            <FiArrowLeft className="w-8 h-8 lg:w-10 lg:h-10 text-slate-100 mx-auto mb-2 rotate-180" />
-                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Belum Ada Rujukan</p>
-                         </div>
-                       ) : (
-                         referrals.map(r => (
-                           <div key={r.id} className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between">
-                              <div>
-                                 <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Rujukan {r.type === 'INTERNAL' ? 'Klinik' : 'RS Luar'}</p>
-                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ke: <span className="text-slate-700">{r.type === 'INTERNAL' ? `${r.toClinic?.name || 'Klinik'} - ${r.toDepartment?.name || 'Poli'}` : r.toHospitalName}</span></p>
-                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Status: {r.status || 'Pending'}</p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                  <button 
-                                    onClick={() => {
-                                      setEditingReferralId(r.id)
-                                      setReferralType(r.type)
-                                      setReferralNotes(r.notes || '')
-                                      if (r.type === 'INTERNAL') {
-                                        setReferralToClinicId(r.toClinicId || '')
-                                        setReferralToDepartmentId(r.toDepartmentId || '')
-                                      } else {
-                                        setReferralToHospitalName(r.toHospitalName || '')
-                                      }
-                                    }} 
-                                    title="Edit Rujukan" 
-                                    className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
-                                  >
-                                    <FiEdit3 className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleReprintReferral(r)} title="Print Ulang Rujukan" className="p-2 text-primary hover:bg-indigo-50 rounded-lg transition-all"><FiPrinter className="w-4 h-4" /></button>
-                                  {!isReadOnly && (
+                          <div className="space-y-3">
+                              <div className="flex gap-2">
+                                 {['INTERNAL', 'EXTERNAL'].map(type => (
                                     <button 
-                                      onClick={() => handleDeleteReferral(r.id)} 
-                                      title="Hapus Rujukan" 
-                                      className="p-2 text-rose-400 hover:bg-rose-50 rounded-lg transition-all"
+                                      key={type} 
+                                      onClick={() => setReferralType(type as any)} 
+                                      className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${referralType === type ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
                                     >
-                                      <FiTrash2 className="w-4 h-4" />
+                                       {type === 'INTERNAL' ? 'Poli Internal' : 'RS Luar'}
                                     </button>
-                                  )}
+                                 ))}
+                              </div>
+
+                              {referralType === 'INTERNAL' ? (
+                                <div className="flex flex-col gap-2">
+                                   <select value={referralToClinicId} onChange={e => setReferralToClinicId(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none">
+                                      <option value="">Pilih Klinik Tujuan...</option>
+                                      {clinicsList.map(c => (
+                                         <option key={c.id} value={c.id}>{c.name}</option>
+                                      ))}
+                                   </select>
+                                   <select value={referralToDepartmentId} onChange={e => setReferralToDepartmentId(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none">
+                                      <option value="">Pilih Poli/Unit Tujuan...</option>
+                                      {departmentsList.map(d => (
+                                         <option key={d.id} value={d.id}>{d.name}</option>
+                                      ))}
+                                   </select>
+                                </div>
+                              ) : (
+                                <input value={referralToHospitalName} onChange={e => setReferralToHospitalName(e.target.value)} placeholder="Ketik nama Rumah Sakit tujuan..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none" />
+                              )}
+
+                              <textarea value={referralNotes} onChange={e => setReferralNotes(e.target.value)} placeholder="Catatan medis tambahan atau rincian klinis untuk rujukan..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none min-h-[70px] max-h-[140px]" />
+                              
+                              <button disabled={isPrinting} onClick={handleSaveAndPrintReferral} className={`w-full py-2.5 mt-1 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg transition-all disabled:opacity-50 ${editingReferralId ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'}`}>
+                                 {isPrinting ? 'Memproses...' : editingReferralId ? 'Perbarui & Cetak Rujukan' : 'Cetak & Simpan Rujukan'}
+                              </button>
+                          </div>
+                       </div>
+                     </div>
+                     
+                     <div className="lg:col-span-6 space-y-3">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-1.5">Riwayat Rujukan Kunjungan Ini</p>
+                        {referrals.length === 0 ? (
+                          <div className="py-8 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/20">
+                             <FiArrowLeft className="w-6 h-6 text-slate-200 mx-auto mb-1.5 rotate-180" />
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum Ada Rujukan</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                             {referrals.map(r => (
+                               <div key={r.id} className="p-2.5 px-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between shadow-sm hover:border-indigo-100 transition-colors">
+                                  <div>
+                                     <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">Rujukan {r.type === 'INTERNAL' ? 'Internal' : 'RS Luar'}</p>
+                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Ke: <span className="text-slate-700">{r.type === 'INTERNAL' ? `${r.toClinic?.name || 'Klinik'} - ${r.toDepartment?.name || 'Poli'}` : r.toHospitalName}</span></p>
+                                     <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded inline-block mt-1">Status: {r.status || 'Pending'}</p>
+                                  </div>
+                                  <div className="flex items-center gap-0.5">
+                                      <button 
+                                        onClick={() => {
+                                          setEditingReferralId(r.id)
+                                          setReferralType(r.type)
+                                          setReferralNotes(r.notes || '')
+                                          if (r.type === 'INTERNAL') {
+                                            setReferralToClinicId(r.toClinicId || '')
+                                            setReferralToDepartmentId(r.toDepartmentId || '')
+                                          } else {
+                                            setReferralToHospitalName(r.toHospitalName || '')
+                                          }
+                                        }} 
+                                        title="Edit Rujukan" 
+                                        className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                      >
+                                        <FiEdit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button onClick={() => handleReprintReferral(r)} title="Print Ulang Rujukan" className="p-1.5 text-primary hover:bg-indigo-50 rounded-lg transition-all"><FiPrinter className="w-3.5 h-3.5" /></button>
+                                      {!isReadOnly && (
+                                        <button 
+                                          onClick={() => handleDeleteReferral(r.id)} 
+                                          title="Hapus Rujukan" 
+                                          className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-all"
+                                        >
+                                          <FiTrash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                   </div>
                                </div>
-                           </div>
-                         ))
-                       )}
-                    </div>
+                             ))}
+                          </div>
+                        )}
+                     </div>
                   </div>
                 </div>
               </motion.div>
             )}
 
             {activeSegment === 'attachment' && (
-              <motion.div key="attachment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
-                  <div className="flex items-center justify-between mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50">
+              <motion.div key="attachment" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                  <div className="flex items-center justify-between mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Media & Attachments</h3>
                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 hidden sm:inline-block">Clinical Photography</span>
                   </div>
@@ -1966,9 +1944,9 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'consent' && (
-              <motion.div key="consent" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
-                  <div className="flex items-center justify-between mb-6 lg:mb-8 pb-4 lg:pb-6 border-b border-slate-50">
+              <motion.div key="consent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                  <div className="flex items-center justify-between mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Informed Consent & Verification</h3>
                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-full border border-rose-100 hidden sm:inline-block">Legal & Safety</span>
                   </div>
@@ -2005,9 +1983,9 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'history' && (
-              <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                <div className="bg-white/80 backdrop-blur-xl p-6 lg:p-10 rounded-3xl lg:rounded-[3rem] border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[500px]">
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 lg:mb-10 pb-4 lg:pb-6 border-b border-slate-50">Riwayat Kunjungan</h3>
+              <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-3 lg:mb-4 pb-3 border-b border-slate-50">Riwayat Kunjungan</h3>
                    <div className="space-y-6 lg:space-y-8">
                      {history.map((h, idx) => (
                         <div key={idx} className="p-6 lg:p-8 bg-slate-50/30 rounded-3xl lg:rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl hover:shadow-slate-100 transition-all">
@@ -2057,6 +2035,190 @@ export default function DoctorConsultationPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Dialog Pilih Tindakan Medis */}
+      <AnimatePresence>
+        {isServiceDialogOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2rem] shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100"
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
+                    <FiActivity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">
+                      Pilih Tindakan Medis
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">
+                      Daftar layanan medis klinik yang tersedia untuk pasien
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-80 group">
+                    <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                    <input 
+                      value={searchServiceDialog} 
+                      onChange={(e) => setSearchServiceDialog(e.target.value)} 
+                      placeholder="Cari tindakan medis..." 
+                      className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none focus:bg-white focus:border-emerald-500 shadow-sm transition-all" 
+                    />
+                    {searchServiceDialog && (
+                      <button onClick={() => setSearchServiceDialog('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 hover:text-slate-600">✕</button>
+                    )}
+                  </div>
+                  <button onClick={() => setIsServiceDialogOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                    <FiMinus className="w-5 h-5" /> 
+                  </button>
+                </div>
+              </div>
+              
+              {/* Content Grid */}
+              <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                {/* Left Side: 4-Column Grid of Services */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {(() => {
+                      const searchLower = searchServiceDialog.toLowerCase();
+                      const filtered = allServices.filter(s => {
+                        const categoryName = s.serviceCategory?.categoryName?.toLowerCase() || '';
+                        const serviceName = s.serviceName.toLowerCase();
+                        
+                        const isLab = categoryName.includes('laboratorium') || 
+                                      categoryName.includes('lab') || 
+                                      serviceName.includes('lab');
+                        
+                        if (isLab) return false;
+                        
+                        return !searchServiceDialog || 
+                          serviceName.includes(searchLower) ||
+                          s.serviceCode.toLowerCase().includes(searchLower);
+                      });
+
+                      return filtered.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {filtered.map(s => {
+                            const isSelected = selectedServices.some(item => item.id === s.id);
+                            return (
+                              <button 
+                                key={s.id} 
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedServices(selectedServices.filter(item => item.id !== s.id))
+                                  } else {
+                                    setSelectedServices([...selectedServices, s])
+                                  }
+                                }} 
+                                className={`p-3 text-left rounded-xl transition-all duration-300 group flex flex-col justify-between border-2 relative overflow-hidden ${
+                                  isSelected 
+                                    ? 'border-emerald-500 bg-emerald-50/80 shadow-md shadow-emerald-500/5 scale-[1.01]' 
+                                    : 'border-slate-200 bg-white shadow-sm hover:border-emerald-400 hover:shadow-md'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between w-full gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded inline-block mb-1.5 transition-all ${
+                                      isSelected 
+                                        ? 'bg-emerald-500 text-white' 
+                                        : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600'
+                                    }`}>
+                                      {s.serviceCode}
+                                    </span>
+                                    <p className={`text-[11px] font-black uppercase tracking-tight leading-tight line-clamp-2 transition-colors ${
+                                      isSelected ? 'text-emerald-950 font-extrabold' : 'text-slate-800 group-hover:text-emerald-700'
+                                    }`}>
+                                      {s.serviceName}
+                                    </p>
+                                  </div>
+                                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                                    isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white group-hover:border-emerald-400'
+                                  }`}>
+                                    {isSelected && <FiCheckCircle className="w-2.5 h-2.5" />}
+                                  </div>
+                                </div>
+                                <div className="mt-2 pt-1.5 border-t border-slate-100/50 flex items-center justify-between w-full">
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Biaya</span>
+                                  <p className={`text-[10px] font-black tracking-tight ${isSelected ? 'text-emerald-800' : 'text-slate-900 group-hover:text-emerald-600'}`}>
+                                    Rp {new Intl.NumberFormat('id-ID').format(s.price)}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-20 text-slate-300">
+                          <FiActivity className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                          <p className="text-xs font-black uppercase tracking-widest">Tindakan tidak ditemukan</p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+                
+                {/* Right Side: Sidebar of Selected Items */}
+                <div className="w-full md:w-80 flex flex-col bg-slate-50 border-l border-slate-100 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-100/30 flex items-center justify-between">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tindakan Terpilih ({selectedServices.length})</p>
+                    {selectedServices.length > 0 && (
+                      <button onClick={() => setSelectedServices([])} className="text-[8px] font-black text-rose-500 uppercase hover:underline">Hapus Semua</button>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    {selectedServices.map(s => (
+                      <div key={s.id} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-sm">
+                        <div className="overflow-hidden">
+                          <p className="text-[10px] font-black text-slate-800 uppercase truncate">{s.serviceName}</p>
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{s.serviceCode}</p>
+                        </div>
+                        <button onClick={() => setSelectedServices(selectedServices.filter(item => item.id !== s.id))} className="text-rose-400 hover:text-rose-600 shrink-0 p-1">
+                          <FiMinus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {selectedServices.length === 0 && (
+                      <div className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Belum ada tindakan dipilih</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
+                <button onClick={() => setIsServiceDialogOpen(false)} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">
+                  Batal
+                </button>
+                <button 
+                  onClick={() => {
+                    const newServiceItems = selectedServices.map(s => {
+                      const existing = serviceItems.find(item => item.serviceId === s.id)
+                      return {
+                        serviceId: s.id,
+                        name: s.serviceName,
+                        code: s.serviceCode,
+                        price: s.price,
+                        quantity: existing ? existing.quantity : 1
+                      }
+                    })
+                    setServiceItems(newServiceItems)
+                    setIsServiceDialogOpen(false)
+                  }} 
+                  className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2"
+                >
+                  <FiCheckCircle /> Terapkan ({selectedServices.length} Tindakan)
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Dialog Pilih Obat */}
       <AnimatePresence>

@@ -11,8 +11,7 @@ import { useAuthStore } from '@/lib/store/useAuthStore'
 import { useUIStore } from '@/lib/store/useUIStore'
 
 const DOCTOR_MENU = [
-  { icon: FiHome, label: 'Dashboard', href: '/doctor' },
-  { icon: FiClock, label: 'Antrian Hari Ini', href: '/doctor/queue' },
+  { icon: FiHome, label: 'Dashboard Antrian', href: '/doctor' },
   { icon: FiUsers, label: 'Riwayat Pasien', href: '/doctor/patients' },
   { icon: FiBookOpen, label: 'Master ICD-10', href: '/doctor/icd10' },
 ]

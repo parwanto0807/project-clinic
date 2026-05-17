@@ -679,6 +679,17 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
       timeout: 30000,
     })
 
+    // REAL-TIME: Notify clinic listeners of queue changes (saves draft or finalizes)
+    const io = req.app.get('io')
+    if (io && result.clinicId) {
+      io.to(`clinic:${result.clinicId}`).emit('queue-updated', {
+        type: 'STATUS_CHANGED',
+        queueId: queueId,
+        status: isFinal ? 'completed' : 'ongoing'
+      })
+      console.log(`[Socket] Emit queue-updated (draft/save) to clinic:${result.clinicId}`)
+    }
+
     res.status(200).json(result)
   } catch (e) {
     const error = e as Error

@@ -410,7 +410,12 @@ export const getQueues = async (req: Request, res: Response) => {
       medicalRecord: q.registration?.medicalRecord ? {
         id: q.registration.medicalRecord.id,
         chiefComplaint: q.registration.medicalRecord.chiefComplaint,
-        vitals: q.registration.medicalRecord.vitals[0] || null
+        vitals: q.registration.medicalRecord.vitals[0] || null,
+        subjective: q.registration.medicalRecord.subjective || '',
+        objective: q.registration.medicalRecord.objective || '',
+        diagnosis: q.registration.medicalRecord.diagnosis || '',
+        treatmentPlan: q.registration.medicalRecord.treatmentPlan || '',
+        consultationDraft: (q.registration.medicalRecord as any).consultationDraft || null
       } : null
     }))
 
