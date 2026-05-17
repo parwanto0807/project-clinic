@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { 
   FiUser, FiMail, FiPhone, FiBriefcase, FiCalendar, 
   FiLock, FiShield, FiMapPin, FiClock, FiCheckCircle,
-  FiEye, FiEyeOff, FiSave, FiAlertCircle
+  FiEye, FiEyeOff, FiSave, FiAlertCircle, FiCamera, FiRefreshCw
 } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
@@ -39,10 +39,50 @@ const ROLE_COLORS: Record<string, { bg: string; desc: string }> = {
 }
 
 export default function AdminProfilePage() {
-  const { user, activeClinicId } = useAuthStore()
+  const { user, activeClinicId, setAuth } = useAuthStore()
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info')
   const [time, setTime] = useState<string>('')
   const [date, setDate] = useState<string>('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Limit file size to 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran file foto maksimal 5MB!')
+      return
+    }
+
+    // Limit type to image
+    if (!file.type.startsWith('image/')) {
+      toast.error('Hanya file gambar yang diperbolehkan!')
+      return
+    }
+
+    try {
+      setUploadingAvatar(true)
+      const formData = new FormData()
+      formData.append('avatar', file)
+
+      const res = await api.post('auth/update-avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      // Update Zustand Auth store
+      setAuth(res.data.user, activeClinicId || undefined)
+      toast.success('Foto profil berhasil diperbarui!')
+    } catch (error: any) {
+      console.error(error)
+      const msg = error.response?.data?.message || 'Gagal mengunggah foto profil'
+      toast.error(msg)
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   // Change Password Form State
   const [currentPassword, setCurrentPassword] = useState('')
@@ -207,12 +247,48 @@ export default function AdminProfilePage() {
 
               {/* Premium Avatar Container */}
               <div className="relative group">
-                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-xl shadow-primary/10 border-4 border-white">
-                  {user?.name?.[0]?.toUpperCase() || 'U'}
+                <div 
+                  className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-xl shadow-primary/10 transition-all hover:scale-[1.03] active:scale-95 cursor-pointer relative"
+                  onClick={() => !uploadingAvatar && document.getElementById('avatar-upload-input')?.click()}
+                >
+                  {uploadingAvatar ? (
+                    <div className="w-full h-full bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+                      <FiRefreshCw className="w-6 h-6 animate-spin mb-1 text-primary" />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Uploading...</span>
+                    </div>
+                  ) : user?.image ? (
+                    <img 
+                      src={user.image.startsWith('http') ? user.image : `${api.defaults.baseURL?.replace('/api/', '') || ''}${user.image}`} 
+                      alt={user.name} 
+                      className="w-full h-full object-cover transition-all group-hover:brightness-75"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-white font-black text-4xl transition-all group-hover:brightness-75">
+                      {user?.name?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  
+                  {/* Camera hover overlay */}
+                  {!uploadingAvatar && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-1 select-none">
+                      <FiCamera className="w-5 h-5" />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Ganti Foto</span>
+                    </div>
+                  )}
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 rounded-full border-4 border-white flex items-center justify-center" title="Status Online">
-                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
+
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 rounded-full border-4 border-white flex items-center justify-center shadow-lg" title="Status Online">
+                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
                 </div>
+                
+                {/* Hidden File Input */}
+                <input 
+                  type="file" 
+                  id="avatar-upload-input" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleAvatarChange} 
+                />
               </div>
 
               <h2 className="text-xl font-black text-gray-900 mt-5 leading-tight">{user?.name || 'Pengguna Yasfina'}</h2>
@@ -250,13 +326,6 @@ export default function AdminProfilePage() {
                     <p className="text-[10px] font-mono font-bold text-gray-500 truncate">{user?.id || '-'}</p>
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-8 p-4 bg-amber-50/50 border border-amber-100 rounded-2xl w-full text-left">
-                <p className="text-[11px] font-semibold text-amber-700 flex items-start gap-2">
-                  <span className="mt-0.5">💡</span>
-                  <span>Untuk mengubah foto profil atau data nama, silakan berkoordinasi dengan Tim IT / Super Admin.</span>
-                </p>
               </div>
             </div>
 

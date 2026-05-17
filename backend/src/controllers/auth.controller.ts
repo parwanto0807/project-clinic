@@ -2,6 +2,9 @@ import { Request, Response } from 'express'
 import { AuthService } from '../services/auth.service'
 import bcrypt from 'bcrypt'
 import { prisma } from '../lib/prisma'
+import path from 'path'
+import sharp from 'sharp'
+import { promises as fs } from 'fs'
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
@@ -108,6 +111,88 @@ export class AuthController {
       })
 
       res.status(200).json({ message: 'Password berhasil diperbarui' })
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message })
+    }
+  }
+
+  static async updateAvatar(req: any, res: Response) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'Tidak ada file foto yang dikirimkan' })
+      }
+
+      const userId = req.user.id
+      const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        include: {
+          doctor: true,
+          clinics: { include: { clinic: true } }
+        }
+      })
+
+      if (!user) {
+        return res.status(404).json({ message: 'Pengguna tidak ditemukan' })
+      }
+
+      const fileName = `avatar-${userId}-${Date.now()}.webp`
+      const uploadDir = path.join(process.cwd(), 'public/uploads/avatars')
+      await fs.mkdir(uploadDir, { recursive: true })
+      const filePath = path.join(uploadDir, fileName)
+
+      // Use sharp to optimize to a clean 300x300 Cover WebP image
+      await sharp(req.file.buffer)
+        .resize(300, 300, { fit: 'cover' })
+        .webp({ quality: 80 })
+        .toFile(filePath)
+
+      const avatarUrl = `/uploads/avatars/${fileName}`
+
+      // Update User Image in Database
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { image: avatarUrl },
+        include: {
+          clinics: {
+            include: {
+              clinic: true
+            }
+          },
+          doctor: true
+        }
+      })
+
+      // Fetch permissions for the user's role
+      const permissions = await prisma.rolePermission.findMany({
+        where: { role: updatedUser.role, canAccess: true },
+        select: { module: true }
+      })
+      const allowedModules = permissions.map(p => p.module)
+
+      const formattedUser = {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        image: updatedUser.image,
+        doctor: updatedUser.doctor,
+        permissions: allowedModules,
+        clinics: updatedUser.clinics.map(uc => ({
+          id: uc.clinic.id,
+          name: uc.clinic.name,
+          code: uc.clinic.code,
+          address: uc.clinic.address,
+          phone: uc.clinic.phone,
+          isMain: uc.clinic.isMain
+        }))
+      }
+
+      res.status(200).json({ 
+        message: 'Foto profil berhasil diperbarui', 
+        user: formattedUser 
+      })
     } catch (error) {
       res.status(500).json({ message: (error as Error).message })
     }

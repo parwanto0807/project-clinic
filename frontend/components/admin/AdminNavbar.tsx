@@ -7,6 +7,7 @@ import { useThemeStore } from '@/lib/store/useThemeStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import ClinicSwitcher from './ClinicSwitcher'
+import api from '@/lib/api'
 
 interface AdminNavbarProps {
   onMobileMenuOpen?: () => void
@@ -109,7 +110,6 @@ export default function AdminNavbar({ onMobileMenuOpen }: AdminNavbarProps) {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             {/* Avatar */}
-            {/* Avatar - Initial Based */}
             <div
               className="w-7 h-7 sm:w-8 sm:h-8 relative overflow-hidden rounded-lg border transition-all flex items-center justify-center shadow-sm"
               style={{ 
@@ -117,11 +117,19 @@ export default function AdminNavbar({ onMobileMenuOpen }: AdminNavbarProps) {
                 background: 'linear-gradient(135deg, var(--primary) 0%, #0ea5e9 100%)' 
               }}
             >
-              <span className="text-[11px] sm:text-xs font-black text-white uppercase tracking-tighter">
-                {user?.name?.toLowerCase().startsWith('dr') && user?.name?.split(' ').length > 1
-                  ? user?.name?.split(' ')[1]?.charAt(0)
-                  : user?.name?.charAt(0) || 'U'}
-              </span>
+              {user?.image ? (
+                <img 
+                  src={user.image.startsWith('http') ? user.image : `${api.defaults.baseURL?.replace('/api/', '') || ''}${user.image}`} 
+                  alt={user.name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-[11px] sm:text-xs font-black text-white uppercase tracking-tighter">
+                  {user?.name?.toLowerCase().startsWith('dr') && user?.name?.split(' ').length > 1
+                    ? user?.name?.split(' ')[1]?.charAt(0)
+                    : user?.name?.charAt(0) || 'U'}
+                </span>
+              )}
               {/* Subtle glass reflection */}
               <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/20 pointer-events-none" />
             </div>
