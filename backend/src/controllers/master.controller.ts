@@ -1146,10 +1146,7 @@ export const getProductMasters = async (req: Request, res: Response) => {
       }
     })
 
-    // Sort by stock DESC only when not searching (so initial list shows available items first)
-    if (!search) {
-      data.sort((a, b) => (b.availableStock || 0) - (a.availableStock || 0))
-    }
+
 
     const result: PaginatedResult<any> = {
       data,
