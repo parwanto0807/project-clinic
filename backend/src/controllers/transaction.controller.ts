@@ -534,3 +534,132 @@ export const getQueueById = async (req: Request, res: Response) => {
     res.status(500).json({ message: (e as Error).message })
   }
 }
+
+/**
+ * Reopen a completed consultation queue back to ongoing, resetting any pharmacy statuses
+ */
+export const reopenQueue = async (req: Request, res: Response) => {
+  const startedAt = Date.now()
+  try {
+    const { id } = req.params
+    const userId = (req as any).user?.id || 'system'
+
+    // 1. Fetch Queue Details
+    const queue = await prisma.queueNumber.findUnique({
+      where: { id },
+      include: {
+        registration: {
+          include: {
+            invoices: true,
+            medicalRecord: {
+              include: {
+                prescriptions: {
+                  include: {
+                    items: {
+                      include: {
+                        components: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    if (!queue) {
+      return res.status(404).json({ message: 'Antrian tidak ditemukan' })
+    }
+
+    if (queue.status !== 'completed') {
+      return res.status(400).json({ message: 'Antrian tidak dalam status selesai' })
+    }
+
+    // 2. Check Invoice Status (Block if Paid)
+    const invoices = queue.registration?.invoices || []
+    const isPaid = invoices.some(inv => inv.status === 'paid')
+    if (isPaid) {
+      return res.status(400).json({ 
+        message: 'Konsultasi tidak dapat dibuka kembali karena invoice pasien sudah lunas dibayarkan di Kasir.' 
+      })
+    }
+
+    // 3. Revert statuses inside a Prisma Transaction
+    await prisma.$transaction(async (tx) => {
+      // 3.1. Revert Queue status to 'ongoing'
+      await tx.queueNumber.update({
+        where: { id },
+        data: { status: 'ongoing' }
+      })
+
+      // 3.2. Revert Registration status to 'ongoing'
+      if (queue.registrationId) {
+        await tx.registration.update({
+          where: { id: queue.registrationId },
+          data: { status: 'ongoing' }
+        })
+      }
+
+      // 3.3. If there is a prescription, reset its dispenseStatus back to 'pending'
+      const medicalRecord = queue.registration?.medicalRecord
+      if (medicalRecord && medicalRecord.prescriptions.length > 0) {
+        for (const rx of medicalRecord.prescriptions) {
+          // If the prescription was reserved (preparing or ready), unreserve stocks
+          if (['preparing', 'ready'].includes(rx.dispenseStatus) && queue.clinicId) {
+            const { InventoryService } = require('../services/inventory.service')
+            for (const item of rx.items) {
+               const isExternal = item.instructions?.includes('(Apotek Luar)') || 
+                                  item.instructions?.includes('[Eksternal]') ||
+                                  item.instructions?.includes('Apotek Luar') ||
+                                  item.instructions?.includes('Eksternal');
+               if (isExternal) continue;
+
+               if (item.isRacikan) {
+                  for (const comp of item.components) {
+                     const product = await tx.product.findFirst({ 
+                       where: { masterProduct: { medicineId: comp.medicineId }, clinicId: queue.clinicId } 
+                     });
+                     if (product) {
+                       await InventoryService.unreserveStock(tx, product.id, queue.clinicId, comp.quantity * item.quantity, userId, rx.prescriptionNo);
+                     }
+                  }
+               } else if (item.medicineId) {
+                  const product = await tx.product.findFirst({ 
+                    where: { masterProduct: { medicineId: item.medicineId }, clinicId: queue.clinicId } 
+                  });
+                  if (product) {
+                    await InventoryService.unreserveStock(tx, product.id, queue.clinicId, item.quantity, userId, rx.prescriptionNo);
+                  }
+               }
+            }
+          }
+
+          // Reset status to pending
+          await tx.prescription.update({
+            where: { id: rx.id },
+            data: {
+              dispenseStatus: 'pending',
+              pharmacistId: null,
+              dispenseDate: null,
+              counselingGiven: false
+            }
+          })
+        }
+      }
+    })
+
+    // REAL-TIME: Notify clinic listeners
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`clinic:${queue.clinicId}`).emit('queue-updated', { type: 'STATUS_CHANGED', queueId: id, status: 'ongoing' })
+    }
+
+    res.json({ message: 'Konsultasi berhasil dibuka kembali. Dokter dapat mengubah resep sekarang.' })
+    console.log(`[Perf] reopenQueue took ${Date.now() - startedAt}ms`)
+  } catch (e) {
+    console.error('[reopenQueue] Error:', e)
+    res.status(500).json({ message: (e as Error).message })
+  }
+}

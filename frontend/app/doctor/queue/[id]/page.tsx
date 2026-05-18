@@ -122,6 +122,19 @@ export default function DoctorConsultationPage() {
   const [hasInformedConsent, setHasInformedConsent] = useState(false)
   
   const [prescriptionItems, setPrescriptionItems] = useState<any[]>([])
+
+  const isStockInsufficient = (p: any) => {
+    if (p.isExternal) return false
+    if (p.isRacikan) {
+      if (!p.components) return false
+      return p.components.some((c: any) => {
+        const needed = (parseFloat(c.quantity) || 0) * (parseInt(p.quantity) || 0)
+        return c.availableStock !== undefined && needed > c.availableStock
+      })
+    }
+    return p.availableStock !== undefined && (parseInt(p.quantity) || 0) > p.availableStock
+  }
+
   const [serviceItems, setServiceItems] = useState<any[]>([])
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
@@ -178,6 +191,172 @@ export default function DoctorConsultationPage() {
   const labDropdownRef = useRef<HTMLDivElement>(null)
   const icdContainerRef = useRef<HTMLDivElement>(null)
   const icdItemRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  // Racikan (Compound Prescription) States
+  const [isRacikanDialogOpen, setIsRacikanDialogOpen] = useState(false)
+  const [compoundFormulas, setCompoundFormulas] = useState<any[]>([])
+  const [selectedFormula, setSelectedFormula] = useState<any | null>(null)
+  const [racikanName, setRacikanName] = useState('')
+  const [racikanQty, setRacikanQty] = useState('10')
+  const [racikanDosageForm, setRacikanDosageForm] = useState('Puyer')
+  const [racikanDosage, setRacikanDosage] = useState('')
+  const [racikanFrequency, setRacikanFrequency] = useState('3x1')
+  const [racikanDuration, setRacikanDuration] = useState('3 hari')
+  const [racikanInstructions, setRacikanInstructions] = useState('Sesudah makan')
+  const [racikanTuslah, setRacikanTuslah] = useState('10000')
+  const [racikanComponents, setRacikanComponents] = useState<any[]>([])
+  const [searchComponentMed, setSearchComponentMed] = useState('')
+  const [searchComponentResults, setSearchComponentResults] = useState<any[]>([])
+  const [isSearchingComponentMed, setIsSearchingComponentMed] = useState(false)
+  const [isEditingRacikanIdx, setIsEditingRacikanIdx] = useState<number | null>(null)
+
+  // Fetch Compound Formulas on load
+  useEffect(() => {
+    const fetchFormulas = async () => {
+      try {
+        const res = await api.get('pharmacy/compound-formulas', {
+          params: { isActive: true, clinicId: queue?.clinicId || activeClinicId }
+        })
+        setCompoundFormulas(res.data)
+      } catch (err) {
+        console.error('Failed to fetch compound formulas:', err)
+      }
+    }
+    if (queue?.clinicId || activeClinicId) {
+      fetchFormulas()
+    }
+  }, [queue?.clinicId, activeClinicId])
+
+  // Search Raw Components for Custom Racikan
+  useEffect(() => {
+    if (!searchComponentMed) {
+      setSearchComponentResults([])
+      return
+    }
+    const controller = new AbortController()
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        setIsSearchingComponentMed(true)
+        const medRes = await api.get('master/products', {
+          headers: queue?.clinicId ? { 'x-clinic-id': queue.clinicId } : undefined,
+          params: {
+            isActive: true,
+            search: searchComponentMed,
+            limit: 50,
+            clinicId: queue?.clinicId || activeClinicId
+          },
+          signal: controller.signal
+        })
+        const list = medRes.data.data || medRes.data
+        setSearchComponentResults(Array.isArray(list) ? list : [])
+      } catch (err: any) {
+        if (err.name === 'CanceledError' || err.name === 'AbortError') return
+        console.error('Failed to search components:', err)
+      } finally {
+        setIsSearchingComponentMed(false)
+      }
+    }, 300)
+    return () => {
+      clearTimeout(delayDebounceFn)
+      controller.abort()
+    }
+  }, [searchComponentMed, queue?.clinicId, activeClinicId])
+
+  // Handle Formula Selection and apply from server
+  const handleSelectFormula = async (formulaId: string) => {
+    if (!formulaId) return
+    try {
+      const res = await api.post(`pharmacy/compound-formulas/${formulaId}/apply`, {
+        clinicId: queue?.clinicId || activeClinicId,
+        quantity: parseInt(racikanQty) || 10
+      })
+      const { prescriptionItemData, formula } = res.data
+      setRacikanName(prescriptionItemData.racikanName || '')
+      setRacikanDosageForm(prescriptionItemData.components?.[0]?.medicine?.dosageForm || 'Puyer')
+      setRacikanDosage(prescriptionItemData.dosage || '')
+      setRacikanFrequency(prescriptionItemData.frequency || '3x1')
+      setRacikanDuration(prescriptionItemData.duration || '3 hari')
+      setRacikanInstructions(prescriptionItemData.instructions || 'Sesudah makan')
+      setRacikanTuslah(String(formula?.tuslahPrice || 0))
+      setRacikanComponents(prescriptionItemData.components.map((c: any) => ({
+        medicineId: c.medicineId,
+        medicineName: c.medicine?.medicineName || 'Bahan',
+        quantity: c.quantity, // qty per 1 unit racikan
+        unit: c.unit || c.medicine?.unit || 'tablet',
+        availableStock: c.availableStock ?? 0
+      })))
+    } catch (err) {
+      toast.error('Gagal memuat formula racikan')
+    }
+  }
+
+  // Handle Saving Racikan Prescription Item
+  const handleSaveRacikan = () => {
+    if (!racikanName.trim()) {
+      toast.error('Nama racikan wajib diisi')
+      return
+    }
+    const qty = parseInt(racikanQty) || 0
+    if (qty <= 0) {
+      toast.error('Jumlah racikan harus lebih dari 0')
+      return
+    }
+    if (racikanComponents.length === 0) {
+      toast.error('Bahan racikan minimal 1 obat')
+      return
+    }
+
+    const newRacikanItem = {
+      isRacikan: true,
+      name: racikanName,
+      racikanName: racikanName,
+      quantity: qty,
+      dosage: racikanComponents.map(c => `${c.medicineName}: ${c.quantity} ${c.unit}`).join(', '),
+      frequency: racikanFrequency,
+      duration: racikanDuration,
+      instructions: racikanInstructions,
+      unit: racikanDosageForm || 'Puyer',
+      formulaId: selectedFormula?.id || null,
+      tuslahPrice: parseFloat(racikanTuslah) || 0,
+      components: racikanComponents.map(c => ({
+        medicineId: c.medicineId,
+        medicine: { medicineName: c.medicineName },
+        quantity: parseFloat(c.quantity) || 0,
+        unit: c.unit || 'unit',
+        availableStock: c.availableStock ?? 99999
+      })),
+      isExternal: false,
+      availableStock: 99999 // skip frontend check
+    }
+
+    if (isEditingRacikanIdx !== null) {
+      const updated = [...prescriptionItems]
+      updated[isEditingRacikanIdx] = newRacikanItem
+      setPrescriptionItems(updated)
+    } else {
+      setPrescriptionItems([...prescriptionItems, newRacikanItem])
+    }
+
+    setIsRacikanDialogOpen(false)
+    resetRacikanForm()
+  }
+
+  // Reset Racikan Form States
+  const resetRacikanForm = () => {
+    setSelectedFormula(null)
+    setRacikanName('')
+    setRacikanQty('10')
+    setRacikanDosageForm('Puyer')
+    setRacikanDosage('')
+    setRacikanFrequency('3x1')
+    setRacikanDuration('3 hari')
+    setRacikanInstructions('Sesudah makan')
+    setRacikanTuslah('10000')
+    setRacikanComponents([])
+    setSearchComponentMed('')
+    setSearchComponentResults([])
+    setIsEditingRacikanIdx(null)
+  }
 
   const isReadOnly = useMemo(() => queue?.status === 'completed', [queue])
 
@@ -238,19 +417,32 @@ export default function DoctorConsultationPage() {
             const savedItems = data.prescriptions.flatMap((rx: any) =>
               rx.items.map((item: any) => ({
                 medicineId: item.medicineId,
-                name: item.medicine?.medicineName || 'Obat',
+                name: item.isRacikan ? (item.racikanName || 'Obat Racikan') : (item.medicine?.medicineName || 'Obat'),
+                racikanName: item.racikanName,
                 quantity: item.quantity,
-                dosage: item.dosage,
+                dosage: item.isRacikan && item.components
+                  ? item.components.map((c: any) => `${c.medicine?.medicineName || 'Bahan'}: ${c.quantity} ${c.unit || 'unit'}`).join(', ')
+                  : item.dosage,
                 frequency: item.frequency,
                 duration: item.duration,
                 instructions: item.instructions || '',
-                unit: item.unit || item.medicine?.unit || 'unit',
-                availableStock: item.medicine?.stock ?? 0,
+                unit: item.unit || item.medicine?.unit || (item.isRacikan ? 'porsi' : 'unit'),
+                availableStock: item.isRacikan ? 99999 : (item.medicine?.stock ?? 0),
                 alreadySavedInDB: true, // Flag: already persisted, skip frontend stock check
                 isExternal: item.instructions?.includes('(Apotek Luar)') || 
                             item.instructions?.includes('[Eksternal]') ||
                             item.instructions?.includes('Apotek Luar') ||
-                            item.instructions?.includes('Eksternal')
+                            item.instructions?.includes('Eksternal'),
+                isRacikan: !!item.isRacikan,
+                formulaId: item.formulaId,
+                tuslahPrice: item.tuslahPrice || 0,
+                components: item.components?.map((c: any) => ({
+                  medicineId: c.medicineId,
+                  medicineName: c.medicine?.medicineName || 'Bahan',
+                  quantity: c.quantity,
+                  unit: c.unit || 'unit',
+                  availableStock: c.medicine?.stock ?? 0
+                })) || []
               }))
             )
             setPrescriptionItems(savedItems)
@@ -561,13 +753,14 @@ export default function DoctorConsultationPage() {
     const toastId = toast.loading(isFinal ? 'Menyimpan hasil konsultasi...' : 'Menyimpan draft...')
     try {
       // Validate prescription quantities against stock
-      // Skip validation for items already saved in DB (alreadySavedInDB=true)
-      // Server will perform authoritative real-time stock check
       for (const p of prescriptionItems) {
-        if (p.alreadySavedInDB) continue // Already in DB, server validates against real-time stock
         if (p.isExternal) continue // Skip stock validation for external medicines!
-        if (p.availableStock !== undefined && p.availableStock !== null && (parseInt(p.quantity) || 0) > p.availableStock) {
-          toast.error(`Stok tidak mencukupi untuk ${p.name} (Tersedia: ${p.availableStock})`, { id: toastId })
+        if (isStockInsufficient(p)) {
+          if (p.isRacikan) {
+            toast.error(`Stok bahan racikan untuk ${p.name} tidak mencukupi`, { id: toastId })
+          } else {
+            toast.error(`Stok tidak mencukupi untuk ${p.name} (Tersedia: ${p.availableStock})`, { id: toastId })
+          }
           setSaving(false)
           return
         }
@@ -1384,9 +1577,27 @@ export default function DoctorConsultationPage() {
         {/* Content Area */}
         <div className="col-span-12 lg:col-span-9 space-y-4">
           {isReadOnly && (
-            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-700">
-               <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
-               <p className="text-xs font-bold uppercase tracking-tight">Kunjungan ini Telah Selesai. Data rekam medis dalam mode baca-saja dan tidak dapat diubah lagi.</p>
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-amber-700">
+               <div className="flex items-center gap-3">
+                  <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p className="text-xs font-bold uppercase tracking-tight">Kunjungan ini Telah Selesai. Data rekam medis dalam mode baca-saja dan tidak dapat diubah lagi.</p>
+               </div>
+               <button
+                  onClick={async () => {
+                     if (!confirm("Buka kembali konsultasi ini? Dokter akan dapat mengedit resep dan rekam medis kembali.")) return;
+                     try {
+                        toast.loading("Membuka rekam medis...", { id: "reopen" });
+                        const res = await api.post(`/transactions/queues/${id}/reopen`);
+                        toast.success(res.data.message || "Konsultasi berhasil dibuka!", { id: "reopen" });
+                        window.location.reload();
+                     } catch (err: any) {
+                        toast.error(err.response?.data?.message || "Gagal membuka konsultasi", { id: "reopen" });
+                     }
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-md shadow-amber-600/10 active:scale-95 transition-all self-start sm:self-auto"
+               >
+                  <FiUnlock className="w-4 h-4" /> Buka Kunci Konsultasi
+               </button>
             </div>
           )}
           <AnimatePresence mode="wait">
@@ -1613,6 +1824,15 @@ export default function DoctorConsultationPage() {
                            <FiPlus className="w-4 h-4" /> PILIH OBAT
                          </button>
                          <button 
+                           onClick={() => {
+                             resetRacikanForm()
+                             setIsRacikanDialogOpen(true)
+                           }} 
+                           className="px-6 py-4 bg-violet-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-500/20 hover:bg-violet-700 transition-all flex items-center gap-2"
+                         >
+                           <HiOutlineBeaker className="w-4 h-4" /> BUAT RACIKAN
+                         </button>
+                         <button 
                            onClick={() => handlePrintPrescription('internal')}
                            disabled={saving || prescriptionItems.filter(p => !p.isExternal).length === 0}
                            className="px-5 py-4 bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
@@ -1636,33 +1856,49 @@ export default function DoctorConsultationPage() {
                         initial={{ opacity: 0, x: -10 }} 
                         animate={{ opacity: 1, x: 0 }} 
                         key={idx}
-                        className="bg-slate-50/30 p-3 lg:p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)]"
+                        className={`p-3 lg:p-4 rounded-xl border transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)] ${
+                          isStockInsufficient(p) 
+                            ? 'bg-rose-50/20 border-rose-200 hover:border-rose-300 hover:bg-rose-50' 
+                            : 'bg-slate-50/30 border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                        }`}
                       >
-                        <div className="grid grid-cols-1 lg:grid-cols-[180px_110px_90px_1fr_70px_35px] gap-3 lg:gap-4 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-[220px_110px_90px_1fr_70px_60px] gap-3 lg:gap-4 items-start">
                           {/* Col 1: Info Obat */}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-slate-100 shrink-0">
-                                  <FiPackage />
+                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm border shrink-0 ${p.isRacikan ? 'bg-violet-50 text-violet-600 border-violet-100' : 'bg-white text-primary border-slate-100'}`}>
+                                  {p.isRacikan ? <HiOutlineBeaker className="w-5 h-5 animate-pulse" /> : <FiPackage />}
                                </div>
-                               <div className="min-w-0">
+                               <div className="min-w-0 flex-1">
                                   <p className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 truncate">
-                                    {p.name}
+                                    {p.isRacikan ? (p.racikanName || 'Obat Racikan') : p.name}
                                     {p.isExternal && (
                                       <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase tracking-widest shrink-0 shadow-sm shadow-rose-500/10">
                                         Luar
                                       </span>
                                     )}
                                   </p>
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{p.dosage}</p>
-                                    {p.unit && (
-                                      <>
-                                        <span className="text-slate-300">•</span>
-                                        <span className="text-[8px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded truncate">
-                                          {p.unit}
-                                        </span>
-                                      </>
+                                  <div className="flex flex-col mt-0.5">
+                                    {p.isRacikan ? (
+                                      <div className="flex flex-wrap gap-1 mt-1 max-w-xs">
+                                        {p.components?.map((c: any, cidx: number) => (
+                                          <span key={cidx} className="inline-block text-[8px] font-bold text-violet-750 bg-violet-50 border border-violet-100/50 px-1.5 py-0.5 rounded">
+                                            {c.medicineName || c.medicine?.medicineName || 'Bahan'} ({c.quantity} {c.unit || 'unit'})
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1">
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{p.dosage}</p>
+                                        {p.unit && (
+                                          <>
+                                            <span className="text-slate-300">•</span>
+                                            <span className="text-[8px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded truncate">
+                                              {p.unit}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                </div>
@@ -1759,7 +1995,7 @@ export default function DoctorConsultationPage() {
                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">
                               Qty
                             </label>
-                            <div className={`flex flex-col border border-slate-200 rounded-xl overflow-hidden ${isReadOnly ? 'bg-slate-50' : 'bg-white'} ${(p.availableStock !== undefined && !p.isExternal && (parseInt(p.quantity) || 0) > p.availableStock) ? 'border-rose-500 bg-rose-50' : ''}`}>
+                            <div className={`flex flex-col border rounded-xl overflow-hidden ${isReadOnly ? 'bg-slate-50' : 'bg-white'} ${isStockInsufficient(p) ? 'border-rose-500 bg-rose-50' : 'border-slate-200'}`}>
                                <input 
                                   disabled={isReadOnly} 
                                   type="number" 
@@ -1774,10 +2010,12 @@ export default function DoctorConsultationPage() {
                                     setPrescriptionItems(n); 
                                   }} 
                                   className="w-full text-center py-2 text-xs font-black outline-none bg-transparent" 
-                               />
+                                />
                             </div>
-                            {p.availableStock !== undefined && !p.isExternal && (parseInt(p.quantity) || 0) > p.availableStock && (
-                              <p className="text-[8px] font-black text-rose-500 uppercase mt-1 text-center animate-pulse">Melebihi Stok!</p>
+                            {isStockInsufficient(p) && (
+                              <p className="text-[8px] font-black text-rose-500 uppercase mt-1 text-center animate-pulse">
+                                {p.isRacikan ? 'Bahan Melebihi Stok!' : 'Melebihi Stok!'}
+                              </p>
                             )}
                           </div>
                           
@@ -1785,12 +2023,46 @@ export default function DoctorConsultationPage() {
                           <div className="w-full flex flex-col items-center">
                              <label className="text-[9px] font-black text-transparent select-none mb-1.5 block">Aksi</label>
                              {!isReadOnly && (
-                               <button 
-                                 onClick={() => setPrescriptionItems(prescriptionItems.filter((_, i) => i !== idx))} 
-                                 className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 hover:border-rose-100 rounded-xl transition-all flex items-center justify-center animate-none"
-                               >
-                                  <FiTrash2 className="w-4 h-4" />
-                               </button>
+                               <div className="flex items-center gap-1.5">
+                                 {p.isRacikan && (
+                                   <button 
+                                     onClick={() => {
+                                       setIsEditingRacikanIdx(idx)
+                                       setRacikanName(p.racikanName || p.name)
+                                       setRacikanQty(String(p.quantity))
+                                       setRacikanDosageForm(p.unit || 'Puyer')
+                                       setRacikanDosage(p.dosage || '')
+                                       setRacikanFrequency(p.frequency || '3x1')
+                                       setRacikanDuration(p.duration || '3 hari')
+                                       setRacikanInstructions(p.instructions || 'Sesudah makan')
+                                       setRacikanTuslah(String(p.tuslahPrice || 0))
+                                       setRacikanComponents(p.components?.map((c: any) => ({
+                                         medicineId: c.medicineId,
+                                         medicineName: c.medicineName || c.medicine?.medicineName || 'Bahan',
+                                         quantity: c.quantity,
+                                         unit: c.unit || 'unit',
+                                         availableStock: c.availableStock ?? 99999
+                                       })) || [])
+                                       if (p.formulaId) {
+                                         const f = compoundFormulas.find((cf: any) => cf.id === p.formulaId)
+                                         setSelectedFormula(f || null)
+                                       } else {
+                                         setSelectedFormula(null)
+                                       }
+                                       setIsRacikanDialogOpen(true)
+                                     }}
+                                     className="p-2 text-violet-500 hover:text-violet-600 hover:bg-violet-50 border border-slate-100 hover:border-violet-100 rounded-xl transition-all flex items-center justify-center animate-none"
+                                   >
+                                      <FiEdit3 className="w-4 h-4" />
+                                   </button>
+                                 )}
+                                 <button 
+                                   onClick={() => setPrescriptionItems(prescriptionItems.filter((_, i) => i !== idx))} 
+                                   className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 hover:border-rose-100 rounded-xl transition-all flex items-center justify-center animate-none"
+                                 >
+                                    <FiTrash2 className="w-4 h-4" />
+                                 </button>
+                               </div>
                              )}
                           </div>
                         </div>
@@ -2685,6 +2957,339 @@ export default function DoctorConsultationPage() {
                   className="px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
                 >
                   <FiCheckCircle /> Konfirmasi ({selectedMedicines.length})
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Dialog Racikan (Puyer / Custom) */}
+      <AnimatePresence>
+        {isRacikanDialogOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100"
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-violet-50/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600 shadow-sm border border-violet-100">
+                    <HiOutlineBeaker className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">
+                      {isEditingRacikanIdx !== null ? 'Edit Resep Racikan' : 'Buat Resep Racikan (Puyer/Kapsul)'}
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">
+                      Kelola resep racikan kustom atau pakai template formula standar
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setIsRacikanDialogOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                  <FiMinus className="w-5 h-5" /> 
+                </button>
+              </div>
+              
+              {/* Scrollable Content */}
+              <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-[450px]">
+                {/* Kiri: Detail Racikan & Bahan Baku */}
+                <div className="flex-1 flex flex-col border-r border-slate-100 overflow-y-auto p-6 space-y-4">
+                  
+                  {/* Pilihan Template Formula */}
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Template Formula Standar (BoM)</label>
+                    <select 
+                      value={selectedFormula?.id || ''} 
+                      onChange={(e) => {
+                        const fid = e.target.value
+                        if (fid) {
+                          const f = compoundFormulas.find(cf => cf.id === fid)
+                          setSelectedFormula(f)
+                          handleSelectFormula(fid)
+                        } else {
+                          setSelectedFormula(null)
+                          resetRacikanForm()
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all"
+                    >
+                      <option value="">-- Buat Racikan Kustom (Tanpa Template) --</option>
+                      {compoundFormulas.map(cf => (
+                        <option key={cf.id} value={cf.id}>
+                          {cf.formulaName} [{cf.formulaCode}] - Kategori: {cf.category || '-'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Form Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Nama Racikan</label>
+                      <input 
+                        type="text" 
+                        value={racikanName} 
+                        onChange={(e) => setRacikanName(e.target.value)} 
+                        placeholder="Contoh: Puyer Demam & Batuk Anak" 
+                        className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Bentuk Sediaan</label>
+                      <select 
+                        value={racikanDosageForm} 
+                        onChange={(e) => setRacikanDosageForm(e.target.value)}
+                        className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                      >
+                        <option value="Puyer">Puyer</option>
+                        <option value="Kapsul">Kapsul</option>
+                        <option value="Sirup">Sirup</option>
+                        <option value="Salep">Salep</option>
+                        <option value="Tablet">Tablet</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Jumlah Racikan</label>
+                      <input 
+                        type="number" 
+                        value={racikanQty} 
+                        onChange={(e) => setRacikanQty(e.target.value)} 
+                        placeholder="Contoh: 10" 
+                        className="w-full px-4 py-2.5 text-xs font-black text-center bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Frekuensi</label>
+                      <input 
+                        type="text" 
+                        value={racikanFrequency} 
+                        onChange={(e) => setRacikanFrequency(e.target.value)} 
+                        placeholder="3x1" 
+                        className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Durasi</label>
+                      <input 
+                        type="text" 
+                        value={racikanDuration} 
+                        onChange={(e) => setRacikanDuration(e.target.value)} 
+                        placeholder="3 hari" 
+                        className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Instruksi Khusus</label>
+                      <input 
+                        type="text" 
+                        value={racikanInstructions} 
+                        onChange={(e) => setRacikanInstructions(e.target.value)} 
+                        placeholder="Sesudah makan" 
+                        className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Jasa Racik (Tuslah)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
+                        <input 
+                          type="number" 
+                          value={racikanTuslah} 
+                          onChange={(e) => setRacikanTuslah(e.target.value)} 
+                          placeholder="0" 
+                          className="w-full pl-8 pr-3 py-2.5 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pencarian Bahan Baku */}
+                  <div className="border-t border-slate-100 pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <FiPlus className="text-violet-500" /> Tambah Bahan Baku (Komponen)
+                      </h4>
+                    </div>
+
+                    <div className="relative group">
+                      <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
+                      <input 
+                        value={searchComponentMed} 
+                        onChange={(e) => setSearchComponentMed(e.target.value)} 
+                        placeholder="Cari obat bahan baku..." 
+                        className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-violet-500 shadow-sm transition-all" 
+                      />
+                      
+                      <AnimatePresence>
+                        {searchComponentMed && searchComponentResults.length > 0 && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 5 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            exit={{ opacity: 0 }} 
+                            className="absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-[200px] overflow-y-auto p-2"
+                          >
+                            {searchComponentResults.map(m => {
+                              const stock = m.availableStock ?? m.stock ?? 0
+                              const alreadyAdded = racikanComponents.some(rc => rc.medicineId === m.medicineId || rc.medicineId === m.id)
+                              return (
+                                <button 
+                                  key={m.id} 
+                                  disabled={alreadyAdded}
+                                  onClick={() => {
+                                    setRacikanComponents([...racikanComponents, {
+                                      medicineId: m.medicineId || m.id,
+                                      medicineName: m.masterName,
+                                      quantity: 1,
+                                      unit: m.unit || m.medicine?.dosageForm || 'tablet',
+                                      availableStock: stock
+                                    }])
+                                    setSearchComponentMed('')
+                                  }}
+                                  className="w-full p-2.5 text-left rounded-lg hover:bg-slate-50 flex items-center justify-between transition-colors disabled:opacity-50"
+                                >
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-700">{m.masterName}</p>
+                                    <p className="text-[9px] text-slate-400 font-medium">Stok: {stock} {m.unit}</p>
+                                  </div>
+                                  <span className="text-[9px] font-black text-violet-600 bg-violet-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                                    {alreadyAdded ? 'Sudah Ada' : 'Tambah'}
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kanan: Ringkasan Komponen Racikan */}
+                <div className="w-full md:w-96 flex flex-col bg-slate-50 overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 bg-slate-100/50 flex items-center justify-between">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Bahan Baku Terpilih ({racikanComponents.length})
+                    </p>
+                    {racikanComponents.length > 0 && (
+                      <button 
+                        onClick={() => setRacikanComponents([])} 
+                        className="text-[8px] font-black text-rose-500 uppercase hover:underline"
+                      >
+                        Hapus Semua
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {racikanComponents.map((c, cidx) => {
+                      const totalNeeded = (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0)
+                      const insufficient = totalNeeded > c.availableStock
+                      return (
+                        <div key={cidx} className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">
+                                {c.medicineName}
+                              </p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
+                                Stok: {c.availableStock} {c.unit}
+                              </p>
+                            </div>
+                            <button 
+                              onClick={() => setRacikanComponents(racikanComponents.filter((_, i) => i !== cidx))} 
+                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                            >
+                              <FiTrash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 pt-1.5 border-t border-slate-50">
+                            <div className="flex-1">
+                              <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+                                Qty per unit
+                              </label>
+                              <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden h-8">
+                                <input 
+                                  type="number" 
+                                  step="0.1"
+                                  value={c.quantity} 
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    const n = [...racikanComponents]
+                                    n[cidx].quantity = val
+                                    setRacikanComponents(n)
+                                  }}
+                                  className="w-full text-center py-1 text-xs font-black outline-none bg-transparent"
+                                />
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+                                Total Kebutuhan
+                              </label>
+                              <p className={`text-xs font-black ${insufficient ? 'text-rose-600 animate-pulse' : 'text-slate-700'}`}>
+                                {totalNeeded.toFixed(1)} {c.unit}
+                              </p>
+                            </div>
+                          </div>
+                          {insufficient && (
+                            <p className="text-[8px] font-black text-rose-500 uppercase tracking-wider text-right animate-pulse">
+                              ⚠️ Stok tidak cukup!
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {racikanComponents.length === 0 && (
+                      <div className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest space-y-2">
+                        <FiPackage className="w-8 h-8 mx-auto opacity-30 text-slate-500" />
+                        <p>Belum ada bahan baku ditambahkan</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Estimasi Biaya */}
+                  {racikanComponents.length > 0 && (
+                    <div className="bg-slate-100 p-4 border-t border-slate-200 space-y-1.5">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                        <span>Tuslah Racik (Jasa)</span>
+                        <span>Rp {Number(selectedFormula?.tuslahPrice || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-black text-slate-800 uppercase pt-1 border-t border-slate-200">
+                        <span>Estimasi Total</span>
+                        <span>
+                          Rp {Number(
+                            (racikanComponents.reduce((sum, c) => sum + 500 * (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0), 0)) + 
+                            (selectedFormula?.tuslahPrice || 0)
+                          ).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
+                <button 
+                  onClick={() => setIsRacikanDialogOpen(false)} 
+                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={handleSaveRacikan}
+                  disabled={racikanComponents.length === 0 || racikanComponents.some(c => (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0) > c.availableStock)}
+                  className="px-6 py-3 bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-violet-700 disabled:opacity-50 transition-all shadow-lg shadow-violet-200 flex items-center gap-2"
+                >
+                  <FiCheckCircle /> {isEditingRacikanIdx !== null ? 'Simpan Perubahan' : 'Tambahkan Racikan'}
                 </button>
               </div>
             </motion.div>

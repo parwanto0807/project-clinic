@@ -289,16 +289,34 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
 
       // 2. Handle Prescriptions (Only if Final)
       if (prescriptions && Array.isArray(prescriptions) && prescriptions.length > 0) {
-        const validPrescriptions = prescriptions.filter((item: any) => item.medicineId)
+        const validPrescriptions = prescriptions.filter((item: any) => item.medicineId || item.isRacikan)
 
         if (validPrescriptions.length > 0) {
-          const medicineIds = [...new Set(validPrescriptions.map((item: any) => item.medicineId))]
+          const medicineIds = [
+            ...new Set(
+              validPrescriptions
+                .map((item: any) => {
+                  if (item.isRacikan && Array.isArray(item.components)) {
+                    return item.components.map((c: any) => c.medicineId)
+                  }
+                  return [item.medicineId]
+                })
+                .flat()
+                .filter(Boolean)
+            )
+          ]
           const existingMedicines = await tx.medicine.findMany({
             where: { id: { in: medicineIds } },
             select: { id: true }
           })
           const validMedicineIds = new Set(existingMedicines.map((m: any) => m.id))
-          const safePrescriptions = validPrescriptions.filter((item: any) => validMedicineIds.has(item.medicineId))
+          const safePrescriptions = validPrescriptions.filter((item: any) => {
+            if (item.isRacikan) {
+              if (!Array.isArray(item.components) || item.components.length === 0) return false
+              return item.components.every((c: any) => validMedicineIds.has(c.medicineId))
+            }
+            return validMedicineIds.has(item.medicineId)
+          })
 
           // SERVER-SIDE STOCK VALIDATION: Read real-time stock from DB to prevent race conditions
           // Check current stock against prescriptions from the PRODUCT table (the actual stock)
@@ -310,17 +328,35 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
                                item.instructions?.includes('Eksternal');
             if (isExternal) continue;
 
-            const product = await tx.product.findFirst({
-              where: {
-                clinicId: mr.clinicId,
-                masterProduct: { medicineId: item.medicineId }
-              },
-              select: { id: true, quantity: true, productName: true }
-            })
-            if (product) {
-              const requestedQty = parseInt(item.quantity) || 0
-              if (requestedQty > product.quantity) {
-                throw new Error(`Stok tidak mencukupi untuk ${product.productName}: dibutuhkan ${requestedQty}, tersedia ${product.quantity}`)
+            if (item.isRacikan) {
+              for (const comp of item.components) {
+                const product = await tx.product.findFirst({
+                  where: {
+                    clinicId: mr.clinicId,
+                    masterProduct: { medicineId: comp.medicineId }
+                  },
+                  select: { id: true, quantity: true, productName: true }
+                })
+                if (product) {
+                  const requiredQty = (parseFloat(comp.quantity) || 0) * (parseInt(item.quantity) || 0)
+                  if (requiredQty > product.quantity) {
+                    throw new Error(`Stok tidak mencukupi untuk bahan racikan ${product.productName}: dibutuhkan ${requiredQty}, tersedia ${product.quantity}`)
+                  }
+                }
+              }
+            } else {
+              const product = await tx.product.findFirst({
+                where: {
+                  clinicId: mr.clinicId,
+                  masterProduct: { medicineId: item.medicineId }
+                },
+                select: { id: true, quantity: true, productName: true }
+              })
+              if (product) {
+                const requestedQty = parseInt(item.quantity) || 0
+                if (requestedQty > product.quantity) {
+                  throw new Error(`Stok tidak mencukupi untuk ${product.productName}: dibutuhkan ${requestedQty}, tersedia ${product.quantity}`)
+                }
               }
             }
           }
@@ -343,12 +379,23 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
                 prescriptionDate: new Date(),
                 items: {
                   create: safePrescriptions.map((item: any) => ({
-                    medicineId: item.medicineId,
+                    isRacikan: !!item.isRacikan,
+                    racikanName: item.racikanName || null,
+                    formulaId: item.formulaId || null,
+                    medicineId: item.medicineId || null,
                     quantity: parseInt(item.quantity) || 0,
                     dosage: item.dosage,
                     frequency: item.frequency,
                     duration: item.duration,
-                    instructions: item.instructions
+                    instructions: item.instructions,
+                    tuslahPrice: parseFloat(item.tuslahPrice) || 0,
+                    components: item.isRacikan && Array.isArray(item.components) ? {
+                      create: item.components.map((comp: any) => ({
+                        medicineId: comp.medicineId,
+                        quantity: parseFloat(comp.quantity) || 0,
+                        unit: comp.unit || null
+                      }))
+                    } : undefined
                   }))
                 }
               }
@@ -360,12 +407,23 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
               await tx.prescriptionItem.create({
                 data: {
                   prescriptionId: existingPrescription.id,
-                  medicineId: item.medicineId,
+                  isRacikan: !!item.isRacikan,
+                  racikanName: item.racikanName || null,
+                  formulaId: item.formulaId || null,
+                  medicineId: item.medicineId || null,
                   quantity: parseInt(item.quantity) || 0,
                   dosage: item.dosage,
                   frequency: item.frequency,
                   duration: item.duration,
-                  instructions: item.instructions
+                  instructions: item.instructions,
+                  tuslahPrice: parseFloat(item.tuslahPrice) || 0,
+                  components: item.isRacikan && Array.isArray(item.components) ? {
+                    create: item.components.map((comp: any) => ({
+                      medicineId: comp.medicineId,
+                      quantity: parseFloat(comp.quantity) || 0,
+                      unit: comp.unit || null
+                    }))
+                  } : undefined
                 }
               })
             }
@@ -636,31 +694,115 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
                                p.instructions?.includes('Eksternal');
             if (isExternal) continue;
 
-            const product = await tx.product.findFirst({
-              where: {
-                clinicId: mr.clinicId,
-                masterProduct: {
-                  medicineId: p.medicineId
+            if (p.isRacikan) {
+              let itemPrice = 0
+              if (Array.isArray(p.components)) {
+                for (const comp of p.components) {
+                  const compProd = await tx.product.findFirst({
+                    where: {
+                      clinicId: mr.clinicId,
+                      masterProduct: { medicineId: comp.medicineId }
+                    }
+                  })
+                  if (compProd) {
+                    itemPrice += (compProd.sellingPrice || 0) * (parseFloat(comp.quantity) || 0)
+                  }
                 }
               }
-            })
-
-            if (product) {
-              const itemPrice = product.sellingPrice || 0
-              const quantity = parseInt(p.quantity) || 0
-              const subtotal = itemPrice * quantity
               
+              let tuslah = parseFloat(p.tuslahPrice) || 0
+              if (tuslah === 0 && p.formulaId) {
+                const formula = await tx.compoundFormula.findUnique({
+                  where: { id: p.formulaId },
+                  select: { tuslahPrice: true }
+                })
+                if (formula) {
+                  tuslah = formula.tuslahPrice || 0
+                }
+              }
+
+              const quantity = parseInt(p.quantity) || 0
+              const medicineSubtotal = itemPrice * quantity
+              
+              // 1. Create Invoice Item for the Puyer itself (ONLY raw price, NO tuslah!)
               await tx.invoiceItem.create({
                 data: {
                   invoiceId: invoice.id,
                   serviceId: obatService.id,
-                  description: `${product.productName} (${p.dosage})`,
+                  description: `${p.racikanName || 'Obat Racikan'} (${p.dosageForm || 'Racikan'})`,
                   quantity: quantity,
                   price: itemPrice,
-                  subtotal
+                  subtotal: medicineSubtotal
                 }
               })
-              additionalTotal += subtotal
+              additionalTotal += medicineSubtotal
+
+              // 2. Create Invoice Item for the Tuslah Fee separately!
+              if (tuslah > 0) {
+                let tuslahService = await tx.service.findFirst({
+                  where: {
+                    OR: [
+                      { serviceCode: 'TUSLAH-GEN' },
+                      { serviceName: { contains: 'Tuslah', mode: 'insensitive' } },
+                      { serviceName: { contains: 'Jasa Racik', mode: 'insensitive' } }
+                    ],
+                    AND: {
+                      OR: [ { clinicId: mr.clinicId }, { clinic: { isMain: true } } ]
+                    }
+                  }
+                })
+
+                if (!tuslahService) {
+                  tuslahService = await tx.service.create({
+                    data: {
+                      serviceCode: 'TUSLAH-GEN',
+                      serviceName: 'Biaya Racik Obat (Tuslah)',
+                      price: 0,
+                      isActive: true,
+                      clinicId: mr.clinicId
+                    }
+                  })
+                }
+
+                await tx.invoiceItem.create({
+                  data: {
+                    invoiceId: invoice.id,
+                    serviceId: tuslahService.id,
+                    description: `Biaya Racik Obat (Tuslah) - ${p.racikanName || 'Obat Racikan'}`,
+                    quantity: 1,
+                    price: tuslah,
+                    subtotal: tuslah
+                  }
+                })
+                additionalTotal += tuslah
+              }
+            } else {
+              const product = await tx.product.findFirst({
+                where: {
+                  clinicId: mr.clinicId,
+                  masterProduct: {
+                    medicineId: p.medicineId
+                  }
+                }
+              })
+
+              if (product) {
+                const itemPrice = product.sellingPrice || 0
+                const quantity = parseInt(p.quantity) || 0
+                const subtotal = itemPrice * quantity
+                
+                await tx.invoiceItem.create({
+                  data: {
+                    invoiceId: invoice.id,
+                    serviceId: obatService.id,
+                    description: `${product.productName} (${p.dosage})`,
+                    quantity: quantity,
+                    price: itemPrice,
+                    subtotal
+                  }
+                })
+                additionalTotal += subtotal
+              }
             }
           }
         }
@@ -727,7 +869,7 @@ export const getMedicalRecordByRegistration = async (req: Request, res: Response
             where: { registrationId: id },
             include: {
                 vitals: { orderBy: { recordedAt: 'desc' }, take: 1 },
-                prescriptions: { include: { items: { include: { medicine: true } } } },
+                prescriptions: { include: { items: { include: { medicine: true, components: { include: { medicine: true } } } } } },
                 services: { include: { service: true } },
                 referrals: { include: { toClinic: true, toDepartment: true } },
                 labOrders: { 
@@ -747,6 +889,45 @@ export const getMedicalRecordByRegistration = async (req: Request, res: Response
         if (!mr) {
             console.warn(`[DEBUG] No Medical Record found for Registration ID: ${id}`)
             return res.json(null)
+        }
+
+        // Populate clinic-specific medicine stock for prescription items and components
+        if (mr.prescriptions && mr.prescriptions.length > 0) {
+            for (const rx of mr.prescriptions) {
+                if (rx.items && rx.items.length > 0) {
+                    for (const item of rx.items) {
+                        if (item.medicineId) {
+                            const product = await prisma.product.findFirst({
+                                where: {
+                                    clinicId: mr.clinicId,
+                                    masterProduct: { medicineId: item.medicineId }
+                                },
+                                select: { quantity: true }
+                            })
+                            if (item.medicine) {
+                                (item.medicine as any).stock = product ? product.quantity : 0
+                            }
+                        }
+
+                        if (item.isRacikan && item.components && item.components.length > 0) {
+                            for (const comp of item.components) {
+                                if (comp.medicineId) {
+                                    const product = await prisma.product.findFirst({
+                                        where: {
+                                            clinicId: mr.clinicId,
+                                            masterProduct: { medicineId: comp.medicineId }
+                                        },
+                                        select: { quantity: true }
+                                    })
+                                    if (comp.medicine) {
+                                        (comp.medicine as any).stock = product ? product.quantity : 0
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Access Control: If user is a DOCTOR and NOT in admin view, check if they are the assigned doctor
@@ -778,7 +959,7 @@ export const getMedicalRecordsByPatient = async (req: Request, res: Response) =>
                 prescriptions: { 
                   include: { 
                     items: { 
-                      include: { medicine: true } 
+                      include: { medicine: true, components: { include: { medicine: true } } } 
                     } 
                   } 
                 },

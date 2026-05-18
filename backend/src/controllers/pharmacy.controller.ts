@@ -95,6 +95,9 @@ export const getPrescriptionById = async (req: Request, res: Response) => {
                 include: {
                   invoices: {
                     select: { status: true, total: true, amountPaid: true }
+                  },
+                  queueNumbers: {
+                    select: { id: true, status: true }
                   }
                 }
               }
@@ -136,6 +139,7 @@ export const getPrescriptionById = async (req: Request, res: Response) => {
 
         // Handle Racikan Components
         if (item.components && item.components.length > 0) {
+          let totalRacikanPrice = 0;
           await Promise.all(item.components.map(async (comp) => {
             const product = await prisma.product.findFirst({
               where: {
@@ -151,10 +155,26 @@ export const getPrescriptionById = async (req: Request, res: Response) => {
               (comp as any).usedUnit = product.usedUnit;
               (comp as any).storageUnit = product.storageUnit;
               (comp as any).sellingPrice = product.sellingPrice;
+              totalRacikanPrice += (product.sellingPrice || 0) * (comp.quantity || 0);
             } else {
               (comp as any).availableStock = 0;
             }
           }));
+
+          if (item.isRacikan) {
+            let formulaTuslah = item.tuslahPrice || 0;
+            if (formulaTuslah === 0 && item.formulaId) {
+              const formula = await prisma.compoundFormula.findUnique({
+                where: { id: item.formulaId },
+                select: { tuslahPrice: true }
+              });
+              if (formula) formulaTuslah = formula.tuslahPrice || 0;
+            }
+            const parentQty = item.quantity || 1;
+            (item as any).sellingPrice = totalRacikanPrice + (parentQty > 0 ? formulaTuslah / parentQty : 0);
+            (item as any).usedUnit = (item as any).unit || 'Racik';
+            (item as any).storageUnit = (item as any).unit || 'Racik';
+          }
         }
 
         return item;

@@ -94,6 +94,30 @@ export default function PharmacyDetailPage({ params }: { params: Promise<{ id: s
     }
   }
 
+  const handleReopenFromPharmacy = async () => {
+    const qId = prescription.medicalRecord?.registration?.queueNumbers?.[0]?.id
+    if (!qId) {
+      setError('ID Antrian tidak ditemukan untuk resep ini.')
+      return
+    }
+    
+    if (!confirm('Apakah Anda yakin ingin mengembalikan resep ini ke Dokter? Ini akan membuka kunci konsultasi dokter agar dapat mengedit resep.')) {
+      return
+    }
+    
+    setIsSubmitting(true)
+    setError('')
+    try {
+      await api.post(`/transactions/queues/${qId}/reopen`)
+      alert('Resep berhasil dikembalikan ke Dokter! Konsultasi dokter telah terbuka.')
+      router.push('/admin/transactions/pharmacy')
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Gagal mengembalikan resep ke Dokter')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const saveItemChanges = async () => {
     setIsSubmitting(true)
     setError('')
@@ -418,6 +442,15 @@ export default function PharmacyDetailPage({ params }: { params: Promise<{ id: s
                                 <span className="uppercase tracking-[0.2em] text-[11px]">MULAI PENGERJAAN</span>
                                 <span className="text-[9px] font-bold opacity-60 uppercase">Ubah Status ke Preparing</span>
                              </button>
+
+                             <button 
+                                onClick={handleReopenFromPharmacy} 
+                                disabled={isSubmitting} 
+                                className="w-full py-4 bg-amber-50 text-amber-700 border border-amber-200 font-black rounded-[20px] shadow-sm hover:scale-[1.02] hover:bg-amber-100/50 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:grayscale disabled:opacity-50 disabled:scale-100"
+                              >
+                                 <span className="uppercase tracking-widest text-[10px]">KEMBALIKAN KE DOKTER</span>
+                                 <span className="text-[8px] font-bold opacity-75 uppercase">Buka Kunci Konsultasi</span>
+                              </button>
                         </div>
                       )}
 
