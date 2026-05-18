@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 import { useUIStore } from '@/lib/store/useUIStore'
+import api from '@/lib/api'
 
 const DOCTOR_MENU = [
   { icon: FiHome, label: 'Dashboard Antrian', href: '/doctor' },
@@ -123,8 +124,16 @@ export default function DoctorSidebar() {
         {!isCollapsed ? (
           <div className="px-4 py-3 rounded-2xl bg-gray-50/80 border border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-tr from-indigo-500 to-primary flex items-center justify-center text-white font-bold text-xs">
-                {user?.name?.[0] || 'D'}
+              <div className="w-8 h-8 flex-shrink-0 rounded-full overflow-hidden bg-gradient-to-tr from-indigo-500 to-primary flex items-center justify-center text-white font-bold text-xs relative">
+                {user?.image ? (
+                  <img 
+                    src={user.image.startsWith('http') ? user.image : `${api.defaults.baseURL?.replace('/api/', '') || ''}${user.image}`} 
+                    alt={user.name} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  user?.name?.[0] || 'D'
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-gray-900 truncate">{user?.name || 'Doctor'}</p>
@@ -133,8 +142,16 @@ export default function DoctorSidebar() {
             </div>
           </div>
         ) : (
-          <div className="w-10 h-10 mx-auto rounded-full bg-gradient-to-tr from-indigo-500 to-primary flex items-center justify-center text-white font-bold text-sm shadow-sm">
-            {user?.name?.[0] || 'D'}
+          <div className="w-10 h-10 mx-auto rounded-full overflow-hidden bg-gradient-to-tr from-indigo-500 to-primary flex items-center justify-center text-white font-bold text-sm shadow-sm relative">
+            {user?.image ? (
+              <img 
+                src={user.image.startsWith('http') ? user.image : `${api.defaults.baseURL?.replace('/api/', '') || ''}${user.image}`} 
+                alt={user.name} 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              user?.name?.[0] || 'D'
+            )}
           </div>
         )}
 

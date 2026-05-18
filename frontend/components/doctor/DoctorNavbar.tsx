@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { FiUser, FiSettings, FiLogOut, FiClock, FiActivity } from 'react-icons/fi'
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import api from '@/lib/api'
 
 export default function DoctorNavbar() {
   const { user, logout, activeClinicId } = useAuthStore()
@@ -84,10 +85,18 @@ export default function DoctorNavbar() {
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center gap-2 sm:gap-3 pl-1 pr-1 sm:pl-4 sm:pr-4 py-1 sm:py-2 rounded-2xl border border-gray-100 sm:border-gray-200 hover:bg-gray-50 hover:border-indigo-200 transition-all group"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-primary flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
-              {user?.name?.toLowerCase().startsWith('dr') && user?.name?.split(' ').length > 1
-                ? user?.name?.split(' ')[1]?.charAt(0)
-                : user?.name?.[0] || 'D'}
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-gradient-to-tr from-indigo-500 to-primary flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform relative">
+              {user?.image ? (
+                <img 
+                  src={user.image.startsWith('http') ? user.image : `${api.defaults.baseURL?.replace('/api/', '') || ''}${user.image}`} 
+                  alt={user.name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                user?.name?.toLowerCase().startsWith('dr') && user?.name?.split(' ').length > 1
+                  ? user?.name?.split(' ')[1]?.charAt(0)
+                  : user?.name?.[0] || 'D'
+              )}
             </div>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-xs font-black text-gray-900 leading-tight">
@@ -124,16 +133,6 @@ export default function DoctorNavbar() {
                     >
                       <FiUser className="w-4 h-4" />
                       View Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        router.push('/doctor/settings')
-                        setDropdownOpen(false)
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-xs text-gray-600 hover:bg-indigo-50 hover:text-primary rounded-xl transition-all font-black uppercase tracking-widest"
-                    >
-                      <FiSettings className="w-4 h-4" />
-                      Station Settings
                     </button>
                   </div>
                   <div className="p-2 border-t border-gray-100">
