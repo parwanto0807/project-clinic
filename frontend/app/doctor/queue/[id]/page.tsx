@@ -29,7 +29,8 @@ interface Queue {
   status: 'waiting' | 'called' | 'triage' | 'ready' | 'ongoing' | 'completed' | 'no-show'
   patient: { name: string; medicalRecordNo: string; gender: string; allergies?: string; dateOfBirth?: string; address?: string }
   doctor: { name: string; specialization: string } | null
-  department: { name: string } | null
+  department: { id: string; name: string } | null
+  departmentId?: string | null
 }
 
 interface Referral {
@@ -81,6 +82,7 @@ interface Service {
   serviceName: string
   price: number
   serviceCategory?: { categoryName: string }
+  departmentId?: string | null
 }
 
 export default function DoctorConsultationPage() {
@@ -685,12 +687,41 @@ export default function DoctorConsultationPage() {
 
       if (isLab) return false;
 
+      // Filter based on Poli (Department) context of the Queue/Doctor
+      if (queue?.departmentId) {
+        const isDentalQueue = queue.department?.name?.toLowerCase().includes('gigi') || queue.department?.name?.toLowerCase().includes('dental');
+        
+        if (isDentalQueue) {
+          // For dentist: only show services that belong specifically to the dental department
+          if (s.departmentId !== queue.departmentId) {
+            return false;
+          }
+        } else {
+          // For other/general doctors: only show general services (departmentId is null/empty) or matching their own department,
+          // and strictly exclude dental department services
+          if (s.departmentId && s.departmentId !== queue.departmentId) {
+            return false;
+          }
+          // Also exclude dental categories just in case
+          const isDentalService = categoryName.includes('gigi') || 
+            categoryName.includes('dental') || 
+            categoryName.includes('konservasi') || 
+            categoryName.includes('orthodontic') || 
+            categoryName.includes('prosthodontia') || 
+            categoryName.includes('periodontia') || 
+            categoryName.includes('surgery');
+          if (isDentalService) {
+            return false;
+          }
+        }
+      }
+
       return !searchService ||
         serviceName.includes(searchLower) ||
         s.serviceCode.toLowerCase().includes(searchLower);
     })
     setFilteredServices(filtered.slice(0, 100))
-  }, [searchService, allServices, isServiceDropdownOpen, isReadOnly])
+  }, [searchService, allServices, isServiceDropdownOpen, isReadOnly, queue?.departmentId, queue?.department])
 
   // Click Outside to Close
   useEffect(() => {
@@ -3339,57 +3370,116 @@ export default function DoctorConsultationPage() {
 
                         if (isLab) return false;
 
+                        // Filter based on Poli (Department) context of the Queue/Doctor
+                        if (queue?.departmentId) {
+                          const isDentalQueue = queue.department?.name?.toLowerCase().includes('gigi') || queue.department?.name?.toLowerCase().includes('dental');
+                          
+                          if (isDentalQueue) {
+                            // For dentist: only show services that belong specifically to the dental department
+                            if (s.departmentId !== queue.departmentId) {
+                              return false;
+                            }
+                          } else {
+                            // For other/general doctors: only show general services (departmentId is null/empty) or matching their own department,
+                            // and strictly exclude dental department services
+                            if (s.departmentId && s.departmentId !== queue.departmentId) {
+                              return false;
+                            }
+                            // Also exclude dental categories just in case
+                            const isDentalService = categoryName.includes('gigi') || 
+                              categoryName.includes('dental') || 
+                              categoryName.includes('konservasi') || 
+                              categoryName.includes('orthodontic') || 
+                              categoryName.includes('prosthodontia') || 
+                              categoryName.includes('periodontia') || 
+                              categoryName.includes('surgery');
+                            if (isDentalService) {
+                              return false;
+                            }
+                          }
+                        }
+
                         return !searchServiceDialog ||
                           serviceName.includes(searchLower) ||
                           s.serviceCode.toLowerCase().includes(searchLower);
                       });
 
+                      // Group by Category Name
+                      const groups: Record<string, typeof filtered> = {};
+                      for (const s of filtered) {
+                        const catName = s.serviceCategory?.categoryName || 'TINDAKAN / LAYANAN LAINNYA';
+                        if (!groups[catName]) {
+                          groups[catName] = [];
+                        }
+                        groups[catName].push(s);
+                      }
+
                       return filtered.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {filtered.map(s => {
-                            const isSelected = selectedServices.some(item => item.id === s.id);
-                            return (
-                              <button
-                                key={s.id}
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedServices(selectedServices.filter(item => item.id !== s.id))
-                                  } else {
-                                    setSelectedServices([...selectedServices, s])
-                                  }
-                                }}
-                                className={`p-3 text-left rounded-xl transition-all duration-300 group flex flex-col justify-between border-2 relative overflow-hidden ${isSelected
-                                    ? 'border-emerald-500 bg-emerald-50/80 shadow-md shadow-emerald-500/5 scale-[1.01]'
-                                    : 'border-slate-200 bg-white shadow-sm hover:border-emerald-400 hover:shadow-md'
-                                  }`}
-                              >
-                                <div className="flex items-start justify-between w-full gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded inline-block mb-1.5 transition-all ${isSelected
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600'
-                                      }`}>
-                                      {s.serviceCode}
-                                    </span>
-                                    <p className={`text-[11px] font-black uppercase tracking-tight leading-tight line-clamp-2 transition-colors ${isSelected ? 'text-emerald-950 font-extrabold' : 'text-slate-800 group-hover:text-emerald-700'
-                                      }`}>
-                                      {s.serviceName}
-                                    </p>
-                                  </div>
-                                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white group-hover:border-emerald-400'
-                                    }`}>
-                                    {isSelected && <FiCheckCircle className="w-2.5 h-2.5" />}
-                                  </div>
-                                </div>
-                                <div className="mt-2 pt-1.5 border-t border-slate-100/50 flex items-center justify-between w-full">
-                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Biaya</span>
-                                  <p className={`text-[10px] font-black tracking-tight ${isSelected ? 'text-emerald-800' : 'text-slate-900 group-hover:text-emerald-600'}`}>
-                                    Rp {new Intl.NumberFormat('id-ID').format(s.price)}
-                                  </p>
-                                </div>
-                              </button>
-                            );
-                          })}
+                        <div className="space-y-6">
+                          {Object.entries(groups).map(([category, items]) => (
+                            <div key={category} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                              {/* Category Header */}
+                              <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                                <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  {category}
+                                </h4>
+                                <span className="text-[8px] font-black bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                  {items.length} Tindakan
+                                </span>
+                              </div>
+                              
+                              {/* Actions Table (1-Column List) */}
+                              <div className="divide-y divide-slate-100">
+                                {items.map(s => {
+                                  const isSelected = selectedServices.some(item => item.id === s.id);
+                                  return (
+                                    <div
+                                      key={s.id}
+                                      onClick={() => {
+                                        if (isSelected) {
+                                          setSelectedServices(selectedServices.filter(item => item.id !== s.id))
+                                        } else {
+                                          setSelectedServices([...selectedServices, s])
+                                        }
+                                      }}
+                                      className={`px-4 py-3 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition-all ${
+                                        isSelected ? 'bg-emerald-50/40 hover:bg-emerald-50/60' : ''
+                                      }`}
+                                    >
+                                      {/* Left side: Code and Name */}
+                                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className={`text-[8px] font-black tracking-widest px-2 py-1 rounded shrink-0 transition-colors uppercase ${
+                                          isSelected ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'
+                                        }`}>
+                                          {s.serviceCode}
+                                        </div>
+                                        <p className={`text-[11px] font-bold leading-tight truncate transition-colors ${
+                                          isSelected ? 'text-emerald-950 font-black' : 'text-slate-800'
+                                        }`}>
+                                          {s.serviceName}
+                                        </p>
+                                      </div>
+
+                                      {/* Right side: Price and Checkbox */}
+                                      <div className="flex items-center gap-4 shrink-0">
+                                        <p className={`text-[10px] font-black tracking-tight ${
+                                          isSelected ? 'text-emerald-700' : 'text-slate-900'
+                                        }`}>
+                                          Rp {new Intl.NumberFormat('id-ID').format(s.price)}
+                                        </p>
+                                        <div className={`w-4.5 h-4.5 rounded border flex items-center justify-center shrink-0 transition-all ${
+                                          isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'
+                                        }`}>
+                                          {isSelected && <FiCheckCircle className="w-3 h-3" />}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div className="text-center py-20 text-slate-300">

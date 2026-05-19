@@ -588,6 +588,7 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
               serviceCode: 'CONS-DOC',
               serviceName: 'Jasa Pemeriksaan',
               price: 70000,
+              doctorFee: 70000,
               isActive: true,
               clinicId: mr.clinicId
             }

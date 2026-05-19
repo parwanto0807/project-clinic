@@ -41,6 +41,7 @@ const coaData = [
   { code: '4-1101', name: 'Jasa Konsultasi Dokter Umum', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },
   { code: '4-1102', name: 'Jasa Konsultasi Dokter Spesialis', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },
   { code: '4-1201', name: 'Jasa Tindakan Medis & Bedah', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },
+  { code: '4-1202', name: 'Jasa Tindakan Medis Gigi', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },
   { code: '4-1301', name: 'Penjualan Obat-obatan', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },
   { code: '4-1401', name: 'Pendapatan cek Lab / Diagnostik', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },
   { code: '4-1501', name: 'Biaya Administrasi & Kartu', category: AccountCategory.REVENUE, accountType: AccountType.DETAIL, parentCode: '4-1000' },

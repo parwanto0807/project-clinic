@@ -349,6 +349,7 @@ export const postInvoice = async (req: Request, res: Response) => {
           const serviceData = item.service as any
           const sName = (serviceData?.serviceName || '').trim().toLowerCase()
           const cName = (serviceData?.serviceCategory?.categoryName || '').trim().toLowerCase()
+          const sCode = (serviceData?.serviceCode || '').trim().toUpperCase()
 
           let targetCoa: any = null
 
@@ -403,17 +404,21 @@ export const postInvoice = async (req: Request, res: Response) => {
           if (totalDoctorFee > 0) {
             totalDoctorFees += totalDoctorFee
 
-            // Track for centralized report
-            commissionRecords.push({
-              doctorId: invoice.registration?.doctorId || invoice.patient.medicalRecords[0]?.doctorId, // Fallback
-              clinicId: targetClinicId,
-              invoiceId: invoice.id,
-              description: item.description,
-              amount: totalDoctorFee,
-              type: 'INVOICE',
-              sourceId: item.id,
-              date: invoice.invoiceDate
-            })
+            // Track for centralized report (skip auto-consultation items to prevent duplicates)
+            const isConsultation = sCode === 'CONS-DOC' || sName.includes('pemeriksaan') || sName.includes('konsultasi')
+            const isLab = sName.includes('laboratorium') || cName.includes('lab')
+            if (!(isConsultation && !isLab)) {
+              commissionRecords.push({
+                doctorId: invoice.registration?.doctorId || invoice.patient.medicalRecords[0]?.doctorId, // Fallback
+                clinicId: targetClinicId,
+                invoiceId: invoice.id,
+                description: item.description,
+                amount: totalDoctorFee,
+                type: 'INVOICE',
+                sourceId: item.id,
+                date: invoice.invoiceDate
+              })
+            }
           }
         }
 
