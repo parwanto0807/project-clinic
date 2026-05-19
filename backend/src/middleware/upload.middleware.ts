@@ -35,3 +35,22 @@ export const uploadDocument = multer({
     }
   }
 })
+
+export const uploadClinicalAttachment = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req: any, file: any, cb: any) => {
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf']
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf', 'application/x-pdf']
+    
+    const extension = path.extname(file.originalname).toLowerCase()
+    const mimetype = file.mimetype
+    
+    if (allowedExtensions.includes(extension) || allowedMimeTypes.includes(mimetype)) {
+      return cb(null, true)
+    } else {
+      cb(new Error('Hanya file gambar (JPG, PNG, WEBP) dan PDF yang diizinkan!'))
+    }
+  }
+})
+

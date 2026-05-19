@@ -13,7 +13,7 @@ export default function FAQSection() {
   if (!faqs || faqs.length === 0) return null;
 
   return (
-    <section id="faq" className="section-padding bg-white dark:bg-slate-950 transition-colors duration-500 relative">
+    <section id="faq" className="section-padding bg-white dark:bg-slate-950 transition-colors duration-500 relative overflow-hidden">
       <div className="container-custom max-w-4xl">
         <div className="text-center mb-16">
           <motion.div

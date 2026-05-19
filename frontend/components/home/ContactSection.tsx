@@ -11,7 +11,7 @@ export default function ContactSection() {
   if (!contact) return null;
 
   return (
-    <section id="contact" className="section-padding bg-gray-50 dark:bg-slate-900 transition-colors duration-500">
+    <section id="contact" className="section-padding bg-gray-50 dark:bg-slate-900 transition-colors duration-500 overflow-hidden">
       <div className="container-custom">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <motion.div

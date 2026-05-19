@@ -20,7 +20,7 @@ export default function FeaturesSection() {
   const features = settings.features
 
   return (
-    <section id="features" className="section-padding bg-white dark:bg-slate-950 transition-colors duration-500">
+    <section id="features" className="section-padding bg-white dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
       <div className="container-custom">
         {/* Header */}
         <motion.div

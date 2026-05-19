@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.middleware'
-import { upload } from '../middleware/upload.middleware'
+import { upload, uploadClinicalAttachment } from '../middleware/upload.middleware'
 import {
   createReferral,
   getReferralsByMedicalRecord,
@@ -28,7 +28,7 @@ clinicalRoutes.get('/templates', getTemplates)
 clinicalRoutes.post('/templates', createTemplate)
 
 // Attachments
-clinicalRoutes.post('/attachments', upload.single('file'), uploadAttachment)
+clinicalRoutes.post('/attachments', uploadClinicalAttachment.single('file'), uploadAttachment)
 clinicalRoutes.delete('/attachments/:id', deleteAttachment)
 
 export default clinicalRoutes

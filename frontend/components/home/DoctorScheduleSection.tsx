@@ -72,7 +72,7 @@ export default function DoctorScheduleSection() {
   const specialties = Object.keys(groupedSchedules)
 
   return (
-    <section id="schedule" className="section-padding bg-slate-50 dark:bg-slate-900/50 transition-colors duration-500">
+    <section id="schedule" className="section-padding bg-slate-50 dark:bg-slate-900/50 transition-colors duration-500 overflow-hidden">
       <div className="container-custom">
         <div className="text-center mb-16">
           <motion.div

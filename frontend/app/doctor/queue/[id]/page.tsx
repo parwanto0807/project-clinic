@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import api from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
-import { 
-  FiActivity, FiCheckCircle, FiRefreshCw, FiUser, 
+import {
+  FiActivity, FiCheckCircle, FiRefreshCw, FiUser,
   FiHome, FiAlertCircle, FiClipboard, FiHeart, FiThermometer, FiWind,
   FiEdit3, FiTrash2, FiSearch, FiPackage, FiInfo, FiArrowLeft, FiSave, FiRotateCcw, FiPrinter,
   FiPlus, FiMinus, FiDollarSign, FiHash, FiClock, FiChevronDown, FiCalendar, FiLock, FiUnlock,
@@ -88,7 +88,7 @@ export default function DoctorConsultationPage() {
   const router = useRouter()
   const { user, activeClinicId } = useAuthStore()
   const { isDoctorSidebarCollapsed } = useUIStore()
-  
+
   const patientHeaderRef = useRef<HTMLDivElement>(null)
   const [headerHeight, setHeaderHeight] = useState(80)
   const [isRxPreviewOpen, setIsRxPreviewOpen] = useState(false)
@@ -102,7 +102,7 @@ export default function DoctorConsultationPage() {
   const [filteredServices, setFilteredServices] = useState<Service[]>([])
   const [history, setHistory] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  
+
   // Consultation State
   const [medicalRecord, setMedicalRecord] = useState<any>(null)
   const [subjective, setSubjective] = useState('')
@@ -120,7 +120,19 @@ export default function DoctorConsultationPage() {
   const [labResults, setLabResults] = useState('')
   const [notes, setNotes] = useState('')
   const [hasInformedConsent, setHasInformedConsent] = useState(false)
-  
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [signeeName, setSigneeName] = useState('')
+  const [signeeRelation, setSigneeRelation] = useState('Pasien Sendiri')
+  const [isUploadingConsent, setIsUploadingConsent] = useState(false)
+
+  useEffect(() => {
+    if (queue?.patient?.name && !signeeName) {
+      setSigneeName(queue.patient.name)
+    }
+  }, [queue, signeeName])
+
   const [prescriptionItems, setPrescriptionItems] = useState<any[]>([])
 
   const isStockInsufficient = (p: any) => {
@@ -153,7 +165,7 @@ export default function DoctorConsultationPage() {
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
   const [selectedServices, setSelectedServices] = useState<Service[]>([])
   const [searchServiceDialog, setSearchServiceDialog] = useState('')
-  
+
   // Referral State
   const [referralType, setReferralType] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL')
   const [referralToClinicId, setReferralToClinicId] = useState('')
@@ -165,7 +177,7 @@ export default function DoctorConsultationPage() {
   const [isPrinting, setIsPrinting] = useState(false)
   const [isReferralPreviewOpen, setIsReferralPreviewOpen] = useState(false)
   const [currentPrintReferral, setCurrentPrintReferral] = useState<any>(null)
-  
+
   // Lab State
   const [labItems, setLabItems] = useState<any[]>([])
   const [labTestMasters, setLabTestMasters] = useState<any[]>([])
@@ -173,7 +185,7 @@ export default function DoctorConsultationPage() {
   const [isLabDropdownOpen, setIsLabDropdownOpen] = useState(false)
   const [isLabPreviewOpen, setIsLabPreviewOpen] = useState(false)
   const [currentPrintLab, setCurrentPrintLab] = useState<any>(null)
-  
+
   const [isRMEInfoOpen, setIsRMEInfoOpen] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
   const [finalChecklist, setFinalChecklist] = useState({
@@ -413,7 +425,7 @@ export default function DoctorConsultationPage() {
           setHasInformedConsent(!!data.hasInformedConsent)
           setReferrals(data.referrals || [])
           setAttachments(data.attachments || [])
-          
+
           if (data.prescriptions && data.prescriptions.length > 0) {
             const savedItems = data.prescriptions.flatMap((rx: any) =>
               rx.items.map((item: any) => ({
@@ -430,10 +442,10 @@ export default function DoctorConsultationPage() {
                 unit: item.unit || item.medicine?.unit || (item.isRacikan ? 'porsi' : 'unit'),
                 availableStock: item.isRacikan ? 99999 : (item.medicine?.stock ?? 0),
                 alreadySavedInDB: true, // Flag: already persisted, skip frontend stock check
-                isExternal: item.instructions?.includes('(Apotek Luar)') || 
-                            item.instructions?.includes('[Eksternal]') ||
-                            item.instructions?.includes('Apotek Luar') ||
-                            item.instructions?.includes('Eksternal'),
+                isExternal: item.instructions?.includes('(Apotek Luar)') ||
+                  item.instructions?.includes('[Eksternal]') ||
+                  item.instructions?.includes('Apotek Luar') ||
+                  item.instructions?.includes('Eksternal'),
                 isRacikan: !!item.isRacikan,
                 formulaId: item.formulaId,
                 tuslahPrice: item.tuslahPrice || 0,
@@ -450,58 +462,58 @@ export default function DoctorConsultationPage() {
           }
 
           if (data.consultationDraft) {
-             const draft = data.consultationDraft;
-             if (draft.prescriptions) {
-               // Merge draft prescriptions with availableStock from previously loaded DB prescriptions
-               // to avoid losing stock info when draft overrides
-               setPrescriptionItems(draft.prescriptions.map((dp: any) => ({
-                 ...dp,
-                 // Keep availableStock if it exists in draft, else mark as unknown (server will validate)
-                 availableStock: dp.availableStock ?? undefined,
-                 alreadySavedInDB: false,
-                 isExternal: dp.isExternal || 
-                             dp.instructions?.includes('(Apotek Luar)') || 
-                             dp.instructions?.includes('[Eksternal]') ||
-                             dp.instructions?.includes('Apotek Luar') ||
-                             dp.instructions?.includes('Eksternal')
-               })));
-             }
-             if (draft.services) {
-                // Separate general services and lab services
-                const generalServices = draft.services.filter((s: any) => !s.isLab);
-                const labServices = draft.services.filter((s: any) => s.isLab);
-                
-                setServiceItems(generalServices);
-                // Map labServices back to the format expected by labItems state if needed
-                setLabItems(labServices.map((s: any) => ({
-                   id: s.serviceId,
-                   serviceName: s.name || s.serviceName,
-                   price: s.price,
-                   serviceCode: s.code || s.serviceCode
-                })));
-             }
-          }
-           // In actual completed items, they should come from actual medical record services if present
-           if (data.services && data.services.length > 0 && qData.status === 'completed') {
-             const allSavedServices = data.services.map((s: any) => ({
-               serviceId: s.serviceId,
-               name: s.service?.serviceName || 'Layanan',
-               code: s.service?.serviceCode || '',
-               price: s.price,
-               quantity: s.quantity,
-               // Check if it's a lab service based on code or name
-               isLab: s.service?.serviceCode === 'LAB-GEN' || 
-                      s.service?.serviceName?.toLowerCase().includes('lab')
-             }));
+            const draft = data.consultationDraft;
+            if (draft.prescriptions) {
+              // Merge draft prescriptions with availableStock from previously loaded DB prescriptions
+              // to avoid losing stock info when draft overrides
+              setPrescriptionItems(draft.prescriptions.map((dp: any) => ({
+                ...dp,
+                // Keep availableStock if it exists in draft, else mark as unknown (server will validate)
+                availableStock: dp.availableStock ?? undefined,
+                alreadySavedInDB: false,
+                isExternal: dp.isExternal ||
+                  dp.instructions?.includes('(Apotek Luar)') ||
+                  dp.instructions?.includes('[Eksternal]') ||
+                  dp.instructions?.includes('Apotek Luar') ||
+                  dp.instructions?.includes('Eksternal')
+              })));
+            }
+            if (draft.services) {
+              // Separate general services and lab services
+              const generalServices = draft.services.filter((s: any) => !s.isLab);
+              const labServices = draft.services.filter((s: any) => s.isLab);
 
-             setServiceItems(allSavedServices.filter((s: any) => !s.isLab));
-             setLabItems(allSavedServices.filter((s: any) => s.isLab).map((s: any) => ({
-               id: s.serviceId,
-               serviceName: s.name,
-               price: s.price,
-               serviceCode: s.code
-             })));
-           }
+              setServiceItems(generalServices);
+              // Map labServices back to the format expected by labItems state if needed
+              setLabItems(labServices.map((s: any) => ({
+                id: s.serviceId,
+                serviceName: s.name || s.serviceName,
+                price: s.price,
+                serviceCode: s.code || s.serviceCode
+              })));
+            }
+          }
+          // In actual completed items, they should come from actual medical record services if present
+          if (data.services && data.services.length > 0 && qData.status === 'completed') {
+            const allSavedServices = data.services.map((s: any) => ({
+              serviceId: s.serviceId,
+              name: s.service?.serviceName || 'Layanan',
+              code: s.service?.serviceCode || '',
+              price: s.price,
+              quantity: s.quantity,
+              // Check if it's a lab service based on code or name
+              isLab: s.service?.serviceCode === 'LAB-GEN' ||
+                s.service?.serviceName?.toLowerCase().includes('lab')
+            }));
+
+            setServiceItems(allSavedServices.filter((s: any) => !s.isLab));
+            setLabItems(allSavedServices.filter((s: any) => s.isLab).map((s: any) => ({
+              id: s.serviceId,
+              serviceName: s.name,
+              price: s.price,
+              serviceCode: s.code
+            })));
+          }
         }
 
         setHistory((historyRes.data || []).filter((h: any) => h.id !== data?.id))
@@ -547,7 +559,7 @@ export default function DoctorConsultationPage() {
     return () => window.removeEventListener('resize', updateHeaderHeight)
   }, [queue])
 
-  
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (labDropdownRef.current && !labDropdownRef.current.contains(event.target as Node)) {
@@ -562,7 +574,7 @@ export default function DoctorConsultationPage() {
   useEffect(() => {
     if (isReadOnly) return
     const controller = new AbortController()
-    
+
     const searchTimeout = setTimeout(async () => {
       // Tampilkan dropdown jika sedang dibuka, tidak peduli panjang search text
       if (!isMedDropdownOpen && !isMedDialogOpen) {
@@ -573,33 +585,33 @@ export default function DoctorConsultationPage() {
       try {
         setIsSearchingMed(true)
         console.log(`[Debug] Fetching medicines for clinic: ${queue?.clinicId || 'global'}`)
-        const medRes = await api.get('master/products', { 
+        const medRes = await api.get('master/products', {
           headers: queue?.clinicId ? { 'x-clinic-id': queue.clinicId } : undefined,
-          params: { 
-            isActive: true, 
-            search: searchMed || undefined, 
+          params: {
+            isActive: true,
+            search: searchMed || undefined,
             limit: 1000,
             clinicId: queue?.clinicId || activeClinicId // Gunakan activeClinicId sebagai fallback
           },
           signal: controller.signal
         })
-        
+
         console.log('[Debug] Medicine response:', medRes.data)
         const list = medRes.data.data || medRes.data
-        
-        const processedList = Array.isArray(list) 
+
+        const processedList = Array.isArray(list)
           ? list
-              .sort((a: any, b: any) => {
-                const stockA = a.availableStock ?? a.stock ?? 0
-                const stockB = b.availableStock ?? b.stock ?? 0
-                if (stockB !== stockA) {
-                  return stockB - stockA
-                }
-                // Jika stok sama, urutkan secara alfabetis berdasarkan nama master
-                return a.masterName.localeCompare(b.masterName)
-              })
+            .sort((a: any, b: any) => {
+              const stockA = a.availableStock ?? a.stock ?? 0
+              const stockB = b.availableStock ?? b.stock ?? 0
+              if (stockB !== stockA) {
+                return stockB - stockA
+              }
+              // Jika stok sama, urutkan secara alfabetis berdasarkan nama master
+              return a.masterName.localeCompare(b.masterName)
+            })
           : []
-        
+
         console.log('[Debug] Processed medicines:', processedList.length)
         setSearchMedicines(processedList)
       } catch (e: any) {
@@ -620,7 +632,7 @@ export default function DoctorConsultationPage() {
   useEffect(() => {
     if (isReadOnly || !isIcdDropdownOpen) return
     const controller = new AbortController()
-    
+
     const searchTimeout = setTimeout(async () => {
       try {
         setIsSearchingIcd(true)
@@ -666,14 +678,14 @@ export default function DoctorConsultationPage() {
       // Exclude laboratory services from Tindakan Medis
       const categoryName = s.serviceCategory?.categoryName?.toLowerCase() || '';
       const serviceName = s.serviceName.toLowerCase();
-      
-      const isLab = categoryName.includes('laboratorium') || 
-                    categoryName.includes('lab') || 
-                    serviceName.includes('lab');
-      
+
+      const isLab = categoryName.includes('laboratorium') ||
+        categoryName.includes('lab') ||
+        serviceName.includes('lab');
+
       if (isLab) return false;
-      
-      return !searchService || 
+
+      return !searchService ||
         serviceName.includes(searchLower) ||
         s.serviceCode.toLowerCase().includes(searchLower);
     })
@@ -780,12 +792,12 @@ export default function DoctorConsultationPage() {
         notes,
         hasInformedConsent,
         services: [
-          ...serviceItems.map(s => ({ 
-            serviceId: s.serviceId, 
+          ...serviceItems.map(s => ({
+            serviceId: s.serviceId,
             name: s.name,
             code: s.code,
-            quantity: parseInt(s.quantity as any) || 0, 
-            price: parseFloat(s.price as any) || 0 
+            quantity: parseInt(s.quantity as any) || 0,
+            price: parseFloat(s.price as any) || 0
           })),
           ...labItems.map(l => ({
             serviceId: l.id,
@@ -806,9 +818,9 @@ export default function DoctorConsultationPage() {
         })),
         isFinal
       })
-      
+
       toast.success(isFinal ? 'Pemeriksaan selesai!' : 'Draft disimpan!', { id: toastId })
-      
+
       if (goToPrescription) {
         setIsRxPreviewOpen(true)
       } else if (isFinal) {
@@ -961,7 +973,7 @@ export default function DoctorConsultationPage() {
       if (y > 240) { doc.addPage(); y = 25 }
       doc.setFillColor(idx % 2 === 0 ? 248 : 255, idx % 2 === 0 ? 250 : 255, idx % 2 === 0 ? 252 : 255)
       doc.roundedRect(15, y, 180, 18, 2, 2, 'F')
-      
+
       // Number badge
       doc.setFillColor(79, 70, 229)
       doc.circle(23, y + 9, 5, 'F')
@@ -969,20 +981,20 @@ export default function DoctorConsultationPage() {
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
       doc.text(String(idx + 1), 23, y + 11.5, { align: 'center' })
-      
+
       // Medicine name
       doc.setTextColor(15, 23, 42)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text(p.name.toUpperCase().substring(0, 65), 32, y + 7)
-      
+
       // Details
       doc.setFontSize(7.5)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(100, 116, 139)
       const details = [p.dosage, p.frequency, p.duration ? `selama ${p.duration}` : '', p.instructions].filter(Boolean).join('  ·  ')
       doc.text(details.substring(0, 95), 32, y + 13)
-      
+
       // Quantity
       doc.setTextColor(79, 70, 229)
       doc.setFont('helvetica', 'bold')
@@ -1084,11 +1096,11 @@ export default function DoctorConsultationPage() {
         toHospitalName: referralType === 'EXTERNAL' ? referralToHospitalName : undefined,
         notes: referralNotes
       }
-      
-      const res = editingReferralId 
+
+      const res = editingReferralId
         ? await api.put(`clinical/referrals/${editingReferralId}`, payload)
         : await api.post('clinical/referrals', payload)
-      
+
       if (editingReferralId) {
         toast.success('Rujukan berhasil diperbarui', { id: toastId })
         setReferrals(referrals.map(r => r.id === editingReferralId ? res.data : r))
@@ -1096,18 +1108,18 @@ export default function DoctorConsultationPage() {
         toast.success('Rujukan berhasil disimpan', { id: toastId })
         setReferrals([res.data, ...referrals])
       }
-      
+
       // Set print data and trigger print
       setCurrentPrintReferral(res.data)
       setIsReferralPreviewOpen(true)
-      
+
       // Reset form
       setEditingReferralId(null)
       setReferralNotes('')
       setReferralToClinicId('')
       setReferralToDepartmentId('')
       setReferralToHospitalName('')
-      
+
     } catch (e: any) {
       toast.error(e.response?.data?.message || 'Gagal memproses rujukan', { id: toastId })
     }
@@ -1115,13 +1127,13 @@ export default function DoctorConsultationPage() {
 
   const handleDeleteReferral = async (referralId: string) => {
     if (!confirm('Apakah Anda yakin ingin menghapus rujukan ini?')) return
-    
+
     const toastId = toast.loading('Menghapus rujukan...')
     try {
       await api.delete(`clinical/referrals/${referralId}`)
       setReferrals(referrals.filter(r => r.id !== referralId))
       toast.success('Rujukan berhasil dihapus', { id: toastId })
-      
+
       // Reset form if we were editing the deleted referral
       if (editingReferralId === referralId) {
         setEditingReferralId(null)
@@ -1141,7 +1153,7 @@ export default function DoctorConsultationPage() {
       setIsPrinting(false)
       return
     }
-    
+
     try {
       const toastId = toast.loading('Memproses PDF Order Lab...')
       const canvas = await html2canvas(printElement, {
@@ -1149,18 +1161,18 @@ export default function DoctorConsultationPage() {
         useCORS: true,
         logging: false
       })
-      
+
       const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pdfWidth = 210
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-      
+
       const dateStr = new Date().toISOString().split('T')[0]
       pdf.save(`Order_Lab_${patientName.replace(/\s+/g, '_')}_${dateStr}.pdf`)
       toast.success('Order Lab berhasil diunduh', { id: toastId })
-      
+
     } catch (e) {
       console.error('Error generating Lab PDF:', e)
       toast.error('Gagal menghasilkan file PDF Order Lab')
@@ -1177,7 +1189,7 @@ export default function DoctorConsultationPage() {
     const pageHeight = doc.internal.pageSize.getHeight();
 
     // --- Colors (Yasfina Green) ---
-    const primaryGreen: [number, number, number] = [21, 128, 61]; 
+    const primaryGreen: [number, number, number] = [21, 128, 61];
 
     // --- Header ---
     try {
@@ -1185,7 +1197,7 @@ export default function DoctorConsultationPage() {
     } catch (e) {
       doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
       doc.setLineWidth(1);
-      doc.rect(15, 8, 30, 25); 
+      doc.rect(15, 8, 30, 25);
       doc.setFontSize(8);
       doc.text('LOGO', 23, 22);
     }
@@ -1194,7 +1206,7 @@ export default function DoctorConsultationPage() {
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.setFont('helvetica', 'bold');
     doc.text('LABORATORIUM KLINIK PRATAMA YASFINA', 50, 20);
-    
+
     doc.setFontSize(9);
     doc.setTextColor(80);
     doc.setFont('helvetica', 'normal');
@@ -1337,7 +1349,7 @@ export default function DoctorConsultationPage() {
       setIsPrinting(false)
       return
     }
-    
+
     try {
       const toastId = toast.loading('Memproses PDF...')
       // Capture the element
@@ -1346,20 +1358,20 @@ export default function DoctorConsultationPage() {
         useCORS: true,
         logging: false
       })
-      
+
       const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF('p', 'mm', 'a4')
-      
+
       // A4 size: 210 x 297 mm
       const pdfWidth = 210
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-      
+
       const dateStr = new Date().toISOString().split('T')[0]
       pdf.save(`Surat_Rujukan_${patientName.replace(/\s+/g, '_')}_${dateStr}.pdf`)
       toast.success('PDF berhasil diunduh', { id: toastId })
-      
+
     } catch (e) {
       console.error('Error generating PDF:', e)
       toast.error('Gagal menghasilkan file PDF')
@@ -1371,6 +1383,434 @@ export default function DoctorConsultationPage() {
   const handleReprintReferral = (referral: any) => {
     setCurrentPrintReferral(referral)
     setIsReferralPreviewOpen(true)
+  }
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let clientX, clientY
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+      e.preventDefault()
+    } else {
+      clientX = e.clientX
+      clientY = e.clientY
+    }
+
+    const rect = canvas.getBoundingClientRect()
+    const x = clientX - rect.left
+    const y = clientY - rect.top
+
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.strokeStyle = '#0f172a'
+    ctx.lineWidth = 3
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    setIsDrawing(true)
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let clientX, clientY
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+      e.preventDefault()
+    } else {
+      clientX = e.clientX
+      clientY = e.clientY
+    }
+
+    const rect = canvas.getBoundingClientRect()
+    const x = clientX - rect.left
+    const y = clientY - rect.top
+
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+  }
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  }
+
+  const handleSaveSignature = async () => {
+    const canvas = canvasRef.current
+    if (!canvas || !medicalRecord) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const buffer = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const isCanvasEmpty = !buffer.data.some(channel => channel !== 0)
+
+    if (isCanvasEmpty) {
+      toast.error('Silakan buat tanda tangan terlebih dahulu')
+      return
+    }
+
+    if (!signeeName.trim()) {
+      toast.error('Silakan isi nama penandatangan')
+      return
+    }
+
+    setIsUploadingConsent(true)
+    const toastId = toast.loading('Menyimpan tanda tangan...')
+    try {
+      const dataUrl = canvas.toDataURL('image/png')
+      const resBlob = await fetch(dataUrl)
+      const blob = await resBlob.blob()
+
+      const fileName = `Signature_${signeeRelation.replace(/\s+/g, '_')}_${signeeName.replace(/\s+/g, '_')}.png`
+      const file = new File([blob], fileName, { type: 'image/png' })
+
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('medicalRecordId', medicalRecord.id)
+
+      const res = await api.post('clinical/attachments', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      setAttachments([...attachments, res.data])
+
+      if (!hasInformedConsent) {
+        setHasInformedConsent(true)
+      }
+
+      toast.success('Tanda tangan digital berhasil disimpan', { id: toastId })
+      clearSignature()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal menyimpan tanda tangan', { id: toastId })
+    } finally {
+      setIsUploadingConsent(false)
+    }
+  }
+
+  const handleUploadConsentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !medicalRecord) return
+
+    setIsUploadingConsent(true)
+    const toastId = toast.loading('Mengunggah berkas informed consent...')
+    try {
+      const newName = `Informed_Consent_File_${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+      const renamedFile = new File([file], newName, { type: file.type })
+
+      const formData = new FormData()
+      formData.append('file', renamedFile)
+      formData.append('medicalRecordId', medicalRecord.id)
+
+      const res = await api.post('clinical/attachments', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      setAttachments([...attachments, res.data])
+
+      if (!hasInformedConsent) {
+        setHasInformedConsent(true)
+      }
+
+      toast.success('Berkas informed consent berhasil diunggah', { id: toastId })
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal mengunggah berkas', { id: toastId })
+    } finally {
+      setIsUploadingConsent(false)
+      e.target.value = ''
+    }
+  }
+
+  const handlePrintInformedConsent = async () => {
+    const toastId = toast.loading('Sedang menyiapkan dokumen PDF...')
+    try {
+      // 1. Fetch dynamic clinic info from master database
+      const activeClinic = queue?.clinicId
+        ? clinicsList.find(c => c.id === queue.clinicId)
+        : null
+      const clinicName = activeClinic?.name || 'KLINIK PRATAMA YASFINA'
+      const clinicAddress = activeClinic?.address || 'Villa Bogor Indah Blok BB 2 No. 1'
+      const clinicPhone = activeClinic?.phone || '0251-8666169'
+
+      // 2. Load the official Clinic Logo image from public directory
+      let logoImg: HTMLImageElement | null = null
+      try {
+        logoImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const tempImg = new Image()
+          tempImg.onload = () => resolve(tempImg)
+          tempImg.onerror = (err) => reject(err)
+          tempImg.src = '/logo-yasfina.png'
+        })
+      } catch (logoError) {
+        console.warn('Gagal memuat logo-yasfina.png, menggunakan fallback gambar siluet:', logoError)
+      }
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      })
+
+      // ── Kop Surat ──────────────────────────────────────────────────────────
+      // Render Logo on the left (x = 15, y = 12, w = 22, h = 22)
+      const logoWidth = 22
+      const logoHeight = 22
+      const logoX = 15
+      const logoY = 12
+
+      if (logoImg) {
+        doc.addImage(logoImg, 'PNG', logoX, logoY, logoWidth, logoHeight)
+      } else {
+        // Fallback Vector Salib
+        doc.setDrawColor(15, 23, 42) // slate-900
+        doc.setLineWidth(0.4)
+        doc.line(22, 15, 28, 15)
+        doc.line(28, 15, 28, 21)
+        doc.line(28, 21, 34, 21)
+        doc.line(34, 21, 34, 27)
+        doc.line(34, 27, 28, 27)
+        doc.line(28, 27, 28, 33)
+        doc.line(28, 33, 22, 33)
+        doc.line(22, 33, 22, 27)
+        doc.line(22, 27, 16, 27)
+        doc.line(16, 27, 16, 21)
+        doc.line(16, 21, 22, 21)
+        doc.line(22, 21, 22, 15)
+
+        doc.setFont('helvetica', 'bolditalic')
+        doc.setFontSize(8)
+        doc.text('Yasfina', 25, 25.5, { align: 'center' })
+      }
+
+      // Render Dynamic Header Clinic Texts (Left-aligned starting at x = 42 to prevent any logo collision)
+      const textStartX = 42
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.text(clinicName.toUpperCase(), textStartX, 17)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+
+      // Split address to wrap elegantly within 150mm width limit
+      const wrappedAddress = doc.splitTextToSize(clinicAddress, 150)
+      doc.text(wrappedAddress, textStartX, 22)
+
+      const addressLines = Array.isArray(wrappedAddress) ? wrappedAddress.length : 1
+      const phoneY = 22 + (addressLines * 4.2)
+      doc.text(`Telp: ${clinicPhone}`, textStartX, phoneY)
+
+      // Divider lines calculated dynamically based on wrapped address length
+      const dividerY = Math.max(36, phoneY + 4.5)
+      doc.setLineWidth(0.6)
+      doc.line(15, dividerY, 195, dividerY)
+      doc.setLineWidth(0.2)
+      doc.line(15, dividerY + 1.2, 195, dividerY + 1.2)
+
+      // ── Judul & Content Offset (Relative to dividerY) ──────────────────────
+      const titleY = dividerY + 9
+      const contentStartY = titleY + 8
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.text('INFORMED CONSENT TINDAKAN MEDIK', 105, titleY, { align: 'center' })
+
+      // ── Bagian 1: Yang Membuat Pernyataan ──────────────────────────────────
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text('Saya yang bertanda tangan di bawah ini :', 15, contentStartY)
+
+      const isSelf = signeeRelation === 'Pasien Sendiri'
+      const sName = isSelf ? (queue?.patient?.name || '') : signeeName
+
+      // Calculate dynamic patient age based on dateOfBirth to fix TS compiler error
+      const pBirthDate = queue?.patient?.dateOfBirth ? new Date(queue.patient.dateOfBirth) : null
+      const computedAge = pBirthDate ? new Date().getFullYear() - pBirthDate.getFullYear() : null
+      const computedAgeStr = computedAge ? `${computedAge} Tahun` : ''
+
+      const sAge = isSelf ? computedAgeStr : ''
+      const sGender = isSelf ? (queue?.patient?.gender || '') : ''
+      const sAddress = queue?.patient?.address || ''
+      const sGenderStr = sGender ? (sGender.toLowerCase() === 'laki-laki' || sGender.toLowerCase() === 'l' ? 'Laki-laki' : 'Perempuan') : ''
+
+      // Nama
+      const nameY = contentStartY + 7
+      doc.text('Nama', 20, nameY)
+      doc.text(':', 55, nameY)
+      doc.line(58, nameY, 195, nameY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(sName, 60, nameY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      // Umur/Jenis Kelamin
+      const ageY = contentStartY + 14
+      doc.text('Umur/Jenis Kelamin', 20, ageY)
+      doc.text(':', 55, ageY)
+      doc.line(58, ageY, 195, ageY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(sAge ? `${sAge}  /  ${sGenderStr}` : '', 60, ageY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      // Alamat
+      const addrY = contentStartY + 21
+      doc.text('Alamat', 20, addrY)
+      doc.text(':', 55, addrY)
+      doc.line(58, addrY, 195, addrY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(sAddress, 60, addrY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      const stateY = contentStartY + 29
+      doc.text('Menyatakan dengan sesungguhnya telah memberikan', 15, stateY)
+
+      // ── Bagian 2: Persetujuan/Penolakan ─────────────────────────────────────
+      const consentTitleY = contentStartY + 37
+      doc.setFont('helvetica', 'bold')
+      doc.text('PERSETUJUAN/PENOLAKAN', 105, consentTitleY, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+
+      // Tindakan
+      const serviceNames = serviceItems.map(s => s.name).join(', ') || 'Tindakan Medis'
+      const actionY = contentStartY + 45
+      doc.text('Untuk dilakukan tindakan medik berupa :', 15, actionY)
+      doc.line(82, actionY, 195, actionY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(serviceNames, 84, actionY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      // Hubungan
+      const relationY = contentStartY + 52
+      doc.text(`Terhadap ${signeeRelation} saya dengan :`, 15, relationY)
+
+      const pName = queue?.patient?.name || ''
+      const pAge = computedAgeStr
+      const pGender = queue?.patient?.gender || ''
+      const pAddress = queue?.patient?.address || ''
+      const pGenderStr = pGender ? (pGender.toLowerCase() === 'laki-laki' || pGender.toLowerCase() === 'l' ? 'Laki-laki' : 'Perempuan') : ''
+
+      // Nama Pasien
+      const pNameY = contentStartY + 60
+      doc.text('Nama', 20, pNameY)
+      doc.text(':', 55, pNameY)
+      doc.line(58, pNameY, 195, pNameY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(pName, 60, pNameY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      // Umur Pasien
+      const pAgeY = contentStartY + 67
+      doc.text('Umur/Jenis Kelamin', 20, pAgeY)
+      doc.text(':', 55, pAgeY)
+      doc.line(58, pAgeY, 195, pAgeY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(pAge ? `${pAge}  /  ${pGenderStr}` : '', 60, pAgeY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      // Alamat Pasien
+      const pAddrY = contentStartY + 74
+      doc.text('Alamat', 20, pAddrY)
+      doc.text(':', 55, pAddrY)
+      doc.line(58, pAddrY, 195, pAddrY)
+      doc.setFont('helvetica', 'bold')
+      doc.text(pAddress, 60, pAddrY - 0.8)
+      doc.setFont('helvetica', 'normal')
+
+      // ── Bagian 3: Penjelasan & Kesadaran ──────────────────────────────────
+      const p1 = 'Yang tujuan, sifat dan perlunya tindakan medik tersebut di atas, serta resiko yang dapat ditimbulkannya dan upaya mengatasinya telah cukup dijelaskan oleh dokter dan telah saya mengerti sepenuhnya.'
+      const p2 = 'Demikian pernyataan ini saya buat dengan penuh kesadaran dan tanpa paksaan.'
+
+      const p1Lines = doc.splitTextToSize(p1, 180)
+      const p2Lines = doc.splitTextToSize(p2, 180)
+
+      const p1Y = contentStartY + 83
+      const p2Y = p1Y + 11
+      doc.text(p1Lines, 15, p1Y)
+      doc.text(p2Lines, 15, p2Y)
+
+      // ── Bagian Tanda Tangan ──────────────────────────────────────────────────
+      const today = new Date()
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+      const formattedDate = `${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`
+
+      const dateY = p2Y + 10
+      doc.text(`Bogor, ${formattedDate}`, 130, dateY)
+
+      // Row 1
+      const signRow1Y = dateY + 9
+      doc.text('Dokter,', 45, signRow1Y, { align: 'center' })
+      doc.text('Yang Membuat Pernyataan,', 150, signRow1Y, { align: 'center' })
+
+      const docName = queue?.doctor?.name ? `( ${queue.doctor.name} )` : '( ........................................ )'
+      const signerNameIndicator = `( ${sName} )`
+
+      const signNamesRow1Y = signRow1Y + 25
+      doc.setFont('helvetica', 'bold')
+      doc.text(docName, 45, signNamesRow1Y, { align: 'center' })
+      doc.text(signerNameIndicator, 150, signNamesRow1Y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+
+      // Row 2
+      const signRow2Y = signNamesRow1Y + 11
+      doc.text('Saksi Klinik,', 45, signRow2Y, { align: 'center' })
+      doc.text('Saksi Keluarga,', 150, signRow2Y, { align: 'center' })
+
+      const signNamesRow2Y = signRow2Y + 25
+      doc.text('( ........................................ )', 45, signNamesRow2Y, { align: 'center' })
+      doc.text('( ........................................ )', 150, signNamesRow2Y, { align: 'center' })
+
+      // ── Sematkan Gambar Tanda Tangan Digital Jika Ada ──────────────────────
+      const sigAttachment = attachments.find(a => a.fileName.startsWith('Signature_'))
+      if (sigAttachment) {
+        try {
+          const imgUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5006'}${sigAttachment.fileUrl}`
+
+          // Helper to load image
+          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const tempImg = new Image()
+            tempImg.crossOrigin = 'Anonymous'
+            tempImg.onload = () => resolve(tempImg)
+            tempImg.onerror = (err) => reject(err)
+            tempImg.src = imgUrl
+          })
+
+          // Add image to Yang Membuat Pernyataan area
+          doc.addImage(img, 'PNG', 135, signRow1Y + 3, 30, 20)
+        } catch (imgError) {
+          console.warn('Gagal memuat gambar tanda tangan digital untuk cetak PDF:', imgError)
+        }
+      }
+
+      // ── Footnote ───────────────────────────────────────────────────────────
+      const noteY = signNamesRow2Y + 15
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'italic')
+      doc.text('*Lingkari jawabannya dan coret yang tidak perlu', 15, noteY)
+      doc.text('Inform Consent ini berlaku walaupun tanpa materai', 15, noteY + 4)
+
+      // Save PDF
+      doc.save(`Informed_Consent_${pName.replace(/\s+/g, '_')}.pdf`)
+      toast.success('Formulir Informed Consent berhasil dicetak!', { id: toastId })
+    } catch (e: any) {
+      toast.error('Gagal mencetak formulir: ' + e.message, { id: toastId })
+    }
   }
 
   const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1403,7 +1843,7 @@ export default function DoctorConsultationPage() {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     if (!confirm('Apakah Anda yakin ingin menghapus lampiran ini?')) return
-    
+
     const toastId = toast.loading('Menghapus lampiran...')
     try {
       await api.delete(`clinical/attachments/${attachmentId}`)
@@ -1441,7 +1881,7 @@ export default function DoctorConsultationPage() {
   return (
     <div className="-mt-[20px] lg:-mt-[30px] flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 pt-0">
       {/* Top Professional Header - Fixed below Navbar, respects sidebar */}
-      <div 
+      <div
         ref={patientHeaderRef}
         className={`fixed top-[72px] right-0 z-30 backdrop-blur-xl bg-white/95 border-b border-slate-200/80 shadow-sm p-3 md:py-3.5 md:px-6 transition-all duration-300 ${isDoctorSidebarCollapsed ? 'left-0 lg:left-20' : 'left-0 lg:left-64'}`}
       >
@@ -1460,7 +1900,7 @@ export default function DoctorConsultationPage() {
                     {['L', 'M', 'Laki-laki'].includes(queue.patient.gender) ? 'Laki-laki' : 'Perempuan'}
                   </span>
                 )}
-                <button 
+                <button
                   onClick={() => setIsRMEInfoOpen(true)}
                   className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 bg-amber-400 text-white rounded-lg md:rounded-xl text-[9px] font-black hover:bg-amber-500 transition-all shadow-lg shadow-amber-200 animate-pulse"
                 >
@@ -1472,8 +1912,8 @@ export default function DoctorConsultationPage() {
                   {queue.department?.name || 'UMUM'} • No. Antrean: <span className="text-slate-900">{queue.queueNo}</span>
                 </p>
                 {queue.patient.allergies && (
-                  <motion.div 
-                    animate={{ scale: [1, 1.05, 1] }} 
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1] }}
                     transition={{ repeat: Infinity, duration: 2 }}
                     className="flex items-center gap-1 md:gap-1.5 px-2 py-0.5 bg-rose-500 text-white rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-200"
                   >
@@ -1483,29 +1923,29 @@ export default function DoctorConsultationPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
             {isReadOnly ? (
               <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200 shadow-inner">
-                 <FiLock className="w-3.5 h-3.5" />
-                 <span className="text-[9px] font-black uppercase tracking-widest leading-none">TERKUNCI</span>
+                <FiLock className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-black uppercase tracking-widest leading-none">TERKUNCI</span>
               </div>
             ) : (
               <>
-                <button 
-                  onClick={() => handleSaveConsultation(false)} 
-                  disabled={saving} 
+                <button
+                  onClick={() => handleSaveConsultation(false)}
+                  disabled={saving}
                   className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all shadow-sm"
                 >
-                  <FiSave className="w-3.5 h-3.5" /> 
+                  <FiSave className="w-3.5 h-3.5" />
                   <span>SIMPAN DRAFT</span>
                 </button>
-                <button 
-                  onClick={() => handleSaveConsultation(true)} 
-                  disabled={saving} 
+                <button
+                  onClick={() => handleSaveConsultation(true)}
+                  disabled={saving}
                   className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-primary to-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:shadow-[0_8px_20px_rgba(79,70,229,0.3)] hover:-translate-y-0.5 disabled:opacity-50 transition-all shadow-md shadow-primary/20 relative overflow-hidden group"
                 >
-                  <FiCheckCircle className="w-3.5 h-3.5" /> 
+                  <FiCheckCircle className="w-3.5 h-3.5" />
                   <span>SELESAI PEMERIKSAAN</span>
                 </button>
               </>
@@ -1532,11 +1972,10 @@ export default function DoctorConsultationPage() {
               <button
                 key={s.id}
                 onClick={() => setActiveSegment(s.id as any)}
-                className={`flex-shrink-0 lg:w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[9px] font-black transition-all duration-300 mr-2 lg:mr-0 lg:mb-1 relative overflow-hidden group snap-center ${
-                  activeSegment === s.id 
-                  ? 'text-white shadow-lg shadow-indigo-500/20 lg:translate-x-1' 
-                  : 'text-slate-500 hover:bg-white/80 hover:shadow-sm lg:hover:translate-x-1'
-                }`}
+                className={`flex-shrink-0 lg:w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[9px] font-black transition-all duration-300 mr-2 lg:mr-0 lg:mb-1 relative overflow-hidden group snap-center ${activeSegment === s.id
+                    ? 'text-white shadow-lg shadow-indigo-500/20 lg:translate-x-1'
+                    : 'text-slate-500 hover:bg-white/80 hover:shadow-sm lg:hover:translate-x-1'
+                  }`}
               >
                 {activeSegment === s.id && (
                   <div className="absolute inset-0 bg-gradient-to-r from-primary to-indigo-500 opacity-100 transition-opacity" />
@@ -1549,7 +1988,7 @@ export default function DoctorConsultationPage() {
 
           {latestVitals && (
             <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 relative overflow-hidden group">
-               <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/5 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:scale-110" />
+              <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/5 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:scale-110" />
               <h4 className="text-[10px] font-black text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2 opacity-60">
                 <FiActivity className="w-3 h-3" /> Tanda Vital Terakhir
               </h4>
@@ -1579,26 +2018,26 @@ export default function DoctorConsultationPage() {
         <div className="col-span-12 lg:col-span-9 space-y-4">
           {isReadOnly && (
             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-amber-700">
-               <div className="flex items-center gap-3">
-                  <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
-                  <p className="text-xs font-bold uppercase tracking-tight">Kunjungan ini Telah Selesai. Data rekam medis dalam mode baca-saja dan tidak dapat diubah lagi.</p>
-               </div>
-               <button
-                  onClick={async () => {
-                     if (!confirm("Buka kembali konsultasi ini? Dokter akan dapat mengedit resep dan rekam medis kembali.")) return;
-                     try {
-                        toast.loading("Membuka rekam medis...", { id: "reopen" });
-                        const res = await api.post(`/transactions/queues/${id}/reopen`);
-                        toast.success(res.data.message || "Konsultasi berhasil dibuka!", { id: "reopen" });
-                        window.location.reload();
-                     } catch (err: any) {
-                        toast.error(err.response?.data?.message || "Gagal membuka konsultasi", { id: "reopen" });
-                     }
-                  }}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-md shadow-amber-600/10 active:scale-95 transition-all self-start sm:self-auto"
-               >
-                  <FiUnlock className="w-4 h-4" /> Buka Kunci Konsultasi
-               </button>
+              <div className="flex items-center gap-3">
+                <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="text-xs font-bold uppercase tracking-tight">Kunjungan ini Telah Selesai. Data rekam medis dalam mode baca-saja dan tidak dapat diubah lagi.</p>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm("Buka kembali konsultasi ini? Dokter akan dapat mengedit resep dan rekam medis kembali.")) return;
+                  try {
+                    toast.loading("Membuka rekam medis...", { id: "reopen" });
+                    const res = await api.post(`/transactions/queues/${id}/reopen`);
+                    toast.success(res.data.message || "Konsultasi berhasil dibuka!", { id: "reopen" });
+                    window.location.reload();
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.message || "Gagal membuka konsultasi", { id: "reopen" });
+                  }
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-md shadow-amber-600/10 active:scale-95 transition-all self-start sm:self-auto"
+              >
+                <FiUnlock className="w-4 h-4" /> Buka Kunci Konsultasi
+              </button>
             </div>
           )}
           <AnimatePresence mode="wait">
@@ -1617,36 +2056,36 @@ export default function DoctorConsultationPage() {
               <motion.div key="diag" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
-                     <div className="flex items-center gap-2">
-                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Documentation (S-O-A-P)</h3>
-                     </div>
-                     <div className="flex items-center gap-2">
-                        {templates.length > 0 && (
-                          <div className="relative group">
-                            <button className="flex items-center gap-2 px-3 py-1.5 bg-primary/5 text-primary text-[10px] font-black rounded-lg hover:bg-primary hover:text-white transition-all">
-                              <FiPackage /> PILIH TEMPLATE
-                            </button>
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl invisible group-hover:visible z-50 p-2 overflow-hidden">
-                              <div className="p-3 border-b border-slate-50 mb-1">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Skenario Klinis</p>
-                              </div>
-                              {templates.filter(t => t.type === 'SOAP').map(t => (
-                                <button key={t.id} onClick={() => {
-                                  setSubjective(t.content.subjective || '');
-                                  setObjective(t.content.objective || '');
-                                  setDiagnosis(t.content.diagnosis || '');
-                                  setTreatmentPlan(t.content.treatmentPlan || '');
-                                }} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl text-[11px] font-bold text-slate-700 transition-colors">
-                                  {t.name}
-                                </button>
-                              ))}
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Documentation (S-O-A-P)</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {templates.length > 0 && (
+                        <div className="relative group">
+                          <button className="flex items-center gap-2 px-3 py-1.5 bg-primary/5 text-primary text-[10px] font-black rounded-lg hover:bg-primary hover:text-white transition-all">
+                            <FiPackage /> PILIH TEMPLATE
+                          </button>
+                          <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl invisible group-hover:visible z-50 p-2 overflow-hidden">
+                            <div className="p-3 border-b border-slate-50 mb-1">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Skenario Klinis</p>
                             </div>
+                            {templates.filter(t => t.type === 'SOAP').map(t => (
+                              <button key={t.id} onClick={() => {
+                                setSubjective(t.content.subjective || '');
+                                setObjective(t.content.objective || '');
+                                setDiagnosis(t.content.diagnosis || '');
+                                setTreatmentPlan(t.content.treatmentPlan || '');
+                              }} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl text-[11px] font-bold text-slate-700 transition-colors">
+                                {t.name}
+                              </button>
+                            ))}
                           </div>
-                        )}
-                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">Standardized Format</span>
-                     </div>
+                        </div>
+                      )}
+                      <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">Standardized Format</span>
+                    </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* S Quadrant */}
                     <div className="space-y-1.5 group">
@@ -1672,13 +2111,13 @@ export default function DoctorConsultationPage() {
                         <div className="w-6 h-6 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-violet-500/20 transform group-hover:rotate-6 transition-transform">A</div>
                         <label className="text-[9px] font-black text-violet-400 uppercase tracking-[0.2em] group-focus-within:text-violet-600 transition-colors">Assessment (Diagnosa ICD-10)</label>
                       </div>
-                      
+
                       {/* ICD-10 Search */}
                       {!isReadOnly && (
                         <div className="relative" onClick={(e) => e.stopPropagation()}>
                           <div className="relative group">
                             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <input 
+                            <input
                               value={searchIcd}
                               onChange={(e) => {
                                 setSearchIcd(e.target.value)
@@ -1699,7 +2138,7 @@ export default function DoctorConsultationPage() {
                                 } else if (e.key === 'Enter') {
                                   e.preventDefault()
                                   const indexToSelect = highlightedIcdIndex >= 0 ? highlightedIcdIndex : (icdResults.length > 0 ? 0 : -1)
-                                  
+
                                   if (indexToSelect >= 0 && icdResults[indexToSelect]) {
                                     const item = icdResults[indexToSelect]
                                     setIcd10Id(item.id)
@@ -1719,19 +2158,19 @@ export default function DoctorConsultationPage() {
                             />
                             {isSearchingIcd && <FiRefreshCw className="absolute right-4 top-1/2 -translate-y-1/2 text-primary animate-spin" />}
                           </div>
-                          
+
                           <AnimatePresence>
                             {isIcdDropdownOpen && icdResults.length > 0 && (
-                              <motion.div 
+                              <motion.div
                                 ref={icdContainerRef}
-                                initial={{ opacity: 0, y: 5 }} 
-                                animate={{ opacity: 1, y: 0 }} 
-                                exit={{ opacity: 0 }} 
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
                                 className="absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-[300px] overflow-y-auto p-2"
                               >
                                 {icdResults.map((item, idx) => (
-                                  <button 
-                                    key={item.id} 
+                                  <button
+                                    key={item.id}
                                     ref={el => { icdItemRefs.current[idx] = el }}
                                     onMouseEnter={() => setHighlightedIcdIndex(idx)}
                                     onClick={() => {
@@ -1768,16 +2207,16 @@ export default function DoctorConsultationPage() {
                         <div className="p-2.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center justify-between group">
                           <div className="flex items-center gap-3">
                             <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm border border-primary/5 shrink-0">
-                               <FiCheckCircle />
+                              <FiCheckCircle />
                             </div>
                             <div>
-                               <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded">{selectedIcd10.code}</span>
-                                  <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{selectedIcd10.nameId || selectedIcd10.nameEn}</span>
-                               </div>
-                               {selectedIcd10.description && (
-                                  <p className="text-[10px] font-medium text-slate-500 italic leading-relaxed">{selectedIcd10.description}</p>
-                               )}
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded">{selectedIcd10.code}</span>
+                                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{selectedIcd10.nameId || selectedIcd10.nameEn}</span>
+                              </div>
+                              {selectedIcd10.description && (
+                                <p className="text-[10px] font-medium text-slate-500 italic leading-relaxed">{selectedIcd10.description}</p>
+                              )}
                             </div>
                           </div>
                           {!isReadOnly && (
@@ -1814,98 +2253,97 @@ export default function DoctorConsultationPage() {
                     </div>
                     {!isReadOnly && (
                       <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
-                         <button 
-                           onClick={() => {
-                             setIsMedDialogOpen(true)
-                             setSelectedMedicines([]) // Reset selection when opening
-                             setSearchMed('') // Reset search
-                           }} 
-                           className="px-6 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
-                         >
-                           <FiPlus className="w-4 h-4" /> PILIH OBAT
-                         </button>
-                         <button 
-                           onClick={() => {
-                             resetRacikanForm()
-                             setIsRacikanDialogOpen(true)
-                           }} 
-                           className="px-6 py-4 bg-violet-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-500/20 hover:bg-violet-700 transition-all flex items-center gap-2"
-                         >
-                           <HiOutlineBeaker className="w-4 h-4" /> BUAT RACIKAN
-                         </button>
-                         <button 
-                           onClick={() => handlePrintPrescription('internal')}
-                           disabled={saving || prescriptionItems.filter(p => !p.isExternal).length === 0}
-                           className="px-5 py-4 bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                         >
-                           <FiPrinter className="w-4 h-4 text-emerald-300 animate-pulse" /> CETAK RESEP INTERNAL ({prescriptionItems.filter(p => !p.isExternal).length})
-                         </button>
-                         <button 
-                           onClick={() => handlePrintPrescription('external')}
-                           disabled={saving || prescriptionItems.filter(p => p.isExternal).length === 0}
-                           className="px-5 py-4 bg-rose-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                         >
-                           <FiPrinter className="w-4 h-4 text-rose-200" /> CETAK RESEP EKSTERNAL ({prescriptionItems.filter(p => p.isExternal).length})
-                         </button>
+                        <button
+                          onClick={() => {
+                            setIsMedDialogOpen(true)
+                            setSelectedMedicines([]) // Reset selection when opening
+                            setSearchMed('') // Reset search
+                          }}
+                          className="px-6 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+                        >
+                          <FiPlus className="w-4 h-4" /> PILIH OBAT
+                        </button>
+                        <button
+                          onClick={() => {
+                            resetRacikanForm()
+                            setIsRacikanDialogOpen(true)
+                          }}
+                          className="px-6 py-4 bg-violet-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-500/20 hover:bg-violet-700 transition-all flex items-center gap-2"
+                        >
+                          <HiOutlineBeaker className="w-4 h-4" /> BUAT RACIKAN
+                        </button>
+                        <button
+                          onClick={() => handlePrintPrescription('internal')}
+                          disabled={saving || prescriptionItems.filter(p => !p.isExternal).length === 0}
+                          className="px-5 py-4 bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                          <FiPrinter className="w-4 h-4 text-emerald-300 animate-pulse" /> CETAK RESEP INTERNAL ({prescriptionItems.filter(p => !p.isExternal).length})
+                        </button>
+                        <button
+                          onClick={() => handlePrintPrescription('external')}
+                          disabled={saving || prescriptionItems.filter(p => p.isExternal).length === 0}
+                          className="px-5 py-4 bg-rose-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                          <FiPrinter className="w-4 h-4 text-rose-200" /> CETAK RESEP EKSTERNAL ({prescriptionItems.filter(p => p.isExternal).length})
+                        </button>
                       </div>
                     )}
                   </div>
 
                   <div className="space-y-3">
                     {prescriptionItems.map((p, idx) => (
-                      <motion.div 
-                        initial={{ opacity: 0, x: -10 }} 
-                        animate={{ opacity: 1, x: 0 }} 
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
                         key={idx}
-                        className={`p-3 lg:p-4 rounded-xl border transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)] ${
-                          isStockInsufficient(p) 
-                            ? 'bg-rose-50/20 border-rose-200 hover:border-rose-300 hover:bg-rose-50' 
+                        className={`p-3 lg:p-4 rounded-xl border transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)] ${isStockInsufficient(p)
+                            ? 'bg-rose-50/20 border-rose-200 hover:border-rose-300 hover:bg-rose-50'
                             : 'bg-slate-50/30 border-slate-100 hover:border-slate-200 hover:bg-slate-50'
-                        }`}
+                          }`}
                       >
                         <div className="grid grid-cols-1 lg:grid-cols-[220px_110px_90px_1fr_70px_60px] gap-3 lg:gap-4 items-start">
                           {/* Col 1: Info Obat */}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm border shrink-0 ${p.isRacikan ? 'bg-violet-50 text-violet-600 border-violet-100' : 'bg-white text-primary border-slate-100'}`}>
-                                  {p.isRacikan ? <HiOutlineBeaker className="w-5 h-5 animate-pulse" /> : <FiPackage />}
-                               </div>
-                               <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 truncate">
-                                    {p.isRacikan ? (p.racikanName || 'Obat Racikan') : p.name}
-                                    {p.isExternal && (
-                                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase tracking-widest shrink-0 shadow-sm shadow-rose-500/10">
-                                        Luar
-                                      </span>
-                                    )}
-                                  </p>
-                                  <div className="flex flex-col mt-0.5">
-                                    {p.isRacikan ? (
-                                      <div className="flex flex-wrap gap-1 mt-1 max-w-xs">
-                                        {p.components?.map((c: any, cidx: number) => (
-                                          <span key={cidx} className="inline-block text-[8px] font-bold text-violet-750 bg-violet-50 border border-violet-100/50 px-1.5 py-0.5 rounded">
-                                            {c.medicineName || c.medicine?.medicineName || 'Bahan'} ({c.quantity} {c.unit || 'unit'})
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm border shrink-0 ${p.isRacikan ? 'bg-violet-50 text-violet-600 border-violet-100' : 'bg-white text-primary border-slate-100'}`}>
+                                {p.isRacikan ? <HiOutlineBeaker className="w-5 h-5 animate-pulse" /> : <FiPackage />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 truncate">
+                                  {p.isRacikan ? (p.racikanName || 'Obat Racikan') : p.name}
+                                  {p.isExternal && (
+                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase tracking-widest shrink-0 shadow-sm shadow-rose-500/10">
+                                      Luar
+                                    </span>
+                                  )}
+                                </p>
+                                <div className="flex flex-col mt-0.5">
+                                  {p.isRacikan ? (
+                                    <div className="flex flex-wrap gap-1 mt-1 max-w-xs">
+                                      {p.components?.map((c: any, cidx: number) => (
+                                        <span key={cidx} className="inline-block text-[8px] font-bold text-violet-750 bg-violet-50 border border-violet-100/50 px-1.5 py-0.5 rounded">
+                                          {c.medicineName || c.medicine?.medicineName || 'Bahan'} ({c.quantity} {c.unit || 'unit'})
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{p.dosage}</p>
+                                      {p.unit && (
+                                        <>
+                                          <span className="text-slate-300">•</span>
+                                          <span className="text-[8px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded truncate">
+                                            {p.unit}
                                           </span>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1">
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{p.dosage}</p>
-                                        {p.unit && (
-                                          <>
-                                            <span className="text-slate-300">•</span>
-                                            <span className="text-[8px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded truncate">
-                                              {p.unit}
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                               </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          
+
                           {/* Col 2: Sumber Obat */}
                           <div className="w-full">
                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Sumber Obat</label>
@@ -1918,11 +2356,10 @@ export default function DoctorConsultationPage() {
                                   n[idx].isExternal = false;
                                   setPrescriptionItems(n);
                                 }}
-                                className={`flex-1 text-[9px] font-black py-1.5 px-2 rounded-lg transition-all uppercase tracking-wider ${
-                                  !p.isExternal
+                                className={`flex-1 text-[9px] font-black py-1.5 px-2 rounded-lg transition-all uppercase tracking-wider ${!p.isExternal
                                     ? 'bg-indigo-600 text-white shadow-sm'
                                     : 'text-slate-400 hover:text-slate-700'
-                                }`}
+                                  }`}
                               >
                                 Internal
                               </button>
@@ -1934,17 +2371,16 @@ export default function DoctorConsultationPage() {
                                   n[idx].isExternal = true;
                                   setPrescriptionItems(n);
                                 }}
-                                className={`flex-1 text-[9px] font-black py-1.5 px-2 rounded-lg transition-all uppercase tracking-wider ${
-                                  p.isExternal
+                                className={`flex-1 text-[9px] font-black py-1.5 px-2 rounded-lg transition-all uppercase tracking-wider ${p.isExternal
                                     ? 'bg-rose-600 text-white shadow-sm'
                                     : 'text-slate-400 hover:text-slate-700'
-                                }`}
+                                  }`}
                               >
                                 Luar
                               </button>
                             </div>
                           </div>
-                          
+
                           {/* Col 3: Frekuensi */}
                           <div className="w-full">
                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block flex items-center justify-between">
@@ -1957,23 +2393,23 @@ export default function DoctorConsultationPage() {
                             </label>
                             <input disabled={isReadOnly} value={p.frequency} onChange={(e) => { const n = [...prescriptionItems]; n[idx].frequency = e.target.value; setPrescriptionItems(n); }} placeholder="e.g. 3x1" className={`w-full px-3 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`} />
                           </div>
-                          
+
                           {/* Col 4: Instruksi Khusus */}
                           <div className="w-full">
                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Instruksi Khusus</label>
-                            <select 
-                              disabled={isReadOnly} 
-                              value={['Sesudah makan', 'Sebelum makan'].includes(p.instructions) ? p.instructions : 'Lainnya'} 
-                              onChange={(e) => { 
+                            <select
+                              disabled={isReadOnly}
+                              value={['Sesudah makan', 'Sebelum makan'].includes(p.instructions) ? p.instructions : 'Lainnya'}
+                              onChange={(e) => {
                                 const val = e.target.value;
-                                const n = [...prescriptionItems]; 
+                                const n = [...prescriptionItems];
                                 if (val !== 'Lainnya') {
-                                  n[idx].instructions = val; 
+                                  n[idx].instructions = val;
                                 } else {
                                   n[idx].instructions = '';
                                 }
-                                setPrescriptionItems(n); 
-                              }} 
+                                setPrescriptionItems(n);
+                              }}
                               className={`w-full px-3 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${(!['Sesudah makan', 'Sebelum makan'].includes(p.instructions) || p.instructions === '') ? 'mb-2' : ''} ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`}
                             >
                               <option value="Sesudah makan">Sesudah makan</option>
@@ -1981,37 +2417,37 @@ export default function DoctorConsultationPage() {
                               <option value="Lainnya">Lainnya / Manual...</option>
                             </select>
                             {(!['Sesudah makan', 'Sebelum makan'].includes(p.instructions) || p.instructions === '') && (
-                              <input 
-                                disabled={isReadOnly} 
-                                value={p.instructions} 
-                                onChange={(e) => { const n = [...prescriptionItems]; n[idx].instructions = e.target.value; setPrescriptionItems(n); }} 
-                                placeholder="Ketik instruksi manual..." 
-                                className={`w-full px-3 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`} 
+                              <input
+                                disabled={isReadOnly}
+                                value={p.instructions}
+                                onChange={(e) => { const n = [...prescriptionItems]; n[idx].instructions = e.target.value; setPrescriptionItems(n); }}
+                                placeholder="Ketik instruksi manual..."
+                                className={`w-full px-3 py-2 text-xs font-black border border-slate-200 rounded-xl focus:border-primary outline-none ${isReadOnly ? 'bg-slate-50' : 'bg-white'}`}
                               />
                             )}
                           </div>
-                          
+
                           {/* Col 5: Qty */}
                           <div className="w-full">
                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">
                               Qty
                             </label>
                             <div className={`flex flex-col border rounded-xl overflow-hidden ${isReadOnly ? 'bg-slate-50' : 'bg-white'} ${isStockInsufficient(p) ? 'border-rose-500 bg-rose-50' : 'border-slate-200'}`}>
-                               <input 
-                                  disabled={isReadOnly} 
-                                  type="number" 
-                                  value={p.quantity} 
-                                  onChange={(e) => { 
-                                    const val = parseInt(e.target.value) || 0;
-                                    if (!p.isExternal && p.availableStock !== undefined && val > p.availableStock) {
-                                      toast.error(`Stok tidak mencukupi (Tersedia: ${p.availableStock})`);
-                                    }
-                                    const n = [...prescriptionItems]; 
-                                    n[idx].quantity = e.target.value; 
-                                    setPrescriptionItems(n); 
-                                  }} 
-                                  className="w-full text-center py-2 text-xs font-black outline-none bg-transparent" 
-                                />
+                              <input
+                                disabled={isReadOnly}
+                                type="number"
+                                value={p.quantity}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  if (!p.isExternal && p.availableStock !== undefined && val > p.availableStock) {
+                                    toast.error(`Stok tidak mencukupi (Tersedia: ${p.availableStock})`);
+                                  }
+                                  const n = [...prescriptionItems];
+                                  n[idx].quantity = e.target.value;
+                                  setPrescriptionItems(n);
+                                }}
+                                className="w-full text-center py-2 text-xs font-black outline-none bg-transparent"
+                              />
                             </div>
                             {isStockInsufficient(p) && (
                               <p className="text-[8px] font-black text-rose-500 uppercase mt-1 text-center animate-pulse">
@@ -2019,52 +2455,52 @@ export default function DoctorConsultationPage() {
                               </p>
                             )}
                           </div>
-                          
+
                           {/* Col 6: Aksi */}
                           <div className="w-full flex flex-col items-center">
-                             <label className="text-[9px] font-black text-transparent select-none mb-1.5 block">Aksi</label>
-                             {!isReadOnly && (
-                               <div className="flex items-center gap-1.5">
-                                 {p.isRacikan && (
-                                   <button 
-                                     onClick={() => {
-                                       setIsEditingRacikanIdx(idx)
-                                       setRacikanName(p.racikanName || p.name)
-                                       setRacikanQty(String(p.quantity))
-                                       setRacikanDosageForm(p.unit || 'Puyer')
-                                       setRacikanDosage(p.dosage || '')
-                                       setRacikanFrequency(p.frequency || '3x1')
-                                       setRacikanDuration(p.duration || '3 hari')
-                                       setRacikanInstructions(p.instructions || 'Sesudah makan')
-                                       setRacikanTuslah(String(p.tuslahPrice || 0))
-                                       setRacikanComponents(p.components?.map((c: any) => ({
-                                         medicineId: c.medicineId,
-                                         medicineName: c.medicineName || c.medicine?.medicineName || 'Bahan',
-                                         quantity: c.quantity,
-                                         unit: c.unit || 'unit',
-                                         availableStock: c.availableStock ?? 99999
-                                       })) || [])
-                                       if (p.formulaId) {
-                                         const f = compoundFormulas.find((cf: any) => cf.id === p.formulaId)
-                                         setSelectedFormula(f || null)
-                                       } else {
-                                         setSelectedFormula(null)
-                                       }
-                                       setIsRacikanDialogOpen(true)
-                                     }}
-                                     className="p-2 text-violet-500 hover:text-violet-600 hover:bg-violet-50 border border-slate-100 hover:border-violet-100 rounded-xl transition-all flex items-center justify-center animate-none"
-                                   >
-                                      <FiEdit3 className="w-4 h-4" />
-                                   </button>
-                                 )}
-                                 <button 
-                                   onClick={() => setPrescriptionItems(prescriptionItems.filter((_, i) => i !== idx))} 
-                                   className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 hover:border-rose-100 rounded-xl transition-all flex items-center justify-center animate-none"
-                                 >
-                                    <FiTrash2 className="w-4 h-4" />
-                                 </button>
-                               </div>
-                             )}
+                            <label className="text-[9px] font-black text-transparent select-none mb-1.5 block">Aksi</label>
+                            {!isReadOnly && (
+                              <div className="flex items-center gap-1.5">
+                                {p.isRacikan && (
+                                  <button
+                                    onClick={() => {
+                                      setIsEditingRacikanIdx(idx)
+                                      setRacikanName(p.racikanName || p.name)
+                                      setRacikanQty(String(p.quantity))
+                                      setRacikanDosageForm(p.unit || 'Puyer')
+                                      setRacikanDosage(p.dosage || '')
+                                      setRacikanFrequency(p.frequency || '3x1')
+                                      setRacikanDuration(p.duration || '3 hari')
+                                      setRacikanInstructions(p.instructions || 'Sesudah makan')
+                                      setRacikanTuslah(String(p.tuslahPrice || 0))
+                                      setRacikanComponents(p.components?.map((c: any) => ({
+                                        medicineId: c.medicineId,
+                                        medicineName: c.medicineName || c.medicine?.medicineName || 'Bahan',
+                                        quantity: c.quantity,
+                                        unit: c.unit || 'unit',
+                                        availableStock: c.availableStock ?? 99999
+                                      })) || [])
+                                      if (p.formulaId) {
+                                        const f = compoundFormulas.find((cf: any) => cf.id === p.formulaId)
+                                        setSelectedFormula(f || null)
+                                      } else {
+                                        setSelectedFormula(null)
+                                      }
+                                      setIsRacikanDialogOpen(true)
+                                    }}
+                                    className="p-2 text-violet-500 hover:text-violet-600 hover:bg-violet-50 border border-slate-100 hover:border-violet-100 rounded-xl transition-all flex items-center justify-center animate-none"
+                                  >
+                                    <FiEdit3 className="w-4 h-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setPrescriptionItems(prescriptionItems.filter((_, i) => i !== idx))}
+                                  className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 hover:border-rose-100 rounded-xl transition-all flex items-center justify-center animate-none"
+                                >
+                                  <FiTrash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </motion.div>
@@ -2083,13 +2519,13 @@ export default function DoctorConsultationPage() {
             {activeSegment === 'tindakan' && (
               <motion.div key="tindakan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
-                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                     <div className="space-y-1">
                       <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Tindakan Medis</h3>
                       <p className="text-[10px] font-bold text-slate-400">Daftar layanan atau tindakan yang diberikan</p>
                     </div>
                     {!isReadOnly && (
-                      <button 
+                      <button
                         onClick={() => {
                           const initialSelected = allServices.filter(s => serviceItems.some(item => item.serviceId === s.id))
                           setSelectedServices(initialSelected)
@@ -2107,24 +2543,24 @@ export default function DoctorConsultationPage() {
                     {serviceItems.map((s, idx) => (
                       <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} key={idx} className="bg-emerald-50/30 p-4 lg:p-6 rounded-2xl lg:rounded-3xl border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 lg:gap-6">
                         <div className="flex items-center gap-3 lg:gap-4">
-                           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100 shrink-0">
-                              <FiCheckCircle />
-                           </div>
-                           <div>
-                              <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{s.name}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{s.code}</p>
-                           </div>
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100 shrink-0">
+                            <FiCheckCircle />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{s.name}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{s.code}</p>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between sm:justify-end gap-4 lg:gap-8 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0">
-                           <div className="text-right">
-                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Biaya</p>
-                              <p className="text-sm font-black text-slate-800 tracking-tight">Rp {new Intl.NumberFormat('id-ID').format(s.price * s.quantity)}</p>
-                           </div>
-                           {!isReadOnly && (
+                          <div className="text-right">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Biaya</p>
+                            <p className="text-sm font-black text-slate-800 tracking-tight">Rp {new Intl.NumberFormat('id-ID').format(s.price * s.quantity)}</p>
+                          </div>
+                          {!isReadOnly && (
                             <button onClick={() => setServiceItems(serviceItems.filter((_, i) => i !== idx))} className="p-3 text-emerald-300 hover:text-rose-500 hover:bg-white rounded-xl transition-all">
-                                <FiTrash2 className="w-5 h-5" />
+                              <FiTrash2 className="w-5 h-5" />
                             </button>
-                           )}
+                          )}
                         </div>
                       </motion.div>
                     ))}
@@ -2143,224 +2579,224 @@ export default function DoctorConsultationPage() {
               <motion.div key='lab' initial={{ opacity: 0 }} animate={{ opacity: 1 }} className='space-y-4'>
                 <div className='bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px] flex flex-col'>
                   <div className='flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3 lg:mb-4 pb-3 border-b border-slate-50'>
-                     <div className='flex items-center gap-4'>
-                        <div className='w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-500/20 shrink-0'>
-                           <HiOutlineBeaker className='w-5 h-5' />
-                        </div>
-                        <div>
-                           <h3 className='text-xs font-black text-slate-800 uppercase tracking-widest leading-none'>Laboratory Diagnostic</h3>
-                           <p className='text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1.5'>Pilih pemeriksaan & kelola hasil</p>
-                        </div>
-                     </div>
-                     <div className='flex flex-col sm:flex-row gap-2 lg:gap-3 w-full md:w-auto'>
-                        <button 
-                           onClick={handlePrintLabOrder}
-                           className='px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2'
-                        >
-                           <FiPrinter /> Cetak Order Lab
-                        </button>
-                         <button 
-                            onClick={() => {
-                               hasFetchedRef.current = null;
-                               fetchData();
-                            }}
-                            className='px-6 py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg shadow-rose-200 flex items-center gap-2 animate-pulse hover:animate-none'
-                         >
-                            <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Hasil
-                         </button>
-                     </div>
+                    <div className='flex items-center gap-4'>
+                      <div className='w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-500/20 shrink-0'>
+                        <HiOutlineBeaker className='w-5 h-5' />
+                      </div>
+                      <div>
+                        <h3 className='text-xs font-black text-slate-800 uppercase tracking-widest leading-none'>Laboratory Diagnostic</h3>
+                        <p className='text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1.5'>Pilih pemeriksaan & kelola hasil</p>
+                      </div>
+                    </div>
+                    <div className='flex flex-col sm:flex-row gap-2 lg:gap-3 w-full md:w-auto'>
+                      <button
+                        onClick={handlePrintLabOrder}
+                        className='px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2'
+                      >
+                        <FiPrinter /> Cetak Order Lab
+                      </button>
+                      <button
+                        onClick={() => {
+                          hasFetchedRef.current = null;
+                          fetchData();
+                        }}
+                        className='px-6 py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg shadow-rose-200 flex items-center gap-2 animate-pulse hover:animate-none'
+                      >
+                        <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Hasil
+                      </button>
+                    </div>
                   </div>
 
                   <div className='grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 flex-1'>
-                     <div className='lg:col-span-7 space-y-4'>
-                        <div className='relative group' ref={labDropdownRef}>
-                           <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-rose-500 transition-colors'>Cari Pemeriksaan Lab</label>
-                           <div className='mt-1.5 relative'>
-                              <button 
-                                 onClick={() => setIsLabDropdownOpen(!isLabDropdownOpen)}
-                                 className='absolute inset-y-0 right-4 flex items-center z-10 text-slate-400 hover:text-rose-500 transition-colors'
+                    <div className='lg:col-span-7 space-y-4'>
+                      <div className='relative group' ref={labDropdownRef}>
+                        <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-rose-500 transition-colors'>Cari Pemeriksaan Lab</label>
+                        <div className='mt-1.5 relative'>
+                          <button
+                            onClick={() => setIsLabDropdownOpen(!isLabDropdownOpen)}
+                            className='absolute inset-y-0 right-4 flex items-center z-10 text-slate-400 hover:text-rose-500 transition-colors'
+                          >
+                            <FiChevronDown className={`w-4 h-4 transition-transform ${isLabDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none'>
+                            <FiSearch className='w-4 h-4 text-slate-400 group-focus-within:text-rose-500 transition-colors' />
+                          </div>
+                          <input
+                            type='text'
+                            value={searchLab}
+                            onChange={(e) => {
+                              setSearchLab(e.target.value);
+                              setIsLabDropdownOpen(true);
+                            }}
+                            onFocus={() => setIsLabDropdownOpen(true)}
+                            className='w-full pl-10 pr-6 py-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all'
+                            placeholder='Cari panel pemeriksaan (ex: Darah Lengkap)...'
+                          />
+                          <AnimatePresence>
+                            {isLabDropdownOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                                className='absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[300px] overflow-y-auto'
                               >
-                                 <FiChevronDown className={`w-4 h-4 transition-transform ${isLabDropdownOpen ? 'rotate-180' : ''}`} />
-                              </button>
-                              <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none'>
-                                 <FiSearch className='w-4 h-4 text-slate-400 group-focus-within:text-rose-500 transition-colors' />
-                              </div>
-                              <input 
-                                 type='text' 
-                                 value={searchLab}
-                                 onChange={(e) => {
-                                    setSearchLab(e.target.value);
-                                    setIsLabDropdownOpen(true);
-                                 }}
-                                 onFocus={() => setIsLabDropdownOpen(true)}
-                                 className='w-full pl-10 pr-6 py-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all'
-                                 placeholder='Cari panel pemeriksaan (ex: Darah Lengkap)...'
-                              />
-                              <AnimatePresence>
-                                 {isLabDropdownOpen && (
-                                    <motion.div 
-                                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                                       className='absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[300px] overflow-y-auto'
-                                    >
-                                       {(() => {
-                                          const labFiltered = labTestMasters.filter(s => {
-                                             const search = searchLab.toLowerCase();
-                                             const name = s.name.toLowerCase();
-                                             const category = s.category?.toLowerCase() || '';
-                                             
-                                             if (!search) return true;
-                                             return name.includes(search) || category.includes(search) || s.code.toLowerCase().includes(search);
-                                          });
- 
-                                          return labFiltered.length > 0 ? (
-                                             labFiltered.map(svc => (
-                                                <button 
-                                                   key={svc.id}
-                                                   onClick={() => {
-                                                      if (!labItems.find(i => i.id === svc.id)) {
-                                                         setLabItems([...labItems, {
-                                                            ...svc,
-                                                            serviceName: svc.name,
-                                                            serviceCode: svc.code,
-                                                            serviceCategory: { categoryName: svc.category }
-                                                         }]);
-                                                      }
-                                                      setSearchLab('');
-                                                      setIsLabDropdownOpen(false);
-                                                   }}
-                                                   className='w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 transition-colors'
-                                                >
-                                                   <div>
-                                                      <p className='text-xs font-bold text-slate-800 uppercase tracking-tight'>{svc.name}</p>
-                                                      <div className="flex items-center gap-2 mt-0.5">
-                                                         <p className='text-[8px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-1.5 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
-                                                         {svc.unit && <span className="text-[8px] font-medium text-slate-400 italic">Unit: {svc.unit}</span>}
-                                                      </div>
-                                                   </div>
-                                                   <div className="text-right">
-                                                      <p className="text-[10px] font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
-                                                      <FiPlus className='text-rose-500 ml-auto mt-0.5 w-3 h-3' />
-                                                   </div>
-                                                </button>
-                                             ))
-                                          ) : (
-                                             <div className='p-6 text-center text-slate-400 text-xs font-bold uppercase tracking-widest'>Pemeriksaan tidak ditemukan</div>
-                                          );
-                                       })()}
-                                    </motion.div>
-                                 )}
-                              </AnimatePresence>
-                           </div>
-                        </div>
-                        <div className='space-y-2'>
-                           <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1'>Pemeriksaan yang Dipilih</label>
-                           {labItems.length > 0 ? (
-                              <div className='flex flex-wrap gap-2 p-3 bg-slate-50/50 border border-slate-100 rounded-2xl'>
-                                 {labItems.map((item, idx) => (
-                                    <motion.span 
-                                       key={item.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                                       className='inline-flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-[10px] font-black text-slate-800 uppercase tracking-tight'
-                                    >
-                                       <span className="w-4 h-4 rounded bg-rose-50 text-rose-600 flex items-center justify-center text-[8px] font-bold shrink-0">{idx + 1}</span>
-                                       <span>{item.serviceName}</span>
-                                       <button 
-                                          onClick={() => setLabItems(labItems.filter(i => i.id !== item.id))}
-                                          className='p-0.5 text-slate-300 hover:text-rose-500 rounded transition-colors ml-1'
-                                       >
-                                          ✕
-                                       </button>
-                                    </motion.span>
-                                 ))}
-                              </div>
-                           ) : (
-                              <div className='py-10 border border-dashed border-slate-200 rounded-2xl text-center bg-slate-50/20'>
-                                 <HiOutlineBeaker className='w-8 h-8 text-slate-200 mx-auto mb-2' />
-                                 <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest'>Belum ada pemeriksaan dipilih</p>
-                              </div>
-                           )}
-                        </div>
-                     </div>
-                     <div className='lg:col-span-5 space-y-4 border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6'>
-                        <div className='space-y-1.5'>
-                           <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]'>Catatan Khusus Laborat</label>
-                           <textarea 
-                              disabled={isReadOnly}
-                              value={labNotes} 
-                              onChange={(e) => setLabNotes(e.target.value)}
-                              className={`w-full p-3 bg-slate-50/50 border border-slate-200 rounded-xl min-h-[60px] max-h-[120px] text-xs font-medium leading-relaxed focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
-                              placeholder='Instruksi tambahan untuk tim lab...'
-                           />
-                        </div>
-                        <div className='space-y-1.5'>
-                           <label className='text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5'>
-                              <FiCheckCircle /> Hasil Lab Terstruktur
-                           </label>
-                           <textarea 
-                               disabled={isReadOnly}
-                               value={labResults} 
-                               onChange={(e) => setLabResults(e.target.value)}
-                               className={`w-full p-3 bg-indigo-50/30 border border-indigo-100/50 rounded-xl min-h-[60px] max-h-[120px] text-xs font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
-                               placeholder='Kesimpulan hasil lab (jika sudah ada)...'
-                           />
-                        </div>
+                                {(() => {
+                                  const labFiltered = labTestMasters.filter(s => {
+                                    const search = searchLab.toLowerCase();
+                                    const name = s.name.toLowerCase();
+                                    const category = s.category?.toLowerCase() || '';
 
-                        {/* Structured Lab Results */}
-                        {(medicalRecord?.labOrders?.length || 0) > 0 && (
-                           <div className='space-y-3 pt-3 border-t border-slate-100'>
-                              <div className='space-y-2.5'>
-                                 {medicalRecord.labOrders.map((order: any) => (
-                                    <div key={order.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-                                       <div className="bg-slate-100/50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
-                                          <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{order.orderNo}</span>
-                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest ${order.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                             {order.status}
-                                          </span>
-                                           {order.status === 'completed' && (
-                                              <button 
-                                                 onClick={() => generateLabResultPDF(order)}
-                                                 className="text-[8px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded transition-colors"
-                                              >
-                                                 <FiPrinter className="w-2.5 h-2.5" /> PDF
-                                              </button>
-                                           )}
-                                       </div>
-                                       {order.results?.length > 0 ? (
-                                           <div className="p-2 space-y-0.5 bg-white">
-                                              {order.results.map((res: any) => (
-                                                 <div key={res.id} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-1.5 rounded transition-colors">
-                                                    <div className="flex-1">
-                                                       <p className="text-[9px] font-bold text-slate-700 uppercase">{res.testMaster?.name}</p>
-                                                    </div>
-                                                    <div className="flex-1 text-center">
-                                                       <p className={`text-[10px] font-black ${res.isCritical ? 'text-rose-500 bg-rose-50 py-0.5 px-1.5 rounded-full inline-block' : 'text-slate-900'}`}>
-                                                         {res.resultValue} <span className="text-[8px] font-medium text-slate-400 ml-0.5">{res.testMaster?.unit}</span>
-                                                       </p>
-                                                    </div>
-                                                    <div className="flex-1 text-right">
-                                                       <p className="text-[8px] font-medium text-slate-400 italic bg-slate-50 py-0.5 px-1.5 rounded inline-block">Ref: {res.testMaster?.normalRangeText}</p>
-                                                    </div>
-                                                 </div>
-                                              ))}
-                                           </div>
-                                       ) : (
-                                          <div className="p-3 text-center">
-                                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Belum ada hasil</p>
+                                    if (!search) return true;
+                                    return name.includes(search) || category.includes(search) || s.code.toLowerCase().includes(search);
+                                  });
+
+                                  return labFiltered.length > 0 ? (
+                                    labFiltered.map(svc => (
+                                      <button
+                                        key={svc.id}
+                                        onClick={() => {
+                                          if (!labItems.find(i => i.id === svc.id)) {
+                                            setLabItems([...labItems, {
+                                              ...svc,
+                                              serviceName: svc.name,
+                                              serviceCode: svc.code,
+                                              serviceCategory: { categoryName: svc.category }
+                                            }]);
+                                          }
+                                          setSearchLab('');
+                                          setIsLabDropdownOpen(false);
+                                        }}
+                                        className='w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 transition-colors'
+                                      >
+                                        <div>
+                                          <p className='text-xs font-bold text-slate-800 uppercase tracking-tight'>{svc.name}</p>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                            <p className='text-[8px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-1.5 py-0.5 rounded'>{svc.category || 'Lab Test'}</p>
+                                            {svc.unit && <span className="text-[8px] font-medium text-slate-400 italic">Unit: {svc.unit}</span>}
                                           </div>
-                                       )}
-                                    </div>
-                                 ))}
-                              </div>
-                           </div>
-                        )}
-                        <div className='p-3 bg-amber-50/40 rounded-xl border border-amber-100/50'>
-                           <p className='text-[8px] font-black text-amber-600 uppercase tracking-[0.2em] mb-1 flex items-center gap-1'>
-                              <FiInfo /> Prosedur Digital Lab
-                           </p>
-                           <p className='text-[8px] font-bold text-amber-600/70 leading-normal uppercase tracking-tight'>
-                              Pastikan pemeriksaan sudah benar sebelum mencetak. Order masuk ke antrian Laboratorium otomatis setelah disimpan.
-                           </p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-[10px] font-black text-slate-700">Rp {Number(svc.price || 0).toLocaleString('id-ID')}</p>
+                                          <FiPlus className='text-rose-500 ml-auto mt-0.5 w-3 h-3' />
+                                        </div>
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className='p-6 text-center text-slate-400 text-xs font-bold uppercase tracking-widest'>Pemeriksaan tidak ditemukan</div>
+                                  );
+                                })()}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                     </div>
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1'>Pemeriksaan yang Dipilih</label>
+                        {labItems.length > 0 ? (
+                          <div className='flex flex-wrap gap-2 p-3 bg-slate-50/50 border border-slate-100 rounded-2xl'>
+                            {labItems.map((item, idx) => (
+                              <motion.span
+                                key={item.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                className='inline-flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-[10px] font-black text-slate-800 uppercase tracking-tight'
+                              >
+                                <span className="w-4 h-4 rounded bg-rose-50 text-rose-600 flex items-center justify-center text-[8px] font-bold shrink-0">{idx + 1}</span>
+                                <span>{item.serviceName}</span>
+                                <button
+                                  onClick={() => setLabItems(labItems.filter(i => i.id !== item.id))}
+                                  className='p-0.5 text-slate-300 hover:text-rose-500 rounded transition-colors ml-1'
+                                >
+                                  ✕
+                                </button>
+                              </motion.span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className='py-10 border border-dashed border-slate-200 rounded-2xl text-center bg-slate-50/20'>
+                            <HiOutlineBeaker className='w-8 h-8 text-slate-200 mx-auto mb-2' />
+                            <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest'>Belum ada pemeriksaan dipilih</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className='lg:col-span-5 space-y-4 border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6'>
+                      <div className='space-y-1.5'>
+                        <label className='text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]'>Catatan Khusus Laborat</label>
+                        <textarea
+                          disabled={isReadOnly}
+                          value={labNotes}
+                          onChange={(e) => setLabNotes(e.target.value)}
+                          className={`w-full p-3 bg-slate-50/50 border border-slate-200 rounded-xl min-h-[60px] max-h-[120px] text-xs font-medium leading-relaxed focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
+                          placeholder='Instruksi tambahan untuk tim lab...'
+                        />
+                      </div>
+                      <div className='space-y-1.5'>
+                        <label className='text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5'>
+                          <FiCheckCircle /> Hasil Lab Terstruktur
+                        </label>
+                        <textarea
+                          disabled={isReadOnly}
+                          value={labResults}
+                          onChange={(e) => setLabResults(e.target.value)}
+                          className={`w-full p-3 bg-indigo-50/30 border border-indigo-100/50 rounded-xl min-h-[60px] max-h-[120px] text-xs font-medium leading-relaxed focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-inner ${isReadOnly ? 'opacity-60' : ''}`}
+                          placeholder='Kesimpulan hasil lab (jika sudah ada)...'
+                        />
+                      </div>
+
+                      {/* Structured Lab Results */}
+                      {(medicalRecord?.labOrders?.length || 0) > 0 && (
+                        <div className='space-y-3 pt-3 border-t border-slate-100'>
+                          <div className='space-y-2.5'>
+                            {medicalRecord.labOrders.map((order: any) => (
+                              <div key={order.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                                <div className="bg-slate-100/50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
+                                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{order.orderNo}</span>
+                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest ${order.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    {order.status}
+                                  </span>
+                                  {order.status === 'completed' && (
+                                    <button
+                                      onClick={() => generateLabResultPDF(order)}
+                                      className="text-[8px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded transition-colors"
+                                    >
+                                      <FiPrinter className="w-2.5 h-2.5" /> PDF
+                                    </button>
+                                  )}
+                                </div>
+                                {order.results?.length > 0 ? (
+                                  <div className="p-2 space-y-0.5 bg-white">
+                                    {order.results.map((res: any) => (
+                                      <div key={res.id} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-1.5 rounded transition-colors">
+                                        <div className="flex-1">
+                                          <p className="text-[9px] font-bold text-slate-700 uppercase">{res.testMaster?.name}</p>
+                                        </div>
+                                        <div className="flex-1 text-center">
+                                          <p className={`text-[10px] font-black ${res.isCritical ? 'text-rose-500 bg-rose-50 py-0.5 px-1.5 rounded-full inline-block' : 'text-slate-900'}`}>
+                                            {res.resultValue} <span className="text-[8px] font-medium text-slate-400 ml-0.5">{res.testMaster?.unit}</span>
+                                          </p>
+                                        </div>
+                                        <div className="flex-1 text-right">
+                                          <p className="text-[8px] font-medium text-slate-400 italic bg-slate-50 py-0.5 px-1.5 rounded inline-block">Ref: {res.testMaster?.normalRangeText}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="p-3 text-center">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Belum ada hasil</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className='p-3 bg-amber-50/40 rounded-xl border border-amber-100/50'>
+                        <p className='text-[8px] font-black text-amber-600 uppercase tracking-[0.2em] mb-1 flex items-center gap-1'>
+                          <FiInfo /> Prosedur Digital Lab
+                        </p>
+                        <p className='text-[8px] font-bold text-amber-600/70 leading-normal uppercase tracking-tight'>
+                          Pastikan pemeriksaan sudah benar sebelum mencetak. Order masuk ke antrian Laboratorium otomatis setelah disimpan.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -2370,120 +2806,120 @@ export default function DoctorConsultationPage() {
               <motion.div key="referral" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
                   <div className="flex items-center justify-between mb-3 lg:mb-4 pb-3 border-b border-slate-50">
-                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Digital Referral Management</h3>
-                     <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-100 hidden sm:inline-block">Care Coordination</span>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Digital Referral Management</h3>
+                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-100 hidden sm:inline-block">Care Coordination</span>
                   </div>
-                               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
-                     <div className="lg:col-span-6 space-y-4">
-                       <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                          <div className="flex items-center justify-between mb-3">
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{editingReferralId ? 'Edit Rujukan Terpilih' : 'Buat Rujukan Baru'}</p>
-                             {editingReferralId && (
-                                <button 
-                                  onClick={() => {
-                                    setEditingReferralId(null)
-                                    setReferralNotes('')
-                                    setReferralToClinicId('')
-                                    setReferralToDepartmentId('')
-                                    setReferralToHospitalName('')
-                                  }}
-                                  className="text-[8px] font-black text-rose-500 uppercase tracking-widest hover:underline"
-                                >
-                                  Batal Edit
-                                </button>
-                             )}
-                          </div>
-                          <div className="space-y-3">
-                              <div className="flex gap-2">
-                                 {['INTERNAL', 'EXTERNAL'].map(type => (
-                                    <button 
-                                      key={type} 
-                                      onClick={() => setReferralType(type as any)} 
-                                      className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${referralType === type ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-                                    >
-                                       {type === 'INTERNAL' ? 'Poli Internal' : 'RS Luar'}
-                                    </button>
-                                 ))}
-                              </div>
-
-                              {referralType === 'INTERNAL' ? (
-                                <div className="flex flex-col gap-2">
-                                   <select value={referralToClinicId} onChange={e => setReferralToClinicId(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none">
-                                      <option value="">Pilih Klinik Tujuan...</option>
-                                      {clinicsList.map(c => (
-                                         <option key={c.id} value={c.id}>{c.name}</option>
-                                      ))}
-                                   </select>
-                                   <select value={referralToDepartmentId} onChange={e => setReferralToDepartmentId(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none">
-                                      <option value="">Pilih Poli/Unit Tujuan...</option>
-                                      {departmentsList.map(d => (
-                                         <option key={d.id} value={d.id}>{d.name}</option>
-                                      ))}
-                                   </select>
-                                </div>
-                              ) : (
-                                <input value={referralToHospitalName} onChange={e => setReferralToHospitalName(e.target.value)} placeholder="Ketik nama Rumah Sakit tujuan..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none" />
-                              )}
-
-                              <textarea value={referralNotes} onChange={e => setReferralNotes(e.target.value)} placeholder="Catatan medis tambahan atau rincian klinis untuk rujukan..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none min-h-[70px] max-h-[140px]" />
-                              
-                              <button disabled={isPrinting} onClick={handleSaveAndPrintReferral} className={`w-full py-2.5 mt-1 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg transition-all disabled:opacity-50 ${editingReferralId ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'}`}>
-                                 {isPrinting ? 'Memproses...' : editingReferralId ? 'Perbarui & Cetak Rujukan' : 'Cetak & Simpan Rujukan'}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+                    <div className="lg:col-span-6 space-y-4">
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{editingReferralId ? 'Edit Rujukan Terpilih' : 'Buat Rujukan Baru'}</p>
+                          {editingReferralId && (
+                            <button
+                              onClick={() => {
+                                setEditingReferralId(null)
+                                setReferralNotes('')
+                                setReferralToClinicId('')
+                                setReferralToDepartmentId('')
+                                setReferralToHospitalName('')
+                              }}
+                              className="text-[8px] font-black text-rose-500 uppercase tracking-widest hover:underline"
+                            >
+                              Batal Edit
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            {['INTERNAL', 'EXTERNAL'].map(type => (
+                              <button
+                                key={type}
+                                onClick={() => setReferralType(type as any)}
+                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${referralType === type ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+                              >
+                                {type === 'INTERNAL' ? 'Poli Internal' : 'RS Luar'}
                               </button>
+                            ))}
                           </div>
-                       </div>
-                     </div>
-                     
-                     <div className="lg:col-span-6 space-y-3">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-1.5">Riwayat Rujukan Kunjungan Ini</p>
-                        {referrals.length === 0 ? (
-                          <div className="py-8 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/20">
-                             <FiArrowLeft className="w-6 h-6 text-slate-200 mx-auto mb-1.5 rotate-180" />
-                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum Ada Rujukan</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                             {referrals.map(r => (
-                               <div key={r.id} className="p-2.5 px-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between shadow-sm hover:border-indigo-100 transition-colors">
-                                  <div>
-                                     <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">Rujukan {r.type === 'INTERNAL' ? 'Internal' : 'RS Luar'}</p>
-                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Ke: <span className="text-slate-700">{r.type === 'INTERNAL' ? `${r.toClinic?.name || 'Klinik'} - ${r.toDepartment?.name || 'Poli'}` : r.toHospitalName}</span></p>
-                                     <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded inline-block mt-1">Status: {r.status || 'Pending'}</p>
-                                  </div>
-                                  <div className="flex items-center gap-0.5">
-                                      <button 
-                                        onClick={() => {
-                                          setEditingReferralId(r.id)
-                                          setReferralType(r.type)
-                                          setReferralNotes(r.notes || '')
-                                          if (r.type === 'INTERNAL') {
-                                            setReferralToClinicId(r.toClinicId || '')
-                                            setReferralToDepartmentId(r.toDepartmentId || '')
-                                          } else {
-                                            setReferralToHospitalName(r.toHospitalName || '')
-                                          }
-                                        }} 
-                                        title="Edit Rujukan" 
-                                        className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
-                                      >
-                                        <FiEdit3 className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button onClick={() => handleReprintReferral(r)} title="Print Ulang Rujukan" className="p-1.5 text-primary hover:bg-indigo-50 rounded-lg transition-all"><FiPrinter className="w-3.5 h-3.5" /></button>
-                                      {!isReadOnly && (
-                                        <button 
-                                          onClick={() => handleDeleteReferral(r.id)} 
-                                          title="Hapus Rujukan" 
-                                          className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-all"
-                                        >
-                                          <FiTrash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
-                                   </div>
-                               </div>
-                             ))}
-                          </div>
-                        )}
-                     </div>
+
+                          {referralType === 'INTERNAL' ? (
+                            <div className="flex flex-col gap-2">
+                              <select value={referralToClinicId} onChange={e => setReferralToClinicId(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none">
+                                <option value="">Pilih Klinik Tujuan...</option>
+                                {clinicsList.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                              <select value={referralToDepartmentId} onChange={e => setReferralToDepartmentId(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none">
+                                <option value="">Pilih Poli/Unit Tujuan...</option>
+                                {departmentsList.map(d => (
+                                  <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <input value={referralToHospitalName} onChange={e => setReferralToHospitalName(e.target.value)} placeholder="Ketik nama Rumah Sakit tujuan..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none" />
+                          )}
+
+                          <textarea value={referralNotes} onChange={e => setReferralNotes(e.target.value)} placeholder="Catatan medis tambahan atau rincian klinis untuk rujukan..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] font-bold bg-white focus:border-primary outline-none min-h-[70px] max-h-[140px]" />
+
+                          <button disabled={isPrinting} onClick={handleSaveAndPrintReferral} className={`w-full py-2.5 mt-1 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg transition-all disabled:opacity-50 ${editingReferralId ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'}`}>
+                            {isPrinting ? 'Memproses...' : editingReferralId ? 'Perbarui & Cetak Rujukan' : 'Cetak & Simpan Rujukan'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="lg:col-span-6 space-y-3">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-1.5">Riwayat Rujukan Kunjungan Ini</p>
+                      {referrals.length === 0 ? (
+                        <div className="py-8 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/20">
+                          <FiArrowLeft className="w-6 h-6 text-slate-200 mx-auto mb-1.5 rotate-180" />
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum Ada Rujukan</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {referrals.map(r => (
+                            <div key={r.id} className="p-2.5 px-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between shadow-sm hover:border-indigo-100 transition-colors">
+                              <div>
+                                <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">Rujukan {r.type === 'INTERNAL' ? 'Internal' : 'RS Luar'}</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Ke: <span className="text-slate-700">{r.type === 'INTERNAL' ? `${r.toClinic?.name || 'Klinik'} - ${r.toDepartment?.name || 'Poli'}` : r.toHospitalName}</span></p>
+                                <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded inline-block mt-1">Status: {r.status || 'Pending'}</p>
+                              </div>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  onClick={() => {
+                                    setEditingReferralId(r.id)
+                                    setReferralType(r.type)
+                                    setReferralNotes(r.notes || '')
+                                    if (r.type === 'INTERNAL') {
+                                      setReferralToClinicId(r.toClinicId || '')
+                                      setReferralToDepartmentId(r.toDepartmentId || '')
+                                    } else {
+                                      setReferralToHospitalName(r.toHospitalName || '')
+                                    }
+                                  }}
+                                  title="Edit Rujukan"
+                                  className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                >
+                                  <FiEdit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => handleReprintReferral(r)} title="Print Ulang Rujukan" className="p-1.5 text-primary hover:bg-indigo-50 rounded-lg transition-all"><FiPrinter className="w-3.5 h-3.5" /></button>
+                                {!isReadOnly && (
+                                  <button
+                                    onClick={() => handleDeleteReferral(r.id)}
+                                    title="Hapus Rujukan"
+                                    className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-all"
+                                  >
+                                    <FiTrash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -2493,25 +2929,25 @@ export default function DoctorConsultationPage() {
               <motion.div key="attachment" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
                   <div className="flex items-center justify-between mb-3 lg:mb-4 pb-3 border-b border-slate-50">
-                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Media & Attachments</h3>
-                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 hidden sm:inline-block">Clinical Photography</span>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Medical Media & Attachments</h3>
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 hidden sm:inline-block">Clinical Photography</span>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {!isReadOnly && (
                       <label className={`aspect-square border-2 border-dashed border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary hover:bg-slate-50 transition-all group ${isUploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
-                         <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 group-hover:text-primary transition-all">
-                            {isUploadingAttachment ? <FiRefreshCw className="w-8 h-8 animate-spin" /> : <FiPlus className="w-8 h-8" />}
-                         </div>
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isUploadingAttachment ? 'Mengunggah...' : 'Unggah Foto / PDF'}</p>
-                         <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadAttachment} disabled={isUploadingAttachment} />
+                        <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 group-hover:text-primary transition-all">
+                          {isUploadingAttachment ? <FiRefreshCw className="w-8 h-8 animate-spin" /> : <FiPlus className="w-8 h-8" />}
+                        </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isUploadingAttachment ? 'Mengunggah...' : 'Unggah Foto / PDF'}</p>
+                        <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadAttachment} disabled={isUploadingAttachment} />
                       </label>
                     )}
-                    
-                    {attachments.map((attachment) => (
+
+                    {attachments.filter(a => !a.fileName.startsWith('Signature_') && !a.fileName.startsWith('Informed_Consent_File_')).map((attachment) => (
                       <div key={attachment.id} className="aspect-square border border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col overflow-hidden group relative bg-slate-50">
                         {attachment.fileType.startsWith('image/') ? (
-                          <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}${attachment.fileUrl}`} alt={attachment.fileName} className="w-full h-4/5 object-cover" />
+                          <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5006'}${attachment.fileUrl}`} alt={attachment.fileName} className="w-full h-4/5 object-cover" />
                         ) : (
                           <div className="w-full h-4/5 flex items-center justify-center bg-indigo-50 text-indigo-300">
                             <FiClipboard className="w-16 h-16" />
@@ -2520,9 +2956,9 @@ export default function DoctorConsultationPage() {
                         <div className="h-1/5 bg-white px-4 py-3 border-t border-slate-100 flex items-center justify-between">
                           <p className="text-[10px] font-black text-slate-600 truncate mr-2" title={attachment.fileName}>{attachment.fileName}</p>
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <a 
-                              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}${attachment.fileUrl}`} 
-                              target="_blank" 
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5006'}${attachment.fileUrl}`}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="p-2 text-primary hover:bg-indigo-50 rounded-lg transition-all"
                               title="Buka File"
@@ -2530,7 +2966,7 @@ export default function DoctorConsultationPage() {
                               <FiMonitor className="w-4 h-4" />
                             </a>
                             {!isReadOnly && (
-                              <button 
+                              <button
                                 onClick={() => handleDeleteAttachment(attachment.id)}
                                 className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
                                 title="Hapus File"
@@ -2542,14 +2978,14 @@ export default function DoctorConsultationPage() {
                         </div>
                       </div>
                     ))}
-                    
+
                     {attachments.length === 0 && isReadOnly && (
-                       <div className="aspect-square border-2 border-dashed border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-slate-50">
-                          <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300">
-                             <FiClipboard className="w-8 h-8" />
-                          </div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada lampiran</p>
-                       </div>
+                      <div className="aspect-square border-2 border-dashed border-slate-200 rounded-3xl lg:rounded-[2.5rem] flex flex-col items-center justify-center gap-4 bg-slate-50">
+                        <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300">
+                          <FiClipboard className="w-8 h-8" />
+                        </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada lampiran</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2557,40 +2993,233 @@ export default function DoctorConsultationPage() {
             )}
 
             {activeSegment === 'consent' && (
-              <motion.div key="consent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
-                  <div className="flex items-center justify-between mb-3 lg:mb-4 pb-3 border-b border-slate-50">
-                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Informed Consent & Verification</h3>
-                     <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-full border border-rose-100 hidden sm:inline-block">Legal & Safety</span>
-                  </div>
-                  
-                  <div className="max-w-xl mx-auto py-6 lg:py-10">
-                    <div className={`p-6 lg:p-10 rounded-3xl lg:rounded-[2.5rem] border-2 transition-all ${hasInformedConsent ? 'bg-emerald-50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-slate-50 border-slate-100'}`}>
-                       <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 mb-6 lg:mb-8">
-                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl transition-all ${hasInformedConsent ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                             {hasInformedConsent ? <FiCheckCircle /> : <FiLock />}
-                          </div>
-                          <div>
-                             <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Persetujuan Tindakan Medis</h4>
-                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Self-Verified by Practitioner</p>
-                          </div>
-                       </div>
-                       
-                       <p className="text-[11px] font-medium text-slate-500 leading-relaxed mb-10">
-                          Dengan mencentang opsi di bawah ini, saya selaku dokter pemeriksa mengonfirmasi bahwa pasien (atau wali yang sah) telah diberikan penjelasan yang cukup mengenai tindakan medis yang akan dilakukan, termasuk risiko, alternatif, dan konsekuensinya, serta telah memberikan persetujuannya secara lisan maupun tertulis.
-                       </p>
-                       
-                       <button 
-                        onClick={() => setHasInformedConsent(!hasInformedConsent)}
-                        className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                          hasInformedConsent 
-                          ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/20' 
-                          : 'bg-white border border-slate-200 text-slate-400 hover:border-primary hover:text-primary'
-                        }`}>
-                         {hasInformedConsent ? '✓ PERSETUJUAN TELAH DICATAT' : 'KLIK UNTUK KONFIRMASI PERSETUJUAN'}
-                       </button>
+              <motion.div key="consent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-6 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 border border-rose-100">
+                        <FiLock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Informed Consent & Verification</h3>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Persetujuan Tindakan Medis & Legalitas Pelayanan</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handlePrintInformedConsent}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-100 text-[9px] font-black uppercase tracking-widest transition-all shadow-sm"
+                      >
+                        <FiPrinter className="w-3.5 h-3.5" /> Cetak Formulir
+                      </button>
+                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-3 py-1 rounded-full border border-rose-100">Legal & Safety</span>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    {/* Kiri: Status & Digital Signature Pad (7/12 width) */}
+                    <div className="lg:col-span-7 space-y-6">
+                      {/* 1. Status Persetujuan */}
+                      <div className={`p-6 rounded-2xl border transition-all ${hasInformedConsent ? 'bg-emerald-50 border-emerald-100 shadow-sm shadow-emerald-500/5' : 'bg-slate-50 border-slate-200/60'}`}>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg transition-all ${hasInformedConsent ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                            {hasInformedConsent ? <FiCheckCircle className="w-5 h-5" /> : <FiLock className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Status Persetujuan Tindakan</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Verifikasi Praktisi & Sistem</p>
+                          </div>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-500 leading-relaxed mb-4">
+                          Konfirmasikan bahwa pasien (atau wali/keluarga terdekat) telah mendapatkan paparan informasi medis lengkap, memahami risiko, dan menyatakan persetujuannya secara sukarela.
+                        </p>
+                        <button
+                          onClick={() => setHasInformedConsent(!hasInformedConsent)}
+                          className={`w-full py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${hasInformedConsent
+                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/10'
+                              : 'bg-white border border-slate-200 text-slate-500 hover:border-rose-400 hover:text-rose-500'
+                            }`}
+                        >
+                          {hasInformedConsent ? '✓ PERSETUJUAN TELAH DICATAT' : 'KLIK UNTUK KONFIRMASI PERSETUJUAN'}
+                        </button>
+                      </div>
+
+                      {/* 2. Digital Signature Canvas */}
+                      {!isReadOnly && (
+                        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                          <div className="pb-2 border-b border-slate-50">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Buat Tanda Tangan Digital Baru</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tanda tangan langsung pada canvas di bawah</p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Penandatangan</label>
+                              <input
+                                type="text"
+                                value={signeeName}
+                                onChange={(e) => setSigneeName(e.target.value)}
+                                placeholder="Ketik nama lengkap..."
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50/50 focus:bg-white focus:border-rose-400 outline-none transition-all"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Hubungan</label>
+                              <select
+                                value={signeeRelation}
+                                onChange={(e) => setSigneeRelation(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50/50 focus:bg-white focus:border-rose-400 outline-none transition-all"
+                              >
+                                <option value="Pasien Sendiri">Pasien Sendiri</option>
+                                <option value="Suami">Suami</option>
+                                <option value="Istri">Istri</option>
+                                <option value="Ayah">Ayah</option>
+                                <option value="Ibu">Ibu</option>
+                                <option value="Anak">Anak</option>
+                                <option value="Wali / Lainnya">Wali / Lainnya</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
+                            <canvas
+                              ref={canvasRef}
+                              width={550}
+                              height={200}
+                              onMouseDown={startDrawing}
+                              onMouseMove={draw}
+                              onMouseUp={stopDrawing}
+                              onMouseLeave={stopDrawing}
+                              onTouchStart={startDrawing}
+                              onTouchMove={draw}
+                              onTouchEnd={stopDrawing}
+                              className="w-full h-[200px] cursor-crosshair touch-none"
+                            />
+                            <div className="absolute top-2 right-2 flex gap-2">
+                              <button
+                                onClick={clearSignature}
+                                className="px-2.5 py-1.5 bg-white hover:bg-rose-50 text-rose-500 rounded-lg border border-slate-200 hover:border-rose-200 text-[8px] font-black uppercase tracking-widest transition-all"
+                              >
+                                Hapus Coretan
+                              </button>
+                            </div>
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
+                              <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">AREA TANDA TANGAN DIGITAL</p>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={handleSaveSignature}
+                            disabled={isUploadingConsent}
+                            className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-rose-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            <FiSave className="w-4 h-4" /> {isUploadingConsent ? 'Menyimpan...' : 'Simpan & Unggah Tanda Tangan Digital'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Kanan: Berkas Informed Consent & Upload (5/12 width) */}
+                    <div className="lg:col-span-5 space-y-6 lg:border-l lg:border-slate-100 lg:pl-6">
+
+                      {/* 1. Upload Berkas Fisik (Kertas yang ditandatangani basah) */}
+                      {!isReadOnly && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Unggah Berkas Fisik (Kertas)</h4>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Ambil foto berkas informed consent fisik atau unggah PDF</p>
+
+                          <label className={`aspect-[4/2] border-2 border-dashed border-slate-200 hover:border-rose-400 hover:bg-slate-50/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${isUploadingConsent ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center group-hover:text-rose-500 transition-all">
+                              {isUploadingConsent ? <FiRefreshCw className="w-5 h-5 animate-spin" /> : <FiPlus className="w-5 h-5" />}
+                            </div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isUploadingConsent ? 'Mengunggah Berkas...' : 'Unggah Foto/PDF Berkas Basah'}</p>
+                            <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadConsentFile} disabled={isUploadingConsent} />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* 2. Daftar Lampiran Informed Consent Terunggah */}
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight border-b border-slate-50 pb-2 flex items-center gap-2">
+                          Dokumen & Tanda Tangan Terdaftar ({attachments.filter(a => a.fileName.startsWith('Signature_') || a.fileName.startsWith('Informed_Consent_File_')).length})
+                        </h4>
+
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                          {attachments.filter(a => a.fileName.startsWith('Signature_') || a.fileName.startsWith('Informed_Consent_File_')).map((attachment) => {
+                            const isSig = attachment.fileName.startsWith('Signature_');
+                            // Beautify name: Signature_Relation_Name.png -> Relation: Name
+                            let displayName = attachment.fileName;
+                            if (isSig) {
+                              const parts = attachment.fileName.replace('.png', '').split('_');
+                              if (parts.length >= 3) {
+                                const relation = parts[1].replace(/_/g, ' ');
+                                const name = parts.slice(2).join(' ').replace(/_/g, ' ');
+                                displayName = `Ttd: ${relation} (${name})`;
+                              } else {
+                                displayName = 'Tanda Tangan Digital';
+                              }
+                            } else {
+                              // Informed_Consent_File_[Timestamp]_filename.ext -> filename.ext
+                              const parts = attachment.fileName.split('_');
+                              if (parts.length >= 5) {
+                                displayName = parts.slice(4).join('_');
+                              } else {
+                                displayName = attachment.fileName.replace('Informed_Consent_File_', '');
+                              }
+                            }
+
+                            return (
+                              <div key={attachment.id} className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between shadow-sm hover:border-rose-100 transition-all">
+                                <div className="min-w-0 flex-1 flex items-center gap-2.5">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-sm ${isSig ? 'bg-rose-50 text-rose-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                                    {isSig ? <FiEdit3 /> : <FiClipboard />}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate">{displayName}</p>
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                      {isSig ? 'Ttd Digital' : 'Berkas Fisik'} • {((attachment.fileSize || 0) / 1024).toFixed(1)} KB
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <a
+                                    href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5006'}${attachment.fileUrl}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+                                    title="Buka Dokumen"
+                                  >
+                                    <FiMonitor className="w-3.5 h-3.5" />
+                                  </a>
+                                  {!isReadOnly && (
+                                    <button
+                                      onClick={() => handleDeleteAttachment(attachment.id)}
+                                      className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-all"
+                                      title="Hapus Dokumen"
+                                    >
+                                      <FiTrash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {attachments.filter(a => a.fileName.startsWith('Signature_') || a.fileName.startsWith('Informed_Consent_File_')).length === 0 && (
+                            <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/20 text-slate-300">
+                              <FiLock className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                              <p className="text-[9px] font-black uppercase tracking-widest">Belum ada tanda tangan atau berkas terunggah</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+
                 </div>
               </motion.div>
             )}
@@ -2598,49 +3227,49 @@ export default function DoctorConsultationPage() {
             {activeSegment === 'history' && (
               <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-3 lg:mb-4 pb-3 border-b border-slate-50">Riwayat Kunjungan</h3>
-                   <div className="space-y-6 lg:space-y-8">
-                     {history.map((h, idx) => (
-                        <div key={idx} className="p-6 lg:p-8 bg-slate-50/30 rounded-3xl lg:rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl hover:shadow-slate-100 transition-all">
-                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                              <div className="flex items-center gap-3">
-                                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-sm border border-slate-100">
-                                    <FiCalendar className="w-6 h-6" />
-                                 </div>
-                                 <div>
-                                    <p className="text-xs font-black text-slate-900">{new Date(h.recordDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{h.doctor?.name}</p>
-                                 </div>
-                              </div>
-                              <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl border border-emerald-100 uppercase tracking-widest self-start md:self-center">Kunjungan Selesai</span>
-                           </div>
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-0 md:pl-14">
-                              <div className="space-y-2">
-                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Diagnosa</p>
-                                 <div className="flex flex-col gap-1">
-                                   {h.icd10 && (
-                                     <div className="flex items-center gap-2">
-                                       <span className="text-[8px] font-black bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">{h.icd10.code}</span>
-                                       <span className="text-[10px] font-bold text-slate-700">{h.icd10.nameId || h.icd10.nameEn}</span>
-                                     </div>
-                                   )}
-                                   <p className="text-sm font-bold text-slate-800 leading-relaxed italic">"{h.diagnosis || '-'}"</p>
-                                 </div>
-                              </div>
-                              <div className="space-y-2">
-                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rencana Terapi</p>
-                                 <p className="text-sm font-medium text-slate-500 leading-relaxed italic">"{h.treatmentPlan || '-'}"</p>
-                              </div>
-                           </div>
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-3 lg:mb-4 pb-3 border-b border-slate-50">Riwayat Kunjungan</h3>
+                  <div className="space-y-6 lg:space-y-8">
+                    {history.map((h, idx) => (
+                      <div key={idx} className="p-6 lg:p-8 bg-slate-50/30 rounded-3xl lg:rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl hover:shadow-slate-100 transition-all">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-sm border border-slate-100">
+                              <FiCalendar className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-slate-900">{new Date(h.recordDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{h.doctor?.name}</p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl border border-emerald-100 uppercase tracking-widest self-start md:self-center">Kunjungan Selesai</span>
                         </div>
-                     ))}
-                     {history.length === 0 && (
-                        <div className="py-24 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] text-slate-300">
-                           <FiRotateCcw className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                           <p className="text-xs font-black uppercase tracking-[0.4em]">Tidak Ada Riwayat Medis Sebelumnya</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-0 md:pl-14">
+                          <div className="space-y-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Diagnosa</p>
+                            <div className="flex flex-col gap-1">
+                              {h.icd10 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[8px] font-black bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">{h.icd10.code}</span>
+                                  <span className="text-[10px] font-bold text-slate-700">{h.icd10.nameId || h.icd10.nameEn}</span>
+                                </div>
+                              )}
+                              <p className="text-sm font-bold text-slate-800 leading-relaxed italic">"{h.diagnosis || '-'}"</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rencana Terapi</p>
+                            <p className="text-sm font-medium text-slate-500 leading-relaxed italic">"{h.treatmentPlan || '-'}"</p>
+                          </div>
                         </div>
-                     )}
-                   </div>
+                      </div>
+                    ))}
+                    {history.length === 0 && (
+                      <div className="py-24 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] text-slate-300">
+                        <FiRotateCcw className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                        <p className="text-xs font-black uppercase tracking-[0.4em]">Tidak Ada Riwayat Medis Sebelumnya</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -2653,7 +3282,7 @@ export default function DoctorConsultationPage() {
       <AnimatePresence>
         {isServiceDialogOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -2677,22 +3306,22 @@ export default function DoctorConsultationPage() {
                 <div className="flex items-center gap-3">
                   <div className="relative w-80 group">
                     <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                    <input 
-                      value={searchServiceDialog} 
-                      onChange={(e) => setSearchServiceDialog(e.target.value)} 
-                      placeholder="Cari tindakan medis..." 
-                      className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none focus:bg-white focus:border-emerald-500 shadow-sm transition-all" 
+                    <input
+                      value={searchServiceDialog}
+                      onChange={(e) => setSearchServiceDialog(e.target.value)}
+                      placeholder="Cari tindakan medis..."
+                      className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none focus:bg-white focus:border-emerald-500 shadow-sm transition-all"
                     />
                     {searchServiceDialog && (
                       <button onClick={() => setSearchServiceDialog('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 hover:text-slate-600">✕</button>
                     )}
                   </div>
                   <button onClick={() => setIsServiceDialogOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                    <FiMinus className="w-5 h-5" /> 
+                    <FiMinus className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-              
+
               {/* Content Grid */}
               <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                 {/* Left Side: 4-Column Grid of Services */}
@@ -2703,14 +3332,14 @@ export default function DoctorConsultationPage() {
                       const filtered = allServices.filter(s => {
                         const categoryName = s.serviceCategory?.categoryName?.toLowerCase() || '';
                         const serviceName = s.serviceName.toLowerCase();
-                        
-                        const isLab = categoryName.includes('laboratorium') || 
-                                      categoryName.includes('lab') || 
-                                      serviceName.includes('lab');
-                        
+
+                        const isLab = categoryName.includes('laboratorium') ||
+                          categoryName.includes('lab') ||
+                          serviceName.includes('lab');
+
                         if (isLab) return false;
-                        
-                        return !searchServiceDialog || 
+
+                        return !searchServiceDialog ||
                           serviceName.includes(searchLower) ||
                           s.serviceCode.toLowerCase().includes(searchLower);
                       });
@@ -2720,39 +3349,35 @@ export default function DoctorConsultationPage() {
                           {filtered.map(s => {
                             const isSelected = selectedServices.some(item => item.id === s.id);
                             return (
-                              <button 
-                                key={s.id} 
+                              <button
+                                key={s.id}
                                 onClick={() => {
                                   if (isSelected) {
                                     setSelectedServices(selectedServices.filter(item => item.id !== s.id))
                                   } else {
                                     setSelectedServices([...selectedServices, s])
                                   }
-                                }} 
-                                className={`p-3 text-left rounded-xl transition-all duration-300 group flex flex-col justify-between border-2 relative overflow-hidden ${
-                                  isSelected 
-                                    ? 'border-emerald-500 bg-emerald-50/80 shadow-md shadow-emerald-500/5 scale-[1.01]' 
+                                }}
+                                className={`p-3 text-left rounded-xl transition-all duration-300 group flex flex-col justify-between border-2 relative overflow-hidden ${isSelected
+                                    ? 'border-emerald-500 bg-emerald-50/80 shadow-md shadow-emerald-500/5 scale-[1.01]'
                                     : 'border-slate-200 bg-white shadow-sm hover:border-emerald-400 hover:shadow-md'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-start justify-between w-full gap-2">
                                   <div className="flex-1 min-w-0">
-                                    <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded inline-block mb-1.5 transition-all ${
-                                      isSelected 
-                                        ? 'bg-emerald-500 text-white' 
+                                    <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded inline-block mb-1.5 transition-all ${isSelected
+                                        ? 'bg-emerald-500 text-white'
                                         : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600'
-                                    }`}>
+                                      }`}>
                                       {s.serviceCode}
                                     </span>
-                                    <p className={`text-[11px] font-black uppercase tracking-tight leading-tight line-clamp-2 transition-colors ${
-                                      isSelected ? 'text-emerald-950 font-extrabold' : 'text-slate-800 group-hover:text-emerald-700'
-                                    }`}>
+                                    <p className={`text-[11px] font-black uppercase tracking-tight leading-tight line-clamp-2 transition-colors ${isSelected ? 'text-emerald-950 font-extrabold' : 'text-slate-800 group-hover:text-emerald-700'
+                                      }`}>
                                       {s.serviceName}
                                     </p>
                                   </div>
-                                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-                                    isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white group-hover:border-emerald-400'
-                                  }`}>
+                                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white group-hover:border-emerald-400'
+                                    }`}>
                                     {isSelected && <FiCheckCircle className="w-2.5 h-2.5" />}
                                   </div>
                                 </div>
@@ -2775,7 +3400,7 @@ export default function DoctorConsultationPage() {
                     })()}
                   </div>
                 </div>
-                
+
                 {/* Right Side: Sidebar of Selected Items */}
                 <div className="w-full md:w-80 flex flex-col bg-slate-50 border-l border-slate-100 overflow-hidden">
                   <div className="p-4 border-b border-slate-100 bg-slate-100/30 flex items-center justify-between">
@@ -2802,13 +3427,13 @@ export default function DoctorConsultationPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Footer */}
               <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
                 <button onClick={() => setIsServiceDialogOpen(false)} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">
                   Batal
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     const newServiceItems = selectedServices.map(s => {
                       const existing = serviceItems.find(item => item.serviceId === s.id)
@@ -2822,7 +3447,7 @@ export default function DoctorConsultationPage() {
                     })
                     setServiceItems(newServiceItems)
                     setIsServiceDialogOpen(false)
-                  }} 
+                  }}
                   className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2"
                 >
                   <FiCheckCircle /> Terapkan ({selectedServices.length} Tindakan)
@@ -2837,7 +3462,7 @@ export default function DoctorConsultationPage() {
       <AnimatePresence>
         {isMedDialogOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -2848,21 +3473,21 @@ export default function DoctorConsultationPage() {
                   <FiPackage className="text-primary" /> Pilih Obat
                 </h3>
                 <button onClick={() => setIsMedDialogOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                  <FiMinus className="w-5 h-5" /> 
+                  <FiMinus className="w-5 h-5" />
                 </button>
               </div>
-              
+
               <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-[400px]">
                 {/* Kiri: Pencarian & Daftar Obat */}
                 <div className="flex-1 flex flex-col border-r border-slate-100 overflow-hidden">
                   <div className="p-4 border-b border-slate-100">
                     <div className="relative group">
                       <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <input 
-                        value={searchMed} 
-                        onChange={(e) => setSearchMed(e.target.value)} 
-                        placeholder="Cari nama obat..." 
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none focus:bg-white focus:border-primary shadow-sm transition-all" 
+                      <input
+                        value={searchMed}
+                        onChange={(e) => setSearchMed(e.target.value)}
+                        placeholder="Cari nama obat..."
+                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none focus:bg-white focus:border-primary shadow-sm transition-all"
                       />
                     </div>
                   </div>
@@ -2871,15 +3496,15 @@ export default function DoctorConsultationPage() {
                       const isSelected = selectedMedicines.some(sm => sm.id === m.id)
                       const stock = m.availableStock ?? m.stock
                       return (
-                        <button 
-                          key={m.id} 
+                        <button
+                          key={m.id}
                           onClick={() => {
                             if (isSelected) {
                               setSelectedMedicines(selectedMedicines.filter(sm => sm.id !== m.id))
                             } else {
                               setSelectedMedicines([...selectedMedicines, m])
                             }
-                          }} 
+                          }}
                           className={`w-full p-4 text-left rounded-2xl transition-all group flex items-start gap-4 border ${isSelected ? 'border-primary bg-primary/5' : 'border-slate-100 hover:bg-slate-50'}`}
                         >
                           <div className={`w-5 h-5 mt-0.5 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary text-white' : 'border-slate-300'}`}>
@@ -2908,7 +3533,7 @@ export default function DoctorConsultationPage() {
                     )}
                   </div>
                 </div>
-                
+
                 {/* Kanan: Obat Terpilih */}
                 <div className="w-full md:w-1/3 flex flex-col bg-slate-50 overflow-hidden">
                   <div className="p-4 border-b border-slate-200 bg-slate-100">
@@ -2931,12 +3556,12 @@ export default function DoctorConsultationPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
                 <button onClick={() => setIsMedDialogOpen(false)} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">
                   Batal
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     // Add all selected to prescriptionItems
                     const newItems = selectedMedicines.map(m => ({
@@ -2950,10 +3575,10 @@ export default function DoctorConsultationPage() {
                       instructions: 'Sesudah makan',
                       unit: m.unit || 'unit'
                     }))
-                    
+
                     setPrescriptionItems([...prescriptionItems, ...newItems])
                     setIsMedDialogOpen(false)
-                  }} 
+                  }}
                   disabled={selectedMedicines.length === 0}
                   className="px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
                 >
@@ -2969,7 +3594,7 @@ export default function DoctorConsultationPage() {
       <AnimatePresence>
         {isRacikanDialogOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -2991,20 +3616,20 @@ export default function DoctorConsultationPage() {
                   </div>
                 </div>
                 <button onClick={() => setIsRacikanDialogOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                  <FiMinus className="w-5 h-5" /> 
+                  <FiMinus className="w-5 h-5" />
                 </button>
               </div>
-              
+
               {/* Scrollable Content */}
               <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-[450px]">
                 {/* Kiri: Detail Racikan & Bahan Baku */}
                 <div className="flex-1 flex flex-col border-r border-slate-100 overflow-y-auto p-6 space-y-4">
-                  
+
                   {/* Pilihan Template Formula */}
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Template Formula Standar (BoM)</label>
-                    <select 
-                      value={selectedFormula?.id || ''} 
+                    <select
+                      value={selectedFormula?.id || ''}
                       onChange={(e) => {
                         const fid = e.target.value
                         if (fid) {
@@ -3031,18 +3656,18 @@ export default function DoctorConsultationPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1.5 sm:col-span-2">
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Nama Racikan</label>
-                      <input 
-                        type="text" 
-                        value={racikanName} 
-                        onChange={(e) => setRacikanName(e.target.value)} 
-                        placeholder="Contoh: Puyer Demam & Batuk Anak" 
+                      <input
+                        type="text"
+                        value={racikanName}
+                        onChange={(e) => setRacikanName(e.target.value)}
+                        placeholder="Contoh: Puyer Demam & Batuk Anak"
                         className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Bentuk Sediaan</label>
-                      <select 
-                        value={racikanDosageForm} 
+                      <select
+                        value={racikanDosageForm}
                         onChange={(e) => setRacikanDosageForm(e.target.value)}
                         className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                       >
@@ -3058,41 +3683,41 @@ export default function DoctorConsultationPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                     <div className="space-y-1.5">
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Jumlah Racikan</label>
-                      <input 
-                        type="number" 
-                        value={racikanQty} 
-                        onChange={(e) => setRacikanQty(e.target.value)} 
-                        placeholder="Contoh: 10" 
+                      <input
+                        type="number"
+                        value={racikanQty}
+                        onChange={(e) => setRacikanQty(e.target.value)}
+                        placeholder="Contoh: 10"
                         className="w-full px-4 py-2.5 text-xs font-black text-center bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Frekuensi</label>
-                      <input 
-                        type="text" 
-                        value={racikanFrequency} 
-                        onChange={(e) => setRacikanFrequency(e.target.value)} 
-                        placeholder="3x1" 
+                      <input
+                        type="text"
+                        value={racikanFrequency}
+                        onChange={(e) => setRacikanFrequency(e.target.value)}
+                        placeholder="3x1"
                         className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Durasi</label>
-                      <input 
-                        type="text" 
-                        value={racikanDuration} 
-                        onChange={(e) => setRacikanDuration(e.target.value)} 
-                        placeholder="3 hari" 
+                      <input
+                        type="text"
+                        value={racikanDuration}
+                        onChange={(e) => setRacikanDuration(e.target.value)}
+                        placeholder="3 hari"
                         className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Instruksi Khusus</label>
-                      <input 
-                        type="text" 
-                        value={racikanInstructions} 
-                        onChange={(e) => setRacikanInstructions(e.target.value)} 
-                        placeholder="Sesudah makan" 
+                      <input
+                        type="text"
+                        value={racikanInstructions}
+                        onChange={(e) => setRacikanInstructions(e.target.value)}
+                        placeholder="Sesudah makan"
                         className="w-full px-4 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                       />
                     </div>
@@ -3100,11 +3725,11 @@ export default function DoctorConsultationPage() {
                       <label className="flex items-end min-h-[28px] pb-1 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 leading-tight">Jasa Racik (Tuslah)</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
-                        <input 
-                          type="number" 
-                          value={racikanTuslah} 
-                          onChange={(e) => setRacikanTuslah(e.target.value)} 
-                          placeholder="0" 
+                        <input
+                          type="number"
+                          value={racikanTuslah}
+                          onChange={(e) => setRacikanTuslah(e.target.value)}
+                          placeholder="0"
                           className="w-full pl-8 pr-3 py-2.5 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 outline-none transition-all"
                         />
                       </div>
@@ -3121,19 +3746,19 @@ export default function DoctorConsultationPage() {
 
                     <div className="relative group">
                       <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
-                      <input 
-                        value={searchComponentMed} 
+                      <input
+                        value={searchComponentMed}
                         onChange={(e) => {
                           setSearchComponentMed(e.target.value)
                           if (!showAllComponentsDropdown) {
                             setShowAllComponentsDropdown(true)
                           }
-                        }} 
+                        }}
                         onFocus={() => setShowAllComponentsDropdown(true)}
-                        placeholder="Cari obat bahan baku..." 
-                        className="w-full pl-12 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-violet-500 shadow-sm transition-all" 
+                        placeholder="Cari obat bahan baku..."
+                        className="w-full pl-12 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-violet-500 shadow-sm transition-all"
                       />
-                      
+
                       <button
                         type="button"
                         onClick={() => setShowAllComponentsDropdown(!showAllComponentsDropdown)}
@@ -3143,26 +3768,26 @@ export default function DoctorConsultationPage() {
                       </button>
 
                       {showAllComponentsDropdown && (
-                        <div 
-                          className="fixed inset-0 z-40 bg-transparent" 
-                          onClick={() => setShowAllComponentsDropdown(false)} 
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => setShowAllComponentsDropdown(false)}
                         />
                       )}
-                      
+
                       <AnimatePresence>
                         {(searchComponentMed || showAllComponentsDropdown) && searchComponentResults.length > 0 && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: -5 }} 
-                            animate={{ opacity: 1, y: 0 }} 
-                            exit={{ opacity: 0 }} 
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
                             className="absolute bottom-full left-0 right-0 z-50 mb-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-[220px] overflow-y-auto p-2"
                           >
                             {searchComponentResults.map(m => {
                               const stock = m.availableStock ?? m.stock ?? 0
                               const alreadyAdded = racikanComponents.some(rc => rc.medicineId === m.medicineId || rc.medicineId === m.id)
                               return (
-                                <button 
-                                  key={m.id} 
+                                <button
+                                  key={m.id}
                                   disabled={alreadyAdded}
                                   onClick={() => {
                                     setRacikanComponents([...racikanComponents, {
@@ -3201,15 +3826,15 @@ export default function DoctorConsultationPage() {
                       Bahan Baku Terpilih ({racikanComponents.length})
                     </p>
                     {racikanComponents.length > 0 && (
-                      <button 
-                        onClick={() => setRacikanComponents([])} 
+                      <button
+                        onClick={() => setRacikanComponents([])}
                         className="text-[8px] font-black text-rose-500 uppercase hover:underline"
                       >
                         Hapus Semua
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {racikanComponents.map((c, cidx) => {
                       const totalNeeded = (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0)
@@ -3225,24 +3850,24 @@ export default function DoctorConsultationPage() {
                                 Stok: {c.availableStock} {c.unit}
                               </p>
                             </div>
-                            <button 
-                              onClick={() => setRacikanComponents(racikanComponents.filter((_, i) => i !== cidx))} 
+                            <button
+                              onClick={() => setRacikanComponents(racikanComponents.filter((_, i) => i !== cidx))}
                               className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
                             >
                               <FiTrash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          
+
                           <div className="flex items-center gap-3 pt-1.5 border-t border-slate-50">
                             <div className="flex-1">
                               <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">
                                 Qty per unit
                               </label>
                               <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden h-8">
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   step="0.1"
-                                  value={c.quantity} 
+                                  value={c.quantity}
                                   onChange={(e) => {
                                     const val = e.target.value
                                     const n = [...racikanComponents]
@@ -3277,7 +3902,7 @@ export default function DoctorConsultationPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Estimasi Biaya */}
                   {racikanComponents.length > 0 && (
                     <div className="bg-slate-100 p-4 border-t border-slate-200 space-y-1.5">
@@ -3289,7 +3914,7 @@ export default function DoctorConsultationPage() {
                         <span>Estimasi Total</span>
                         <span>
                           Rp {Number(
-                            (racikanComponents.reduce((sum, c) => sum + 500 * (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0), 0)) + 
+                            (racikanComponents.reduce((sum, c) => sum + 500 * (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0), 0)) +
                             (selectedFormula?.tuslahPrice || 0)
                           ).toLocaleString('id-ID')}
                         </span>
@@ -3298,16 +3923,16 @@ export default function DoctorConsultationPage() {
                   )}
                 </div>
               </div>
-              
+
               {/* Footer */}
               <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
-                <button 
-                  onClick={() => setIsRacikanDialogOpen(false)} 
+                <button
+                  onClick={() => setIsRacikanDialogOpen(false)}
                   className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
                 >
                   Batal
                 </button>
-                <button 
+                <button
                   onClick={handleSaveRacikan}
                   disabled={racikanComponents.length === 0 || racikanComponents.some(c => (parseFloat(c.quantity) || 0) * (parseInt(racikanQty) || 0) > c.availableStock)}
                   className="px-6 py-3 bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-violet-700 disabled:opacity-50 transition-all shadow-lg shadow-violet-200 flex items-center gap-2"
@@ -3319,12 +3944,12 @@ export default function DoctorConsultationPage() {
           </div>
         )}
       </AnimatePresence>
-      
+
       {/* Lab Order Preview Modal */}
       <AnimatePresence>
         {isLabPreviewOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -3332,101 +3957,101 @@ export default function DoctorConsultationPage() {
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 shadow-sm border border-rose-100">
-                      <HiOutlineBeaker />
-                   </div>
-                   <div>
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Pratinjau Order Laboratorium</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Review pemeriksaan laboratorium sebelum dicetak</p>
-                   </div>
+                  <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 shadow-sm border border-rose-100">
+                    <HiOutlineBeaker />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Pratinjau Order Laboratorium</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Review pemeriksaan laboratorium sebelum dicetak</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
-                   <button 
+                  <button
                     onClick={() => {
                       setIsPrinting(true);
                       setTimeout(() => {
                         generateLabPDF(queue?.patient?.name || 'Pasien');
                         setIsLabPreviewOpen(false);
                       }, 500);
-                    }} 
+                    }}
                     className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2"
-                   >
-                      <FiSave /> UNDUH ORDER LAB
-                   </button>
-                   <button onClick={() => setIsLabPreviewOpen(false)} className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                      <FiMinus className="w-6 h-6" /> 
-                   </button>
+                  >
+                    <FiSave /> UNDUH ORDER LAB
+                  </button>
+                  <button onClick={() => setIsLabPreviewOpen(false)} className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                    <FiMinus className="w-6 h-6" />
+                  </button>
                 </div>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-12 bg-slate-200/50 flex justify-center">
-                 <div className="shadow-2xl scale-[0.85] origin-top transform-gpu">
-                    <div className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden" style={{ padding: '20mm' }}>
-                        <div className="absolute top-0 left-0 right-0 h-4 bg-rose-500"></div>
-                        <div className="flex justify-between items-end border-b-2 border-rose-500 pb-6 mb-8 mt-4">
-                          <div>
-                             <div className="flex items-center gap-3 mb-2">
-                               <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 font-black text-xl">
-                                  <FiHeart />
-                               </div>
-                               <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
-                             </div>
-                             <p className="text-xs text-slate-500 uppercase tracking-widest">Diagnostic & Laboratory Service</p>
+                <div className="shadow-2xl scale-[0.85] origin-top transform-gpu">
+                  <div className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden" style={{ padding: '20mm' }}>
+                    <div className="absolute top-0 left-0 right-0 h-4 bg-rose-500"></div>
+                    <div className="flex justify-between items-end border-b-2 border-rose-500 pb-6 mb-8 mt-4">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 font-black text-xl">
+                            <FiHeart />
                           </div>
-                          <div className="text-right">
-                             <h2 className="text-4xl font-black uppercase tracking-tight text-rose-500">LAB ORDER</h2>
-                             <p className="text-[10px] font-bold uppercase tracking-widest mt-2 bg-rose-50 text-rose-600 inline-block px-3 py-1 rounded-lg">ID: LAB-{new Date().getTime().toString().slice(-6)}</p>
-                          </div>
+                          <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
                         </div>
-                        
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
-                           <table className="w-full text-sm">
-                             <tbody>
-                               <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 font-bold text-base text-slate-900">{queue?.patient.name}</td></tr>
-                               <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
-                               <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Dokter Pengirim</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{queue?.doctor?.name || user?.name}</td></tr>
-                             </tbody>
-                           </table>
-                        </div>
-
-                        <div className="mb-8">
-                           <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><HiOutlineBeaker className="text-rose-500" /> Daftar Pemeriksaan</h3>
-                           <div className="grid grid-cols-1 gap-2">
-                              {labItems.length > 0 ? labItems.map((item, i) => (
-                                 <div key={item.id} className="flex items-center justify-between py-3 border-b border-slate-50">
-                                    <div className="flex items-center gap-4">
-                                       <span className="text-xs font-black text-slate-300">{i + 1}.</span>
-                                       <span className="text-sm font-bold text-slate-700 uppercase">{item.serviceName}</span>
-                                    </div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.serviceCategory?.categoryName || 'LAB'}</span>
-                                 </div>
-                              )) : (
-                                 <p className="text-sm italic text-slate-400 py-4">Tidak ada item pemeriksaan khusus.</p>
-                              )}
-                           </div>
-                        </div>
-
-                        {labNotes && (
-                           <div className="mb-12 bg-rose-50/30 border border-rose-100 rounded-2xl p-6">
-                              <h3 className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-3">Catatan / Instruksi Klinis</h3>
-                              <p className="text-sm text-slate-700 leading-relaxed italic">{labNotes}</p>
-                           </div>
-                        )}
-                        
-                        <div className="flex justify-end mt-16">
-                           <div className="text-center w-64">
-                              <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}<br/>Dokter Pengirim,</p>
-                              <div className="border-b-2 border-slate-300 w-3/4 mx-auto mb-2"></div>
-                              <p className="text-sm font-black uppercase text-slate-900">{queue?.doctor?.name || user?.name}</p>
-                              <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">SIP: {queue?.doctor?.specialization || 'Umum'}</p>
-                           </div>
-                        </div>
-
-                        <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Dicetak melalui Sistem Management Laboratorium Terintegrasi</p>
-                        </div>
+                        <p className="text-xs text-slate-500 uppercase tracking-widest">Diagnostic & Laboratory Service</p>
+                      </div>
+                      <div className="text-right">
+                        <h2 className="text-4xl font-black uppercase tracking-tight text-rose-500">LAB ORDER</h2>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mt-2 bg-rose-50 text-rose-600 inline-block px-3 py-1 rounded-lg">ID: LAB-{new Date().getTime().toString().slice(-6)}</p>
+                      </div>
                     </div>
-                 </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
+                      <table className="w-full text-sm">
+                        <tbody>
+                          <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 font-bold text-base text-slate-900">{queue?.patient.name}</td></tr>
+                          <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
+                          <tr><td className="w-48 py-2 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Dokter Pengirim</td><td className="w-4 py-2 text-slate-400">:</td><td className="py-2 text-slate-700">{queue?.doctor?.name || user?.name}</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mb-8">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><HiOutlineBeaker className="text-rose-500" /> Daftar Pemeriksaan</h3>
+                      <div className="grid grid-cols-1 gap-2">
+                        {labItems.length > 0 ? labItems.map((item, i) => (
+                          <div key={item.id} className="flex items-center justify-between py-3 border-b border-slate-50">
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs font-black text-slate-300">{i + 1}.</span>
+                              <span className="text-sm font-bold text-slate-700 uppercase">{item.serviceName}</span>
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.serviceCategory?.categoryName || 'LAB'}</span>
+                          </div>
+                        )) : (
+                          <p className="text-sm italic text-slate-400 py-4">Tidak ada item pemeriksaan khusus.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {labNotes && (
+                      <div className="mb-12 bg-rose-50/30 border border-rose-100 rounded-2xl p-6">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-3">Catatan / Instruksi Klinis</h3>
+                        <p className="text-sm text-slate-700 leading-relaxed italic">{labNotes}</p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end mt-16">
+                      <div className="text-center w-64">
+                        <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}<br />Dokter Pengirim,</p>
+                        <div className="border-b-2 border-slate-300 w-3/4 mx-auto mb-2"></div>
+                        <p className="text-sm font-black uppercase text-slate-900">{queue?.doctor?.name || user?.name}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">SIP: {queue?.doctor?.specialization || 'Umum'}</p>
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Dicetak melalui Sistem Management Laboratorium Terintegrasi</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -3436,66 +4061,66 @@ export default function DoctorConsultationPage() {
       {/* Hidden Lab Print Template */}
       {isPrinting && (
         <div className="fixed -left-[9999px] top-0 pointer-events-none z-[-1]">
-           <div id="print-lab-template" className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden" style={{ padding: '20mm' }}>
-                <div className="absolute top-0 left-0 right-0 h-4 bg-rose-500"></div>
-                <div className="flex justify-between items-end border-b-2 border-rose-500 pb-6 mb-8 mt-4">
-                  <div>
-                     <div className="flex items-center gap-3 mb-2">
-                       <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 font-black text-xl">
-                          <FiHeart />
-                       </div>
-                       <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
-                     </div>
-                     <p className="text-xs text-slate-500 uppercase tracking-widest">Diagnostic & Laboratory Service</p>
+          <div id="print-lab-template" className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden" style={{ padding: '20mm' }}>
+            <div className="absolute top-0 left-0 right-0 h-4 bg-rose-500"></div>
+            <div className="flex justify-between items-end border-b-2 border-rose-500 pb-6 mb-8 mt-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 font-black text-xl">
+                    <FiHeart />
                   </div>
-                  <div className="text-right">
-                     <h2 className="text-4xl font-black uppercase tracking-tight text-rose-500">LAB ORDER</h2>
-                     <p className="text-xs font-bold uppercase tracking-widest mt-2 bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg">ID: LAB-{new Date().getTime().toString().slice(-6)}</p>
+                  <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
+                </div>
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Diagnostic & Laboratory Service</p>
+              </div>
+              <div className="text-right">
+                <h2 className="text-4xl font-black uppercase tracking-tight text-rose-500">LAB ORDER</h2>
+                <p className="text-xs font-bold uppercase tracking-widest mt-2 bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg">ID: LAB-{new Date().getTime().toString().slice(-6)}</p>
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 font-black text-slate-900">{queue?.patient.name}</td></tr>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Dokter Pengirim</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{queue?.doctor?.name || user?.name}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mb-8">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 border-b border-slate-200 pb-2">Daftar Pemeriksaan</h3>
+              <div className="grid grid-cols-1 gap-1">
+                {labItems.length > 0 ? labItems.map((item, i) => (
+                  <div key={item.id} className="flex items-center justify-between py-2 border-b border-slate-50">
+                    <span className="text-sm font-bold text-slate-700">{i + 1}. {item.serviceName}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase">{item.serviceCategory?.categoryName || 'LAB'}</span>
                   </div>
-                </div>
-                
-                <div className="mb-8">
-                   <table className="w-full text-sm">
-                     <tbody>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 font-black text-slate-900">{queue?.patient.name}</td></tr>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Dokter Pengirim</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{queue?.doctor?.name || user?.name}</td></tr>
-                     </tbody>
-                   </table>
-                </div>
-
-                <div className="mb-8">
-                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 border-b border-slate-200 pb-2">Daftar Pemeriksaan</h3>
-                   <div className="grid grid-cols-1 gap-1">
-                      {labItems.length > 0 ? labItems.map((item, i) => (
-                         <div key={item.id} className="flex items-center justify-between py-2 border-b border-slate-50">
-                            <span className="text-sm font-bold text-slate-700">{i + 1}. {item.serviceName}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase">{item.serviceCategory?.categoryName || 'LAB'}</span>
-                         </div>
-                      )) : (
-                         <p className="text-sm italic text-slate-400 py-2">Tidak ada item pemeriksaan khusus.</p>
-                      )}
-                   </div>
-                </div>
-
-                {labNotes && (
-                   <div className="mb-12 border border-slate-200 rounded-xl p-6 bg-slate-50">
-                      <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Catatan / Instruksi Klinis</h3>
-                      <p className="text-sm text-slate-700 leading-relaxed italic">{labNotes}</p>
-                   </div>
+                )) : (
+                  <p className="text-sm italic text-slate-400 py-2">Tidak ada item pemeriksaan khusus.</p>
                 )}
-                
-                <div className="flex justify-end mt-16">
-                   <div className="text-center w-64">
-                      <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}<br/>Dokter Pengirim,</p>
-                      <p className="text-sm font-black uppercase underline">{queue?.doctor?.name || user?.name}</p>
-                   </div>
-                </div>
+              </div>
+            </div>
 
-                <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Dicetak melalui Sistem Management Laboratorium Terintegrasi pada {new Date().toLocaleString('id-ID')}</p>
-                </div>
-           </div>
+            {labNotes && (
+              <div className="mb-12 border border-slate-200 rounded-xl p-6 bg-slate-50">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Catatan / Instruksi Klinis</h3>
+                <p className="text-sm text-slate-700 leading-relaxed italic">{labNotes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end mt-16">
+              <div className="text-center w-64">
+                <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}<br />Dokter Pengirim,</p>
+                <p className="text-sm font-black uppercase underline">{queue?.doctor?.name || user?.name}</p>
+              </div>
+            </div>
+
+            <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Dicetak melalui Sistem Management Laboratorium Terintegrasi pada {new Date().toLocaleString('id-ID')}</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3503,79 +4128,79 @@ export default function DoctorConsultationPage() {
       {isPrinting && currentPrintLab && (
         <div className="fixed -left-[9999px] top-0 pointer-events-none z-[-1]">
           <div id="print-lab-result-template" className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden" style={{ padding: '20mm' }}>
-                <div className="absolute top-0 left-0 right-0 h-4 bg-rose-500"></div>
-                <div className="flex justify-between items-end border-b-2 border-rose-500 pb-6 mb-8 mt-4">
-                  <div>
-                     <div className="flex items-center gap-3 mb-2">
-                       <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 font-black text-xl">
-                          <FiHeart />
-                       </div>
-                       <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
-                     </div>
-                     <p className="text-xs text-slate-500 uppercase tracking-widest">Diagnostic & Laboratory Service</p>
+            <div className="absolute top-0 left-0 right-0 h-4 bg-rose-500"></div>
+            <div className="flex justify-between items-end border-b-2 border-rose-500 pb-6 mb-8 mt-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 font-black text-xl">
+                    <FiHeart />
                   </div>
-                  <div className="text-right">
-                     <h2 className="text-3xl font-black uppercase tracking-tight text-rose-500">HASIL LABORATORIUM</h2>
-                     <p className="text-xs font-bold uppercase tracking-widest mt-2 bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg">No. Order: {currentPrintLab.orderNo}</p>
-                  </div>
+                  <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
                 </div>
-                
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
-                   <table className="w-full text-sm">
-                     <tbody>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 font-black text-slate-900">{queue?.patient.name}</td></tr>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Dokter Pengirim</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{currentPrintLab.doctor?.name || queue?.doctor?.name || user?.name}</td></tr>
-                       <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Tgl. Periksa</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{new Date(currentPrintLab.orderDate).toLocaleString('id-ID')}</td></tr>
-                     </tbody>
-                   </table>
-                </div>
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Diagnostic & Laboratory Service</p>
+              </div>
+              <div className="text-right">
+                <h2 className="text-3xl font-black uppercase tracking-tight text-rose-500">HASIL LABORATORIUM</h2>
+                <p className="text-xs font-bold uppercase tracking-widest mt-2 bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg">No. Order: {currentPrintLab.orderNo}</p>
+              </div>
+            </div>
 
-                <div className="mb-8">
-                   <table className="w-full text-sm border-collapse">
-                      <thead>
-                         <tr className="bg-rose-500 text-white">
-                            <th className="px-4 py-3 text-left font-black uppercase tracking-widest text-[10px] rounded-tl-xl">Parameter Pemeriksaan</th>
-                            <th className="px-4 py-3 text-center font-black uppercase tracking-widest text-[10px]">Hasil</th>
-                            <th className="px-4 py-3 text-center font-black uppercase tracking-widest text-[10px]">Satuan</th>
-                            <th className="px-4 py-3 text-center font-black uppercase tracking-widest text-[10px]">Nilai Rujukan</th>
-                            <th className="px-4 py-3 text-right font-black uppercase tracking-widest text-[10px] rounded-tr-xl">Status</th>
-                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 border-x border-b border-slate-100">
-                         {currentPrintLab.results?.map((res: any, i: number) => (
-                            <tr key={res.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}>
-                               <td className="px-4 py-4 font-bold text-slate-700">{res.testMaster?.name}</td>
-                               <td className={`px-4 py-4 text-center font-black text-base ${res.isCritical ? 'text-rose-600 animate-pulse' : 'text-slate-900'}`}>{res.resultValue}</td>
-                               <td className="px-4 py-4 text-center text-slate-500 font-medium">{res.testMaster?.unit || '-'}</td>
-                               <td className="px-4 py-4 text-center text-slate-500 font-medium italic">{res.testMaster?.normalRangeText || '-'}</td>
-                               <td className="px-4 py-4 text-right">
-                                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${res.isCritical ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                     {res.isCritical ? 'KRITIS' : 'NORMAL'}
-                                  </span>
-                               </td>
-                            </tr>
-                         ))}
-                      </tbody>
-                   </table>
-                </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Nama Pasien</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 font-black text-slate-900">{queue?.patient.name}</td></tr>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">No. Rekam Medis</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Dokter Pengirim</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{currentPrintLab.doctor?.name || queue?.doctor?.name || user?.name}</td></tr>
+                  <tr><td className="w-48 py-2 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Tgl. Periksa</td><td className="w-4 py-2 text-slate-300">:</td><td className="py-2 text-slate-700">{new Date(currentPrintLab.orderDate).toLocaleString('id-ID')}</td></tr>
+                </tbody>
+              </table>
+            </div>
 
-                <div className="flex justify-between mt-20">
-                   <div className="text-center w-64">
-                      <p className="text-xs text-slate-400 mb-20 uppercase tracking-widest font-black">Dicetak Oleh,</p>
-                      <div className="border-b border-slate-200 w-full mb-2"></div>
-                      <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Sistem RME Yasfina</p>
-                   </div>
-                   <div className="text-center w-64">
-                      <p className="text-xs text-slate-500 mb-20 uppercase tracking-widest font-black">Petugas Laboratorium,</p>
-                      <div className="border-b-2 border-slate-300 w-full mb-2"></div>
-                      <p className="text-sm font-black uppercase text-slate-900">( .............................. )</p>
-                   </div>
-                </div>
+            <div className="mb-8">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-rose-500 text-white">
+                    <th className="px-4 py-3 text-left font-black uppercase tracking-widest text-[10px] rounded-tl-xl">Parameter Pemeriksaan</th>
+                    <th className="px-4 py-3 text-center font-black uppercase tracking-widest text-[10px]">Hasil</th>
+                    <th className="px-4 py-3 text-center font-black uppercase tracking-widest text-[10px]">Satuan</th>
+                    <th className="px-4 py-3 text-center font-black uppercase tracking-widest text-[10px]">Nilai Rujukan</th>
+                    <th className="px-4 py-3 text-right font-black uppercase tracking-widest text-[10px] rounded-tr-xl">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 border-x border-b border-slate-100">
+                  {currentPrintLab.results?.map((res: any, i: number) => (
+                    <tr key={res.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}>
+                      <td className="px-4 py-4 font-bold text-slate-700">{res.testMaster?.name}</td>
+                      <td className={`px-4 py-4 text-center font-black text-base ${res.isCritical ? 'text-rose-600 animate-pulse' : 'text-slate-900'}`}>{res.resultValue}</td>
+                      <td className="px-4 py-4 text-center text-slate-500 font-medium">{res.testMaster?.unit || '-'}</td>
+                      <td className="px-4 py-4 text-center text-slate-500 font-medium italic">{res.testMaster?.normalRangeText || '-'}</td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${res.isCritical ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                          {res.isCritical ? 'KRITIS' : 'NORMAL'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Hasil ini dihasilkan secara otomatis dan sah melalui Sistem Informasi Laboratorium Klinik</p>
-                </div>
+            <div className="flex justify-between mt-20">
+              <div className="text-center w-64">
+                <p className="text-xs text-slate-400 mb-20 uppercase tracking-widest font-black">Dicetak Oleh,</p>
+                <div className="border-b border-slate-200 w-full mb-2"></div>
+                <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Sistem RME Yasfina</p>
+              </div>
+              <div className="text-center w-64">
+                <p className="text-xs text-slate-500 mb-20 uppercase tracking-widest font-black">Petugas Laboratorium,</p>
+                <div className="border-b-2 border-slate-300 w-full mb-2"></div>
+                <p className="text-sm font-black uppercase text-slate-900">( .............................. )</p>
+              </div>
+            </div>
+
+            <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Hasil ini dihasilkan secara otomatis dan sah melalui Sistem Informasi Laboratorium Klinik</p>
+            </div>
           </div>
         </div>
       )}
@@ -3584,7 +4209,7 @@ export default function DoctorConsultationPage() {
       <AnimatePresence>
         {isReferralPreviewOpen && currentPrintReferral && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -3592,156 +4217,156 @@ export default function DoctorConsultationPage() {
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/10">
-                      <FiPrinter />
-                   </div>
-                   <div>
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Pratinjau Surat Rujukan</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Review dokumen sebelum mengunduh PDF</p>
-                   </div>
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/10">
+                    <FiPrinter />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Pratinjau Surat Rujukan</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Review dokumen sebelum mengunduh PDF</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
-                   <button 
+                  <button
                     onClick={() => {
                       setIsPrinting(true);
                       setTimeout(() => {
                         generatePDF(queue?.patient?.name || 'Pasien');
                         setIsReferralPreviewOpen(false);
                       }, 500);
-                    }} 
+                    }}
                     className="px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
-                   >
-                      <FiSave /> UNDUH PDF RUJUKAN
-                   </button>
-                   <button onClick={() => setIsReferralPreviewOpen(false)} className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                      <FiMinus className="w-6 h-6" /> 
-                   </button>
+                  >
+                    <FiSave /> UNDUH PDF RUJUKAN
+                  </button>
+                  <button onClick={() => setIsReferralPreviewOpen(false)} className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                    <FiMinus className="w-6 h-6" />
+                  </button>
                 </div>
               </div>
-              
-              <div className="flex-1 overflow-y-auto p-12 bg-slate-200/50 flex justify-center">
-                 {/* This is the visual preview of the PDF */}
-                 <div className="shadow-2xl scale-[0.85] origin-top transform-gpu">
-                    {/* Reuse the design from the template but without fixed positioning */}
-                    <div className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden shadow-sm" style={{ padding: '20mm' }}>
-                        <div className="absolute top-0 left-0 right-0 h-4 bg-primary"></div>
-                        <div className="flex justify-between items-end border-b-2 border-primary pb-4 mb-6 mt-4">
-                          <div>
-                             <div className="flex items-center gap-3 mb-2">
-                               <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-lg">
-                                  <FiHeart />
-                               </div>
-                               <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
-                             </div>
-                             <p className="text-[10px] text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
-                          </div>
-                          <div className="text-right">
-                             <h2 className="text-2xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
-                          </div>
-                        </div>
-                        
-                        <div className="mb-6">
-                          <p className="text-xs mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
-                        </div>
-                        
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
-                          <table className="w-full text-xs">
-                            <tbody>
-                              <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Nama Pasien</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 font-bold text-sm text-slate-900">{queue?.patient.name}</td></tr>
-                              <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">No. Rekam Medis</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
-                              <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Jenis Kelamin</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{['L', 'M', 'Laki-laki'].includes(queue?.patient.gender || '') ? 'Laki-laki' : 'Perempuan'}</td></tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        
-                        {/* Destination Info */}
-                        <div className="mb-6">
-                           <p className="text-xs text-slate-700 font-bold uppercase tracking-widest mb-2">Tujuan Rujukan:</p>
-                           <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                              <p className="text-sm font-black text-primary uppercase">
-                                 {currentPrintReferral.type === 'INTERNAL' 
-                                    ? `${currentPrintReferral.toClinic?.name || 'Klinik'} - ${currentPrintReferral.toDepartment?.name || 'Poli'}` 
-                                    : currentPrintReferral.toHospitalName}
-                              </p>
-                           </div>
-                        </div>
 
-                        <div className="mb-6 border border-slate-200 rounded-xl p-5 relative overflow-hidden">
-                           <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
-                           <h3 className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
-                           <div className="grid grid-cols-2 gap-6 text-xs">
-                              <div>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Anamnesa (S)</p>
-                                 <p className="whitespace-pre-wrap text-slate-700 mb-4 leading-relaxed">{subjective || '-'}</p>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Pemeriksaan Fisik (O)</p>
-                                 <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{objective || '-'}</p>
-                              </div>
-                              <div>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Diagnosa Sementara (A)</p>
-                                 <p className="whitespace-pre-wrap font-bold text-slate-900 mb-4 leading-relaxed">
-                                   {selectedIcd10 ? `[${selectedIcd10.code}] ${selectedIcd10.nameId || selectedIcd10.nameEn}` : ''}
-                                   {selectedIcd10 && diagnosis ? ' - ' : ''}
-                                   {diagnosis || (!selectedIcd10 ? '-' : '')}
-                                 </p>
-                                 <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Terapi Diberikan (P)</p>
-                                 <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{treatmentPlan || '-'}</p>
-                              </div>
-                           </div>
+              <div className="flex-1 overflow-y-auto p-12 bg-slate-200/50 flex justify-center">
+                {/* This is the visual preview of the PDF */}
+                <div className="shadow-2xl scale-[0.85] origin-top transform-gpu">
+                  {/* Reuse the design from the template but without fixed positioning */}
+                  <div className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden shadow-sm" style={{ padding: '20mm' }}>
+                    <div className="absolute top-0 left-0 right-0 h-4 bg-primary"></div>
+                    <div className="flex justify-between items-end border-b-2 border-primary pb-4 mb-6 mt-4">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-lg">
+                            <FiHeart />
+                          </div>
+                          <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || 'KLINIK' : 'KLINIK PUSAT'}</h1>
                         </div>
-                        
-                        <div className="mb-12 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 relative overflow-hidden">
-                           <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
-                           <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Catatan Rujukan Khusus</h3>
-                           <p className="text-xs text-slate-700 leading-relaxed italic">{currentPrintReferral.notes || '-'}</p>
-                        </div>
-                        
-                        <div className="flex justify-end mt-16">
-                           <div className="text-center w-64">
-                              <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}<br/>Dokter Perujuk,</p>
-                              <div className="border-b-2 border-slate-300 w-3/4 mx-auto mb-2"></div>
-                              <p className="text-sm font-black uppercase text-slate-900">{queue?.doctor?.name || user?.name}</p>
-                              <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">SIP: {queue?.doctor?.specialization || 'Umum'}</p>
-                           </div>
-                        </div>
-                        
-                        <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Pratinjau Dokumen Rekam Medis</p>
-                        </div>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
+                      </div>
+                      <div className="text-right">
+                        <h2 className="text-2xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
+                      </div>
                     </div>
-                 </div>
+
+                    <div className="mb-6">
+                      <p className="text-xs mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+                      <table className="w-full text-xs">
+                        <tbody>
+                          <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Nama Pasien</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 font-bold text-sm text-slate-900">{queue?.patient.name}</td></tr>
+                          <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">No. Rekam Medis</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{queue?.patient.medicalRecordNo}</td></tr>
+                          <tr><td className="w-40 py-1 font-bold text-slate-500 uppercase tracking-widest text-[9px]">Jenis Kelamin</td><td className="w-4 py-1 text-slate-400">:</td><td className="py-1 text-slate-700">{['L', 'M', 'Laki-laki'].includes(queue?.patient.gender || '') ? 'Laki-laki' : 'Perempuan'}</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Destination Info */}
+                    <div className="mb-6">
+                      <p className="text-xs text-slate-700 font-bold uppercase tracking-widest mb-2">Tujuan Rujukan:</p>
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                        <p className="text-sm font-black text-primary uppercase">
+                          {currentPrintReferral.type === 'INTERNAL'
+                            ? `${currentPrintReferral.toClinic?.name || 'Klinik'} - ${currentPrintReferral.toDepartment?.name || 'Poli'}`
+                            : currentPrintReferral.toHospitalName}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mb-6 border border-slate-200 rounded-xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
+                      <h3 className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
+                      <div className="grid grid-cols-2 gap-6 text-xs">
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Anamnesa (S)</p>
+                          <p className="whitespace-pre-wrap text-slate-700 mb-4 leading-relaxed">{subjective || '-'}</p>
+                          <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Pemeriksaan Fisik (O)</p>
+                          <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{objective || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Diagnosa Sementara (A)</p>
+                          <p className="whitespace-pre-wrap font-bold text-slate-900 mb-4 leading-relaxed">
+                            {selectedIcd10 ? `[${selectedIcd10.code}] ${selectedIcd10.nameId || selectedIcd10.nameEn}` : ''}
+                            {selectedIcd10 && diagnosis ? ' - ' : ''}
+                            {diagnosis || (!selectedIcd10 ? '-' : '')}
+                          </p>
+                          <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Terapi Diberikan (P)</p>
+                          <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{treatmentPlan || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-12 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
+                      <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Catatan Rujukan Khusus</h3>
+                      <p className="text-xs text-slate-700 leading-relaxed italic">{currentPrintReferral.notes || '-'}</p>
+                    </div>
+
+                    <div className="flex justify-end mt-16">
+                      <div className="text-center w-64">
+                        <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}<br />Dokter Perujuk,</p>
+                        <div className="border-b-2 border-slate-300 w-3/4 mx-auto mb-2"></div>
+                        <p className="text-sm font-black uppercase text-slate-900">{queue?.doctor?.name || user?.name}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">SIP: {queue?.doctor?.specialization || 'Umum'}</p>
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Pratinjau Dokumen Rekam Medis</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-{/* Hidden Print Template */}
+      {/* Hidden Print Template */}
       {isPrinting && currentPrintReferral && (
         <div className="fixed -left-[9999px] top-0 pointer-events-none z-[-1]">
           <div id="print-referral-template" className="w-[210mm] min-h-[297mm] bg-white text-slate-800 font-sans box-border relative overflow-hidden" style={{ padding: "20mm" }}>
-            
+
             {/* Header Accent */}
             <div className="absolute top-0 left-0 right-0 h-4 bg-primary"></div>
-            
+
             {/* Kop Surat */}
             <div className="flex justify-between items-end border-b-2 border-primary pb-4 mb-6 mt-4">
               <div>
-                 <div className="flex items-center gap-3 mb-2">
-                   <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-lg">
-                      <FiHeart />
-                   </div>
-                   <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || "KLINIK" : "KLINIK PUSAT"}</h1>
-                 </div>
-                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-black text-lg">
+                    <FiHeart />
+                  </div>
+                  <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">{queue?.clinicId ? clinicsList.find(c => c.id === queue.clinicId)?.name || "KLINIK" : "KLINIK PUSAT"}</h1>
+                </div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest">Layanan Medis & Konsultasi Spesialis</p>
               </div>
               <div className="text-right">
-                 <h2 className="text-2xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
+                <h2 className="text-2xl font-black uppercase tracking-tight text-primary">SURAT RUJUKAN</h2>
               </div>
             </div>
-            
+
             <div className="mb-6">
               <p className="text-xs mt-4 text-slate-600">Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:</p>
             </div>
-            
+
             {/* Patient Info Card */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
               <table className="w-full text-xs">
@@ -3752,66 +4377,66 @@ export default function DoctorConsultationPage() {
                 </tbody>
               </table>
             </div>
-            
+
             {/* Destination Info */}
             <div className="mb-6">
-               <p className="text-xs text-slate-700 font-bold uppercase tracking-widest mb-2">Tujuan Rujukan:</p>
-               <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                  <p className="text-sm font-black text-primary uppercase">
-                     {currentPrintReferral.type === 'INTERNAL' 
-                        ? `${currentPrintReferral.toClinic?.name || 'Klinik'} - ${currentPrintReferral.toDepartment?.name || 'Poli'}` 
-                        : currentPrintReferral.toHospitalName}
-                  </p>
-               </div>
+              <p className="text-xs text-slate-700 font-bold uppercase tracking-widest mb-2">Tujuan Rujukan:</p>
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                <p className="text-sm font-black text-primary uppercase">
+                  {currentPrintReferral.type === 'INTERNAL'
+                    ? `${currentPrintReferral.toClinic?.name || 'Klinik'} - ${currentPrintReferral.toDepartment?.name || 'Poli'}`
+                    : currentPrintReferral.toHospitalName}
+                </p>
+              </div>
             </div>
 
             {/* Clinical Info Section */}
             <div className="mb-6 border border-slate-200 rounded-xl p-5 relative overflow-hidden">
-               <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
-               <h3 className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
-               <div className="grid grid-cols-2 gap-6 text-xs">
-                  <div>
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Anamnesa (S)</p>
-                     <p className="whitespace-pre-wrap text-slate-700 mb-4 leading-relaxed">{subjective || "-"}</p>
-                     
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Pemeriksaan Fisik (O)</p>
-                     <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{objective || "-"}</p>
-                  </div>
-                  <div>
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Diagnosa Sementara (A)</p>
-                     <p className="whitespace-pre-wrap font-bold text-slate-900 mb-4 leading-relaxed">
-                        {selectedIcd10 ? `[${selectedIcd10.code}] ${selectedIcd10.nameId || selectedIcd10.nameEn}` : ''}
-                        {selectedIcd10 && diagnosis ? ' - ' : ''}
-                        {diagnosis || (!selectedIcd10 ? '-' : '')}
-                     </p>
-                     
-                     <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Terapi Diberikan (P)</p>
-                     <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{treatmentPlan || "-"}</p>
-                  </div>
-               </div>
+              <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
+              <h3 className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2"><FiActivity /> Informasi Klinis</h3>
+              <div className="grid grid-cols-2 gap-6 text-xs">
+                <div>
+                  <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Anamnesa (S)</p>
+                  <p className="whitespace-pre-wrap text-slate-700 mb-4 leading-relaxed">{subjective || "-"}</p>
+
+                  <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Pemeriksaan Fisik (O)</p>
+                  <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{objective || "-"}</p>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Diagnosa Sementara (A)</p>
+                  <p className="whitespace-pre-wrap font-bold text-slate-900 mb-4 leading-relaxed">
+                    {selectedIcd10 ? `[${selectedIcd10.code}] ${selectedIcd10.nameId || selectedIcd10.nameEn}` : ''}
+                    {selectedIcd10 && diagnosis ? ' - ' : ''}
+                    {diagnosis || (!selectedIcd10 ? '-' : '')}
+                  </p>
+
+                  <p className="font-bold text-slate-400 uppercase tracking-widest text-[8px] mb-1">Terapi Diberikan (P)</p>
+                  <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{treatmentPlan || "-"}</p>
+                </div>
+              </div>
             </div>
-            
+
             {/* Notes Section */}
             <div className="mb-12 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 relative overflow-hidden">
-               <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Catatan Rujukan Khusus</h3>
-               <p className="text-xs text-slate-700 leading-relaxed italic">{currentPrintReferral.notes || "-"}</p>
+              <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Catatan Rujukan Khusus</h3>
+              <p className="text-xs text-slate-700 leading-relaxed italic">{currentPrintReferral.notes || "-"}</p>
             </div>
-            
+
             <div className="flex justify-end mt-16">
-               <div className="text-center w-64">
-                  <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}<br/>Dokter Perujuk,</p>
-                  <div className="border-b-2 border-slate-300 w-3/4 mx-auto mb-2"></div>
-                  <p className="text-sm font-black uppercase text-slate-900">{queue.doctor?.name || user?.name}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">SIP: {queue.doctor?.specialization || "Umum"}</p>
-               </div>
+              <div className="text-center w-64">
+                <p className="text-sm text-slate-500 mb-20">{new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}<br />Dokter Perujuk,</p>
+                <div className="border-b-2 border-slate-300 w-3/4 mx-auto mb-2"></div>
+                <p className="text-sm font-black uppercase text-slate-900">{queue.doctor?.name || user?.name}</p>
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">SIP: {queue.doctor?.specialization || "Umum"}</p>
+              </div>
             </div>
-            
+
             {/* Footer */}
             <div className="absolute bottom-10 left-20 right-20 border-t border-slate-200 pt-6 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Dicetak melalui Sistem Rekam Medis Elektronik pada {new Date().toLocaleString("id-ID")}</p>
             </div>
-            
+
           </div>
         </div>
       )}
@@ -3819,14 +4444,14 @@ export default function DoctorConsultationPage() {
       <AnimatePresence>
         {isRMEInfoOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={() => setIsRMEInfoOpen(false)}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -3836,82 +4461,82 @@ export default function DoctorConsultationPage() {
               <div className="w-full md:w-80 bg-primary p-10 flex flex-col justify-between text-white relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32" />
                 <div className="relative z-10">
-                   <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6 border border-white/20">
-                      <FiMonitor className="w-8 h-8 text-white" />
-                   </div>
-                   <h2 className="text-2xl font-black uppercase tracking-tighter leading-tight">Masa Depan <br/>Rekam Medis Indonesia</h2>
-                   <div className="w-12 h-1 bg-white/40 mt-4 rounded-full" />
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6 border border-white/20">
+                    <FiMonitor className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-black uppercase tracking-tighter leading-tight">Masa Depan <br />Rekam Medis Indonesia</h2>
+                  <div className="w-12 h-1 bg-white/40 mt-4 rounded-full" />
                 </div>
                 <div className="relative z-10 space-y-4">
-                   <p className="text-xs font-medium text-white/70 italic leading-relaxed">"Sistem RME Yasfina dirancang untuk efisiensi tinggi, legalitas hukum, dan kemudahan bagi tenaga medis modern."</p>
-                   <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-white px-4 py-2 rounded-xl">
-                      <FiCheckCircle /> FUTURE READY: SATU SEHAT
-                   </div>
+                  <p className="text-xs font-medium text-white/70 italic leading-relaxed">"Sistem RME Yasfina dirancang untuk efisiensi tinggi, legalitas hukum, dan kemudahan bagi tenaga medis modern."</p>
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-white px-4 py-2 rounded-xl">
+                    <FiCheckCircle /> FUTURE READY: SATU SEHAT
+                  </div>
                 </div>
               </div>
 
               {/* Right Side: Content */}
               <div className="flex-1 p-8 md:p-12 overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-start mb-10">
-                   <div>
-                      <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Informasi Penting</h3>
-                      <h4 className="text-2xl font-black text-slate-900 tracking-tight">Apa itu RME & Kenapa Wajib?</h4>
-                   </div>
-                   <button onClick={() => setIsRMEInfoOpen(false)} className="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-400 transition-all">✕</button>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Informasi Penting</h3>
+                    <h4 className="text-2xl font-black text-slate-900 tracking-tight">Apa itu RME & Kenapa Wajib?</h4>
+                  </div>
+                  <button onClick={() => setIsRMEInfoOpen(false)} className="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-400 transition-all">✕</button>
                 </div>
 
                 <div className="space-y-10">
-                   {/* Point 1: Regulasi */}
-                   <div className="flex gap-6 group">
-                      <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary flex-shrink-0 border border-indigo-100 group-hover:bg-primary group-hover:text-white transition-all">
-                         <FiAlertCircle className="w-6 h-6" />
-                      </div>
-                      <div>
-                         <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Kewajiban Regulasi (PMK No. 24/2022)</h5>
-                         <p className="text-sm text-slate-500 leading-relaxed font-medium">Kemenkes RI mewajibkan seluruh fasilitas kesehatan (Klinik & RS) beralih ke digital paling lambat **31 Desember 2023**. Secara hukum, catatan tulis tangan sudah harus ditinggalkan demi keakuratan data nasional.</p>
-                      </div>
-                   </div>
+                  {/* Point 1: Regulasi */}
+                  <div className="flex gap-6 group">
+                    <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary flex-shrink-0 border border-indigo-100 group-hover:bg-primary group-hover:text-white transition-all">
+                      <FiAlertCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Kewajiban Regulasi (PMK No. 24/2022)</h5>
+                      <p className="text-sm text-slate-500 leading-relaxed font-medium">Kemenkes RI mewajibkan seluruh fasilitas kesehatan (Klinik & RS) beralih ke digital paling lambat **31 Desember 2023**. Secara hukum, catatan tulis tangan sudah harus ditinggalkan demi keakuratan data nasional.</p>
+                    </div>
+                  </div>
 
-                   {/* Point 2: Standard RS Modern */}
-                   <div className="flex gap-6 group">
-                      <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 flex-shrink-0 border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                         <FiActivity className="w-6 h-6" />
-                      </div>
-                      <div>
-                         <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Standar Rumah Sakit Modern & Besar</h5>
-                         <p className="text-sm text-slate-500 leading-relaxed font-medium">Di RS modern (Tipe A/B), dokter tidak lagi membawa map fisik. Semua input SOAP, diagnosa (ICD-10), dan e-resep dilakukan langsung melalui Komputer atau Tablet (COW) untuk menghindari kesalahan baca tulisan tangan.</p>
-                      </div>
-                   </div>
+                  {/* Point 2: Standard RS Modern */}
+                  <div className="flex gap-6 group">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 flex-shrink-0 border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                      <FiActivity className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Standar Rumah Sakit Modern & Besar</h5>
+                      <p className="text-sm text-slate-500 leading-relaxed font-medium">Di RS modern (Tipe A/B), dokter tidak lagi membawa map fisik. Semua input SOAP, diagnosa (ICD-10), dan e-resep dilakukan langsung melalui Komputer atau Tablet (COW) untuk menghindari kesalahan baca tulisan tangan.</p>
+                    </div>
+                  </div>
 
-                   {/* Point 3: Integrasi SATUSEHAT */}
-                   <div className="flex gap-6 group">
-                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 flex-shrink-0 border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                         <HiOutlineBeaker className="w-6 h-6" />
-                      </div>
-                      <div>
-                         <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Konektivitas SATUSEHAT (Nasional)</h5>
-                         <p className="text-sm text-slate-500 leading-relaxed font-medium">Sistem Yasfina dirancang untuk mendukung integrasi penuh dengan platform **SatuSehat** di masa mendatang. Dengan standarisasi data RME saat ini, klinik Anda akan jauh lebih siap ketika regulasi integrasi SatuSehat mulai diimplementasikan secara teknis.</p>
-                      </div>
-                   </div>
+                  {/* Point 3: Integrasi SATUSEHAT */}
+                  <div className="flex gap-6 group">
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 flex-shrink-0 border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <HiOutlineBeaker className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Konektivitas SATUSEHAT (Nasional)</h5>
+                      <p className="text-sm text-slate-500 leading-relaxed font-medium">Sistem Yasfina dirancang untuk mendukung integrasi penuh dengan platform **SatuSehat** di masa mendatang. Dengan standarisasi data RME saat ini, klinik Anda akan jauh lebih siap ketika regulasi integrasi SatuSehat mulai diimplementasikan secara teknis.</p>
+                    </div>
+                  </div>
 
-                   {/* Point 4: Solusi Manual ke Digital */}
-                   <div className="flex gap-6 group">
-                      <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 flex-shrink-0 border border-amber-100 group-hover:bg-amber-600 group-hover:text-white transition-all">
-                         <FiEdit3 className="w-6 h-6" />
-                      </div>
-                      <div>
-                         <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Tantangan Mengetik vs Menulis</h5>
-                         <p className="text-sm text-slate-500 leading-relaxed font-medium">Kami memahami kebiasaan menulis tangan. Sistem Yasfina menyiasati ini dengan fitur **Template & Autofill**. Menginput diagnosa ICD-10 kini lebih cepat daripada menulisnya secara manual, sekaligus memastikan akurasi kode klaim.</p>
-                      </div>
-                   </div>
+                  {/* Point 4: Solusi Manual ke Digital */}
+                  <div className="flex gap-6 group">
+                    <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 flex-shrink-0 border border-amber-100 group-hover:bg-amber-600 group-hover:text-white transition-all">
+                      <FiEdit3 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h5 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Tantangan Mengetik vs Menulis</h5>
+                      <p className="text-sm text-slate-500 leading-relaxed font-medium">Kami memahami kebiasaan menulis tangan. Sistem Yasfina menyiasati ini dengan fitur **Template & Autofill**. Menginput diagnosa ICD-10 kini lebih cepat daripada menulisnya secara manual, sekaligus memastikan akurasi kode klaim.</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-12 p-6 bg-slate-50 rounded-3xl border border-slate-100 text-center">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3">Kesimpulan Untuk Anda</p>
-                   <p className="text-xs font-bold text-slate-600">Sistem yang Anda gunakan saat ini sudah mengikuti alur kerja dokter modern di Indonesia yang mengutamakan **Kecepatan, Akurasi, dan Legalitas.**</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3">Kesimpulan Untuk Anda</p>
+                  <p className="text-xs font-bold text-slate-600">Sistem yang Anda gunakan saat ini sudah mengikuti alur kerja dokter modern di Indonesia yang mengutamakan **Kecepatan, Akurasi, dan Legalitas.**</p>
                 </div>
 
-                <button 
+                <button
                   onClick={() => setIsRMEInfoOpen(false)}
                   className="w-full mt-10 py-5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-[0.4em] shadow-xl hover:bg-slate-800 transition-all"
                 >
@@ -3922,19 +4547,19 @@ export default function DoctorConsultationPage() {
           </div>
         )}
       </AnimatePresence>
-      
+
       {/* Premium Final Confirmation Modal */}
       <AnimatePresence>
         {showFinalConfirm && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowFinalConfirm(false)}
               className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -3942,125 +4567,121 @@ export default function DoctorConsultationPage() {
             >
               <div className="p-8">
                 <div className="flex items-center gap-4 mb-6">
-                   <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                      <FiCheckCircle className="w-6 h-6" />
-                   </div>
-                   <div>
-                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Verifikasi & Kunci Data</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Data akan dikunci permanen untuk arsip medis.</p>
-                   </div>
+                  <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                    <FiCheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Verifikasi & Kunci Data</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Data akan dikunci permanen untuk arsip medis.</p>
+                  </div>
                 </div>
-                
+
                 <div className="space-y-2 mb-8">
-                   {[
-                     { 
-                       id: 'soap', 
-                       label: 'SOAP (Anamnesa & Fisik)', 
-                       icon: <FiActivity />, 
-                       isFilled: !!(subjective.trim() || objective.trim()) 
-                     },
-                     { 
-                       id: 'diagnosis', 
-                       label: 'Diagnosa & Kode ICD-10', 
-                       icon: <FiAlertCircle />, 
-                       isFilled: !!(diagnosis.trim() || selectedIcd10) 
-                     },
-                     { 
-                       id: 'services', 
-                       label: 'Tindakan Medis (Opsional)', 
-                       icon: <FiPlus />, 
-                       isFilled: serviceItems.length > 0 
-                     },
-                     { 
-                       id: 'prescription', 
-                       label: 'Resep Obat & Aturan Pakai', 
-                       icon: <FiPackage />, 
-                       isFilled: prescriptionItems.length > 0 
-                     },
-                     { 
-                       id: 'laboratory', 
-                       label: 'Order Lab (Opsional)', 
-                       icon: <HiOutlineBeaker />, 
-                       isFilled: labItems.length > 0 
-                     },
-                     { 
-                       id: 'consent', 
-                       label: 'Persetujuan Tindakan', 
-                       icon: <FiCheckCircle />, 
-                       isFilled: hasInformedConsent,
-                       action: () => setHasInformedConsent(!hasInformedConsent)
-                     },
-                   ].map((item) => {
-                     const Content = (
-                       <div className="flex items-center gap-4">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                            item.isFilled ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
+                  {[
+                    {
+                      id: 'soap',
+                      label: 'SOAP (Anamnesa & Fisik)',
+                      icon: <FiActivity />,
+                      isFilled: !!(subjective.trim() || objective.trim())
+                    },
+                    {
+                      id: 'diagnosis',
+                      label: 'Diagnosa & Kode ICD-10',
+                      icon: <FiAlertCircle />,
+                      isFilled: !!(diagnosis.trim() || selectedIcd10)
+                    },
+                    {
+                      id: 'services',
+                      label: 'Tindakan Medis (Opsional)',
+                      icon: <FiPlus />,
+                      isFilled: serviceItems.length > 0
+                    },
+                    {
+                      id: 'prescription',
+                      label: 'Resep Obat & Aturan Pakai',
+                      icon: <FiPackage />,
+                      isFilled: prescriptionItems.length > 0
+                    },
+                    {
+                      id: 'laboratory',
+                      label: 'Order Lab (Opsional)',
+                      icon: <HiOutlineBeaker />,
+                      isFilled: labItems.length > 0
+                    },
+                    {
+                      id: 'consent',
+                      label: 'Persetujuan Tindakan',
+                      icon: <FiCheckCircle />,
+                      isFilled: hasInformedConsent,
+                      action: () => setHasInformedConsent(!hasInformedConsent)
+                    },
+                  ].map((item) => {
+                    const Content = (
+                      <div className="flex items-center gap-4">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${item.isFilled ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
                           }`}>
-                             {item.icon}
+                          {item.icon}
+                        </div>
+                        <div className="text-left">
+                          <div className="flex items-center gap-2">
+                            <p className="text-[10px] font-black uppercase tracking-tight">{item.label}</p>
+                            {item.action && !item.isFilled && (
+                              <span className="text-[7px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-md animate-pulse">KLIK DISINI</span>
+                            )}
                           </div>
-                          <div className="text-left">
-                             <div className="flex items-center gap-2">
-                                <p className="text-[10px] font-black uppercase tracking-tight">{item.label}</p>
-                                {item.action && !item.isFilled && (
-                                  <span className="text-[7px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-md animate-pulse">KLIK DISINI</span>
-                                )}
-                             </div>
-                             <p className="text-[8px] font-bold uppercase tracking-widest opacity-70">
-                               {item.isFilled ? '✓ Data Sudah Lengkap' : item.action ? 'KLIK UNTUK VERIFIKASI LANGSUNG' : '! Data Belum Diisi'}
-                             </p>
-                          </div>
-                       </div>
-                     );
+                          <p className="text-[8px] font-bold uppercase tracking-widest opacity-70">
+                            {item.isFilled ? '✓ Data Sudah Lengkap' : item.action ? 'KLIK UNTUK VERIFIKASI LANGSUNG' : '! Data Belum Diisi'}
+                          </p>
+                        </div>
+                      </div>
+                    );
 
-                     const StatusIcon = (
-                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
-                         item.isFilled ? 'text-emerald-500' : 'text-amber-500'
-                       }`}>
-                          {item.isFilled ? <FiCheckCircle className="w-5 h-5" /> : <FiAlertCircle className="w-5 h-5" />}
-                       </div>
-                     );
+                    const StatusIcon = (
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${item.isFilled ? 'text-emerald-500' : 'text-amber-500'
+                        }`}>
+                        {item.isFilled ? <FiCheckCircle className="w-5 h-5" /> : <FiAlertCircle className="w-5 h-5" />}
+                      </div>
+                    );
 
-                     if (item.action) {
-                       return (
-                         <button
-                           key={item.id}
-                           onClick={item.action}
-                           className={`w-full p-4 rounded-2xl border flex items-center justify-between transition-all hover:scale-[1.02] active:scale-95 ${
-                             item.isFilled 
-                               ? 'bg-emerald-50/50 border-emerald-100 text-emerald-700' 
-                               : 'bg-amber-50/50 border-amber-100 text-amber-700 shadow-lg shadow-amber-500/10'
-                           }`}
-                         >
-                           {Content}
-                           {StatusIcon}
-                         </button>
-                       );
-                     }
+                    if (item.action) {
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={item.action}
+                          className={`w-full p-4 rounded-2xl border flex items-center justify-between transition-all hover:scale-[1.02] active:scale-95 ${item.isFilled
+                              ? 'bg-emerald-50/50 border-emerald-100 text-emerald-700'
+                              : 'bg-amber-50/50 border-amber-100 text-amber-700 shadow-lg shadow-amber-500/10'
+                            }`}
+                        >
+                          {Content}
+                          {StatusIcon}
+                        </button>
+                      );
+                    }
 
-                     return (
-                       <div
-                         key={item.id}
-                         className={`w-full p-4 rounded-2xl border flex items-center justify-between transition-all ${
-                           item.isFilled 
-                             ? 'bg-emerald-50/50 border-emerald-100 text-emerald-700' 
-                             : 'bg-amber-50/50 border-amber-100 text-amber-700'
-                         }`}
-                       >
-                         {Content}
-                         {StatusIcon}
-                       </div>
-                     );
-                   })}
+                    return (
+                      <div
+                        key={item.id}
+                        className={`w-full p-4 rounded-2xl border flex items-center justify-between transition-all ${item.isFilled
+                            ? 'bg-emerald-50/50 border-emerald-100 text-emerald-700'
+                            : 'bg-amber-50/50 border-amber-100 text-amber-700'
+                          }`}
+                      >
+                        {Content}
+                        {StatusIcon}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <button 
+                  <button
                     onClick={() => setShowFinalConfirm(false)}
                     className="py-4 px-6 bg-slate-100 text-slate-500 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:bg-slate-200 transition-all"
                   >
                     Tinjau Kembali
                   </button>
-                  <button 
+                  <button
                     onClick={() => executeSave(true, isPrescriptionRedirect)}
                     disabled={saving}
                     className="py-4 px-6 bg-primary text-white font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-primary/30 hover:bg-primary/90 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-2"
@@ -4072,7 +4693,7 @@ export default function DoctorConsultationPage() {
 
               <div className="bg-slate-50 border-t border-slate-100 p-4 text-center">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center justify-center gap-2">
-                   <FiLock /> PERMANENT LOCKING SYSTEM
+                  <FiLock /> PERMANENT LOCKING SYSTEM
                 </p>
               </div>
             </motion.div>
@@ -4136,12 +4757,12 @@ export default function DoctorConsultationPage() {
                     <p className="text-[10px] font-bold text-slate-400 mt-1">Pilih tujuan pengambilan obat</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
-                    <button 
+                    <button
                       onClick={() => {
                         setRxPrintMode('internal');
                         const url = generateRxPDF('internal', 'bloburl') as string;
                         setPdfUrl(url);
-                      }} 
+                      }}
                       className="group p-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
                     >
                       <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/20">
@@ -4154,12 +4775,12 @@ export default function DoctorConsultationPage() {
                         <span className="text-[10px] font-black uppercase tracking-widest">Stok Klinik</span>
                       </div>
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setRxPrintMode('external');
                         const url = generateRxPDF('external', 'bloburl') as string;
                         setPdfUrl(url);
-                      }} 
+                      }}
                       className="group p-6 rounded-2xl border-2 border-amber-100 bg-amber-50/50 hover:border-amber-400 hover:bg-amber-50 transition-all text-left"
                     >
                       <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-amber-500/20">
@@ -4186,14 +4807,14 @@ export default function DoctorConsultationPage() {
                         : <><FiCheckCircle className="w-3.5 h-3.5 text-indigo-500" /><span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Farmasi Klinik · Obat diambil dari stok</span></>
                       }
                     </div>
-                    <button 
+                    <button
                       onClick={() => {
                         setRxPrintMode(null);
                         if (pdfUrl) {
                           URL.revokeObjectURL(pdfUrl);
                           setPdfUrl(null);
                         }
-                      }} 
+                      }}
                       className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest underline"
                     >
                       Ganti
@@ -4202,9 +4823,9 @@ export default function DoctorConsultationPage() {
 
                   <div className="flex-1 overflow-y-auto p-4 bg-slate-100/50 flex flex-col justify-stretch items-stretch min-h-[50vh]">
                     {pdfUrl ? (
-                      <iframe 
-                        src={pdfUrl} 
-                        className="w-full flex-1 rounded-2xl border border-slate-200 shadow-inner bg-white" 
+                      <iframe
+                        src={pdfUrl}
+                        className="w-full flex-1 rounded-2xl border border-slate-200 shadow-inner bg-white"
                         title="Pratinjau PDF Resep"
                       />
                     ) : (

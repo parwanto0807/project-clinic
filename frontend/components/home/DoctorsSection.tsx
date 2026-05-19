@@ -89,7 +89,7 @@ export default function DoctorsSection() {
   }, [API_URL])
 
   return (
-    <section id="doctors" className="section-padding bg-white dark:bg-slate-950 transition-colors duration-500">
+    <section id="doctors" className="section-padding bg-white dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
       <div className="container-custom">
         <div className="text-center mb-16">
           <motion.h2 

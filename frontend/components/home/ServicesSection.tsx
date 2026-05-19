@@ -8,7 +8,7 @@ export default function ServicesSection() {
   const services = settings.services
 
   return (
-    <section id="services" className="section-padding bg-gray-50 dark:bg-slate-900/50">
+    <section id="services" className="section-padding bg-gray-50 dark:bg-slate-900/50 overflow-hidden">
       <div className="container-custom">
         {/* Header */}
         <motion.div
