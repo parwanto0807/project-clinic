@@ -172,37 +172,24 @@ export const getGuestDoctorAssignments = async (req: Request, res: Response) => 
     const clinicId = (req as any).clinicId
     const { skip, take, page } = getPaginationOptions(req.query)
 
-    // Parse date string as local date (YYYY-MM-DD) to avoid UTC offset issues.
-    // new Date('2026-05-20') parses as UTC midnight which shifts the day in UTC+7.
-    // Instead, build the range directly from the date string components.
-    let startOfDay: Date
-    let endOfDay: Date
-
-    if (date) {
-      const [year, month, day] = String(date).split('-').map(Number)
-      startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0)
-      endOfDay   = new Date(year, month - 1, day, 23, 59, 59, 999)
-    } else {
-      const now = new Date()
-      startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-      endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-    }
-
-    const dateFilter = { gte: startOfDay, lt: endOfDay }
+    // For @db.Date fields, Prisma expects a Date object at midnight UTC.
+    // Build it from the YYYY-MM-DD string to avoid local-timezone shifts.
+    const dateStr = date ? String(date) : new Date().toISOString().slice(0, 10)
+    const queryDate = new Date(`${dateStr}T00:00:00.000Z`)
 
     const [total, assignments] = await Promise.all([
       prisma.guestDoctorAssignment.count({
         where: {
           clinicId,
           ...(status ? { status: String(status) } : {}),
-          date: dateFilter
+          date: queryDate
         }
       }),
       prisma.guestDoctorAssignment.findMany({
         where: {
           clinicId,
           ...(status ? { status: String(status) } : {}),
-          date: dateFilter
+          date: queryDate
         },
         include: {
           guestDoctor: true,
@@ -250,16 +237,13 @@ export const createGuestDoctorAssignment = async (req: Request, res: Response) =
       return res.status(404).json({ message: 'Dokter tamu tidak ditemukan' })
     }
 
-    // Check if already has assignment on that date
-    // Parse as local date to avoid UTC offset shifting the day (e.g. UTC+7)
-    let assignmentDate: Date
-    if (date) {
-      const [year, month, day] = String(date).split('-').map(Number)
-      assignmentDate = new Date(year, month - 1, day, 0, 0, 0, 0)
-    } else {
-      const now = new Date()
-      assignmentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-    }
+    // For @db.Date fields Prisma expects UTC midnight. Build from the YYYY-MM-DD
+    // string so the date is never shifted by the server's local timezone.
+    const dateStr = date
+      ? String(date).slice(0, 10)
+      : new Date().toISOString().slice(0, 10)
+    const assignmentDate = new Date(`${dateStr}T00:00:00.000Z`)
+
     const existing = await prisma.guestDoctorAssignment.findUnique({
       where: {
         date_clinicId: {
@@ -496,8 +480,8 @@ export const cancelGuestDoctorAssignment = async (req: Request, res: Response) =
 export const getTodayActiveGuestDoctor = async (req: Request, res: Response) => {
   try {
     const clinicId = (req as any).clinicId
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const today = new Date(`${todayStr}T00:00:00.000Z`)
 
     const assignment = await prisma.guestDoctorAssignment.findFirst({
       where: {

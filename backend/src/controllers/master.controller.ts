@@ -388,15 +388,14 @@ export const getDoctors = async (req: Request, res: Response) => {
     // appear in the doctor picker on the registration page.
     let result: any[] = doctors
     if (targetClinicId) {
-      const now = new Date()
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-      const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+      const todayStr = new Date().toISOString().slice(0, 10)
+      const today = new Date(`${todayStr}T00:00:00.000Z`)
 
       const guestAssignment = await prisma.guestDoctorAssignment.findFirst({
         where: {
           clinicId: targetClinicId,
           status: { in: ['SCHEDULED', 'ACTIVE'] },
-          date: { gte: startOfDay, lte: endOfDay }
+          date: today
         },
         include: { guestDoctor: true }
       })
