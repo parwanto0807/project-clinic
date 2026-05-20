@@ -9,7 +9,7 @@ import {
   FiAlertCircle, FiCopy, FiCheck, FiChevronLeft, FiChevronRight, FiAward, FiX
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { format, addDays, subtractDays } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 
 interface GuestDoctorProfile {
