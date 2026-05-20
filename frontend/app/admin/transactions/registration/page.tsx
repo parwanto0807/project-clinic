@@ -221,7 +221,11 @@ export default function RegistrationPage() {
   }
 
   const availableDoctors = useMemo(() => {
-    return doctors.filter(d => !selectedDeptId || (d.departments && d.departments.some(dept => dept.id === selectedDeptId)))
+    return doctors.filter(d => {
+      // Guest doctors (no departments) are always available regardless of selected dept
+      if (!d.departments || d.departments.length === 0) return true
+      return !selectedDeptId || d.departments.some(dept => dept.id === selectedDeptId)
+    })
   }, [doctors, selectedDeptId])
 
   const canContinue = useMemo(() => {

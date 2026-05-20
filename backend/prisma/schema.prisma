@@ -58,6 +58,8 @@ model Clinic {
   doctorCommissions       DoctorCommission[]
   cashTransfers           CashTransfer[]
   directMedicinePurchases DirectMedicinePurchase[]
+  guestDoctorProfiles     GuestDoctorProfile[]
+  guestDoctorAssignments  GuestDoctorAssignment[]
 
   @@map("clinics")
 }
@@ -75,22 +77,25 @@ model UserClinic {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  username     String        @unique
-  password     String
-  name         String
-  phone        String?
-  isActive     Boolean       @default(true)
-  lastLogin    DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  role         Role          @default(STAFF)
-  image        String?
-  deletedAt    DateTime?
-  activityLogs ActivityLog[]
-  doctor       Doctor?
-  clinics      UserClinic[]
+  id                   String                    @id @default(uuid())
+  email                String?                   @unique          // Nullable untuk guest account
+  username             String                    @unique
+  password             String
+  name                 String
+  phone                String?
+  isActive             Boolean                   @default(true)
+  lastLogin            DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  role                 Role                      @default(STAFF)
+  image                String?
+  deletedAt            DateTime?
+  isGuestAccount       Boolean                   @default(false)
+  guestExpiryDate      DateTime?                 // Kapan guest account expired
+  activityLogs         ActivityLog[]
+  doctor               Doctor?
+  clinics              UserClinic[]
+  guestAssignments     GuestDoctorAssignment[]
 
   @@map("users")
 }
@@ -214,6 +219,58 @@ model DoctorSchedule {
   @@map("doctor_schedules")
 }
 
+// Master profile dokter tamu/guest (tersimpan permanent)
+model GuestDoctorProfile {
+  id                String                  @id @default(uuid())
+  name              String                  // "Dr. Supardi"
+  licenseNumber     String                  @unique // SIP dokter
+  specialization    String                  // "Umum", "Gigi", dll
+  phone             String
+  email             String?                 // Optional
+  address           String?
+  isActive          Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  clinicId          String
+  clinic            Clinic                  @relation(fields: [clinicId], references: [id])
+  
+  assignments       GuestDoctorAssignment[]
+  medicalRecords    MedicalRecord[]
+
+  @@index([clinicId])
+  @@index([licenseNumber])
+  @@map("guest_doctor_profiles")
+}
+
+// Assignment harian (dokter mana aktif hari ini)
+model GuestDoctorAssignment {
+  id                String               @id @default(uuid())
+  date              DateTime             @db.Date // Tanggal assignment
+  guestDoctorId     String
+  guestDoctor       GuestDoctorProfile   @relation(fields: [guestDoctorId], references: [id], onDelete: Cascade)
+  
+  userId            String?              // Akun login temporary (optional)
+  user              User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  createdByAdminId  String               // Admin yang buat assignment
+  status            String               @default("SCHEDULED") // SCHEDULED | ACTIVE | COMPLETED | CANCELLED
+  notes             String?              // "Pengganti Dr. Agus yang cuti"
+  
+  clinicId          String
+  clinic            Clinic               @relation(fields: [clinicId], references: [id])
+  
+  medicalRecords    MedicalRecord[]
+  
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([date, clinicId]) // Satu dokter tamu per hari per clinic
+  @@index([guestDoctorId])
+  @@index([date])
+  @@index([clinicId])
+  @@map("guest_doctor_assignments")
+}
+
 model Department {
   id             String         @id @default(uuid())
   name           String
@@ -313,6 +370,8 @@ model MedicalRecord {
   appointmentId      String?
   patientId          String
   doctorId           String?
+  guestDoctorId      String?                   // Dokter guest/luar
+  guestAssignmentId  String?                   // Assignment dokter guest hari itu
   chiefComplaint     String
   diagnosis          String?
   icd10Id            String?
@@ -336,6 +395,8 @@ model MedicalRecord {
   appointment        Appointment?              @relation(fields: [appointmentId], references: [id])
   clinic             Clinic?                   @relation(fields: [clinicId], references: [id])
   doctor             Doctor?                   @relation(fields: [doctorId], references: [id])
+  guestDoctor        GuestDoctorProfile?       @relation(fields: [guestDoctorId], references: [id])
+  guestAssignment    GuestDoctorAssignment?    @relation(fields: [guestAssignmentId], references: [id])
   patient            Patient                   @relation(fields: [patientId], references: [id], onDelete: Cascade)
   registration       Registration?             @relation(fields: [registrationId], references: [id])
   prescriptions      Prescription[]
@@ -345,6 +406,7 @@ model MedicalRecord {
 
   @@index([patientId])
   @@index([doctorId])
+  @@index([guestDoctorId])
   @@map("medical_records")
 }
 

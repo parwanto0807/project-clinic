@@ -45,7 +45,7 @@ export default function LoginPage() {
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5004'
       const response = await axios.post(`${apiBase}/api/auth/login`, {
-        email,
+        email: email, // Can be email or username (SIP for guest doctors)
         password
       }, {
         withCredentials: true, // Allow browser to receive and store the HttpOnly cookie
@@ -65,7 +65,7 @@ export default function LoginPage() {
         handleFinalLogin(user, user.clinics[0].id)
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Gagal login. Periksa kembali email dan password Anda.')
+      setError(err.response?.data?.message || err.message || 'Gagal login. Periksa kembali email/username dan password Anda.')
     } finally {
       setIsLoading(false)
     }
@@ -205,14 +205,14 @@ export default function LoginPage() {
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2 ml-1">Email atau Username (SIP untuk Dokter Tamu)</label>
                     <div className="relative">
                       <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
-                        type="email"
+                        type="text"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
+                        placeholder="Email atau SIP dokter tamu"
                         required
                         className="w-full pl-12 pr-4 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 dark:text-white border border-slate-200 dark:border-slate-800/80 focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-primary/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all duration-300 font-medium text-sm outline-none"
                         disabled={isLoading}

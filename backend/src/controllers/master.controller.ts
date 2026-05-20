@@ -383,7 +383,54 @@ export const getDoctors = async (req: Request, res: Response) => {
           }) as any),
       orderBy: { name: 'asc' },
     })
-    res.json(doctors)
+
+    // Append today's active guest doctor (if any) for the target clinic so they
+    // appear in the doctor picker on the registration page.
+    let result: any[] = doctors
+    if (targetClinicId) {
+      const now = new Date()
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+      const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+      const guestAssignment = await prisma.guestDoctorAssignment.findFirst({
+        where: {
+          clinicId: targetClinicId,
+          status: { in: ['SCHEDULED', 'ACTIVE'] },
+          date: { gte: startOfDay, lte: endOfDay }
+        },
+        include: { guestDoctor: true }
+      })
+
+      if (guestAssignment) {
+        const gd = guestAssignment.guestDoctor
+        // Mark the guest doctor in the result list with "(Tamu)" suffix so the admin
+        // can distinguish them. They may already be in the list via the regular query.
+        const guestDoctorRecord = await prisma.doctor.findUnique({
+          where: { licenseNumber: gd.licenseNumber },
+          select: { id: true }
+        })
+
+        const existingIdx = result.findIndex((d: any) => d.name === gd.name)
+        const guestEntry = {
+          id: guestDoctorRecord?.id ?? guestAssignment.id,
+          name: `${gd.name} (Tamu)`,
+          specialization: gd.specialization,
+          departments: [],
+          isGuest: true,
+          guestDoctorId: gd.id,
+          userId: guestAssignment.userId
+        }
+
+        if (existingIdx >= 0) {
+          // Replace the existing entry with the labelled guest version
+          result = [...result.slice(0, existingIdx), guestEntry, ...result.slice(existingIdx + 1)]
+        } else {
+          result = [...result, guestEntry]
+        }
+      }
+    }
+
+    res.json(result)
   } catch (e) {
     res.status(500).json({ message: (e as Error).message })
   }

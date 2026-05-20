@@ -24,8 +24,14 @@ export class AuthService {
     return { accessToken, refreshToken }
   }
   static async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Support both EMAIL and USERNAME login
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: email }, // Standard email login
+          { username: email } // Allow username login (for guest doctor with SIP)
+        ]
+      },
       include: {
         doctor: true
       }
@@ -33,7 +39,7 @@ export class AuthService {
 
     // Generic error message to prevent email enumeration
     if (!user) {
-      throw new Error('Email atau password salah')
+      throw new Error('Email/Username atau password salah')
     }
 
     if (!user.isActive) {
@@ -43,7 +49,7 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password)
 
     if (!isPasswordValid) {
-      throw new Error('Email atau password salah')
+      throw new Error('Email/Username atau password salah')
     }
 
     // Update last login

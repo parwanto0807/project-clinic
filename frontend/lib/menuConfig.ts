@@ -4,7 +4,7 @@ import {
   FiBriefcase, FiUserCheck, FiClock, FiActivity,
   FiPackage, FiShoppingBag, FiList, FiMenu, FiX, FiBox,
   FiChevronLeft, FiFolder, FiCpu, FiPlus, FiDollarSign, FiFileText, FiTrendingUp, FiLayers, FiBookOpen, FiLock, FiCreditCard,
-  FiTool, FiRepeat, FiShield, FiBarChart2, FiAlertCircle, FiArchive, FiRefreshCw
+  FiTool, FiRepeat, FiShield, FiBarChart2, FiAlertCircle, FiArchive, FiRefreshCw, FiUser
 } from 'react-icons/fi'
 import { HiOutlineBeaker } from 'react-icons/hi'
 
@@ -159,6 +159,8 @@ export const MASTER_GROUPS = [
     moduleId: 'MEDICAL_MASTER',
     items: [
       { icon: FiUserCheck, label: 'Database Dokter', href: '/admin/master/doctors' },
+      { icon: FiUser, label: 'Kelola Dokter Tamu', href: '/admin/master/guest-doctors' },
+      { icon: FiCalendar, label: 'Penugasan Dokter Tamu', href: '/admin/master/guest-doctors-assignment' },
       { icon: FiClock, label: 'Jadwal Praktek', href: '/admin/master/schedules' },
       { icon: FiBriefcase, label: 'Departemen & Poli', href: '/admin/master/departments' },
       { icon: FiActivity, label: 'Daftar Layanan/Tindakan', href: '/admin/master/services' },

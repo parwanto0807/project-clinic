@@ -3663,16 +3663,18 @@ export default function DoctorConsultationPage() {
                       frequency: '3x1',
                       duration: '5 hari',
                       instructions: 'Sesudah makan',
-                      unit: m.unit || 'unit'
+                      unit: m.unit || 'unit',
+                      isExternal: (m.availableStock ?? m.stock ?? 0) <= 0
                     }))
 
                     setPrescriptionItems([...prescriptionItems, ...newItems])
                     setIsMedDialogOpen(false)
+                    setActiveSegment('rx') // Pindah ke tab Resep Obat Pasien
                   }}
                   disabled={selectedMedicines.length === 0}
                   className="px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
                 >
-                  <FiCheckCircle /> Konfirmasi ({selectedMedicines.length})
+                  <FiCheckCircle /> Konfirmasi &amp; Lihat Resep ({selectedMedicines.length})
                 </button>
               </div>
             </motion.div>
