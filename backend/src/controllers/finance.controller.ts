@@ -603,7 +603,7 @@ export const getFinancialSummary = async (req: Request, res: Response) => {
       prisma.invoice.aggregate({
         where: {
           status: { not: 'paid' },
-          ...(!isAdminView ? { clinicId: currentClinicId } : {})
+          ...(!isAdminView ? { clinicId: currentClinicId } : {}),
         },
         _sum: { total: true }
       }),

@@ -31,6 +31,7 @@ export const LAYANAN_UTAMA_GROUPS = [
     items: [
       { icon: FiActivity, label: 'Nurse Station (Triage)', href: '/admin/transactions/nurse', roles: ['SUPER_ADMIN', 'ADMIN', 'NURSE'] },
       { icon: FiUserCheck, label: 'Doctor Station', href: '/admin/transactions/doctor', roles: ['SUPER_ADMIN', 'ADMIN', 'DOCTOR'] },
+      { icon: FiLayers, label: 'Rangkaian Perawatan', href: '/admin/transactions/treatment-plans', roles: ['SUPER_ADMIN', 'ADMIN', 'DOCTOR', 'STAFF'] },
       { icon: FiUsers, label: 'Database Pasien', href: '/admin/master/patients', roles: ['SUPER_ADMIN', 'ADMIN', 'DOCTOR', 'NURSE', 'STAFF'] },
     ]
   },

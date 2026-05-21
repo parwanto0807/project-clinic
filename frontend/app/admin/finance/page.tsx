@@ -877,23 +877,35 @@ export default function FinanceDashboard() {
 
                                <div className="relative">
                                   <input 
-                                     type="number" 
-                                     value={paymentData.discountInput || ''}
+                                     type="text" 
+                                     value={paymentData.discountInput ? (paymentData.discountType === 'percent' ? paymentData.discountInput : new Intl.NumberFormat('id-ID').format(paymentData.discountInput)) : ''}
                                      onChange={(e) => {
-                                        const val = parseFloat(e.target.value) || 0;
+                                        let valStr = e.target.value;
+                                        let val = 0;
+                                        if (paymentData.discountType === 'percent') {
+                                           valStr = valStr.replace(/[^\d.]/g, '');
+                                           val = parseFloat(valStr) || 0;
+                                        } else {
+                                           valStr = valStr.replace(/\D/g, '');
+                                           val = parseInt(valStr, 10) || 0;
+                                        }
+                                        
                                         const remaining = selectedInvoice.total - (selectedInvoice.amountPaid || 0);
                                         let discAmount = 0;
                                         if (paymentData.discountType === 'percent') {
+                                           val = Math.min(val, 100);
                                            discAmount = (val / 100) * remaining;
                                         } else {
+                                           val = Math.min(val, remaining);
                                            discAmount = val;
                                         }
                                         const finalAmount = Math.max(0, remaining - discAmount);
                                         setPaymentData({ ...paymentData, discountInput: val, discount: discAmount, amount: finalAmount });
                                         setReceivedAmount(finalAmount);
                                      }}
-                                     placeholder={paymentData.discountType === 'percent' ? "0%" : "Rp 0"}
+                                     placeholder={paymentData.discountType === 'percent' ? "0%" : "0"}
                                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-black focus:border-primary outline-none transition-all"
+                                     onFocus={(e) => e.target.select()}
                                   />
                                </div>
 
@@ -957,9 +969,9 @@ export default function FinanceDashboard() {
                                     <div className="relative">
                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-lg font-black text-gray-400">Rp</span>
                                        <input 
-                                          type="number" 
-                                          value={receivedAmount || ''} 
-                                          onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)} 
+                                          type="text" 
+                                          value={receivedAmount ? new Intl.NumberFormat('id-ID').format(receivedAmount) : ''} 
+                                          onChange={(e) => setReceivedAmount(parseInt(e.target.value.replace(/\D/g, ''), 10) || 0)} 
                                           className="w-full pl-16 pr-6 py-6 bg-white border-none rounded-3xl font-black text-3xl text-gray-900 focus:ring-4 focus:ring-primary/10 transition-all text-center shadow-inner"
                                           placeholder="0"
                                           onFocus={(e) => e.target.select()}

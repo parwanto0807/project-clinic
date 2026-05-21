@@ -26,6 +26,7 @@ import labRoutes from './routes/lab.routes';
 import reportRoutes from './routes/report.routes';
 import directPurchaseRoutes from './routes/directPurchase.routes';
 import { guestDoctorRoutes } from './routes/guest-doctor.routes';
+import treatmentPlanRoutes from './routes/treatmentPlan.routes';
 
 // Load environment variables
 dotenv.config();
@@ -107,6 +108,7 @@ app.use('/api/lab', labRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/direct-purchases', directPurchaseRoutes);
 app.use('/api/guest-doctors', guestDoctorRoutes);
+app.use('/api/treatment-plans', treatmentPlanRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

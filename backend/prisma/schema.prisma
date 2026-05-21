@@ -134,6 +134,7 @@ model Patient {
   prescriptions      Prescription[]
   queueNumbers       QueueNumber[]
   registrations      Registration[]
+  treatmentPlans     TreatmentPlan[]
 
   @@index([medicalRecordNo])
   @@index([phone])
@@ -944,14 +945,16 @@ model Invoice {
   isPosted       Boolean            @default(false)
   postedAt       DateTime?
   bankId         String?
-  registrationId String?
-  items          InvoiceItem[]
-  bank           Bank?              @relation(fields: [bankId], references: [id])
-  clinic         Clinic?            @relation(fields: [clinicId], references: [id])
-  patient        Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  registration   Registration?      @relation(fields: [registrationId], references: [id])
-  payments       Payment[]
-  commissions    DoctorCommission[]
+  registrationId  String?
+  treatmentPlanId String?
+  items           InvoiceItem[]
+  bank            Bank?              @relation(fields: [bankId], references: [id])
+  clinic          Clinic?            @relation(fields: [clinicId], references: [id])
+  patient         Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  registration    Registration?      @relation(fields: [registrationId], references: [id])
+  treatmentPlan   TreatmentPlan?     @relation(fields: [treatmentPlanId], references: [id])
+  payments        Payment[]
+  commissions     DoctorCommission[]
 
   @@index([patientId])
   @@index([status])
@@ -1727,4 +1730,69 @@ model DirectMedicinePurchaseItem {
   @@index([directMedicinePurchaseId])
   @@index([productId])
   @@map("direct_medicine_purchase_items")
+}
+
+// ============================================================
+// TREATMENT PLAN - Multi-Visit Medical Treatment with DP Scheme
+// ============================================================
+
+enum TreatmentPlanStatus {
+  ACTIVE
+  COMPLETED
+}
+
+/// Rangkaian perawatan medis bertahap (multi-visit).
+/// Menjadi "payung" utama yang mengikat semua Visit dan satu Invoice.
+/// Contoh: Perawatan Saluran Akar yang butuh 3 kunjungan.
+model TreatmentPlan {
+  id          String              @id @default(uuid())
+  patientId   String
+  description String              // Nama/deskripsi rangkaian, misal "Perawatan Saluran Akar Gigi 36"
+  totalAmount Float               @default(0)
+  status      TreatmentPlanStatus @default(ACTIVE)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  // === Relations ===
+  patient Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visits  Visit[]
+  invoices Invoice[]
+  items   TreatmentPlanItem[]
+
+  @@index([patientId])
+  @@index([status])
+  @@map("treatment_plans")
+}
+
+/// Item perawatan detail pada Rangkaian Perawatan.
+model TreatmentPlanItem {
+  id              String        @id @default(uuid())
+  treatmentPlanId String
+  description     String
+  quantity        Int           @default(1)
+  price           Float         @default(0)
+  subtotal        Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+
+  @@index([treatmentPlanId])
+  @@map("treatment_plan_items")
+}
+
+/// Catatan setiap kedatangan pasien dalam rangkaian perawatan.
+model Visit {
+  id              String        @id @default(uuid())
+  treatmentPlanId String
+  visitDate       DateTime      @default(now())
+  visitNumber     Int           // Kunjungan ke-1, ke-2, ke-3, dst
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+
+  @@index([treatmentPlanId])
+  @@map("visits")
 }
