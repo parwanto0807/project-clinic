@@ -9,6 +9,7 @@ import {
   updateStatus,
   updateTreatmentPlan,
   deleteTreatmentPlan,
+  getActiveTreatmentPlansByPatient
 } from '../controllers/treatmentPlan.controller'
 
 const router = Router()
@@ -18,6 +19,7 @@ router.use(authMiddleware)
 
 // CRUD Treatment Plans
 router.get('/', getTreatmentPlans)
+router.get('/patient/:patientId/active', getActiveTreatmentPlansByPatient)
 router.get('/:id', getTreatmentPlanById)
 router.post('/', createTreatmentPlan)
 router.put('/:id', updateTreatmentPlan)

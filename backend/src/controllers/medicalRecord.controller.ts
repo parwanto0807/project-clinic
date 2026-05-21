@@ -185,7 +185,9 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
         hasInformedConsent,
         services, // [{ serviceId, price, quantity }]
         prescriptions, // [{ medicineId, quantity, dosage, frequency, duration, instructions }]
-        isFinal = true // Default to true for backward compatibility
+        isFinal = true, // Default to true for backward compatibility
+        treatmentPlanId,
+        completedTreatmentPlanItemIds
     } = req.body
 
     const result = await prisma.$transaction(async (tx) => {
@@ -200,11 +202,12 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
           diagnosis,
           icd10Id,
           treatmentPlan,
+          treatmentPlanId: treatmentPlanId || null,
           labNotes,
           labResults,
           notes,
           hasInformedConsent: !!hasInformedConsent,
-          consultationDraft: !isFinal ? { subjective, objective, diagnosis, icd10Id, treatmentPlan, services, prescriptions } : Prisma.DbNull,
+          consultationDraft: !isFinal ? { subjective, objective, diagnosis, icd10Id, treatmentPlan, services, prescriptions, treatmentPlanId, completedTreatmentPlanItemIds } : Prisma.DbNull,
           // Only update doctorId if we have a valid doctor account
           ...( (req as any).user.doctor?.id ? { doctorId: (req as any).user.doctor.id } : {} )
         },
@@ -285,6 +288,45 @@ export const saveDoctorConsultation = async (req: Request, res: Response) => {
       // If it's just a draft, we stop here. We don't close queue, don't bill, don't RX.
       if (!isFinal) {
         return mr
+      }
+
+      // Handle Treatment Plan Visit & Item Completion (Only if Final)
+      if (isFinal && treatmentPlanId) {
+        // Create Visit
+        const existingVisitsCount = await tx.visit.count({
+          where: { treatmentPlanId }
+        })
+        const visit = await tx.visit.create({
+          data: {
+            treatmentPlanId,
+            visitDate: new Date(),
+            visitNumber: existingVisitsCount + 1,
+            notes: notes || `Kunjungan dari rekam medis ${mr.recordNo}`,
+          }
+        })
+
+        // Link MR to Visit
+        await tx.medicalRecord.update({
+          where: { id: mr.id },
+          data: { visitId: visit.id }
+        })
+
+        // Complete Treatment Plan Items
+        if (completedTreatmentPlanItemIds && Array.isArray(completedTreatmentPlanItemIds) && completedTreatmentPlanItemIds.length > 0) {
+          let doctorIdToUse = (req as any).user.doctor?.id || mr.doctorId;
+          if (!doctorIdToUse && queueId) {
+            const q = await tx.queueNumber.findUnique({ where: { id: queueId } })
+            doctorIdToUse = q?.doctorId || null
+          }
+          await tx.treatmentPlanItem.updateMany({
+            where: { id: { in: completedTreatmentPlanItemIds }, treatmentPlanId },
+            data: {
+              status: 'COMPLETED',
+              completedAt: new Date(),
+              completedById: doctorIdToUse
+            }
+          })
+        }
       }
 
       // 2. Handle Prescriptions (Only if Final)

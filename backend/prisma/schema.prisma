@@ -77,25 +77,25 @@ model UserClinic {
 }
 
 model User {
-  id                   String                    @id @default(uuid())
-  email                String?                   @unique          // Nullable untuk guest account
-  username             String                    @unique
-  password             String
-  name                 String
-  phone                String?
-  isActive             Boolean                   @default(true)
-  lastLogin            DateTime?
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
-  role                 Role                      @default(STAFF)
-  image                String?
-  deletedAt            DateTime?
-  isGuestAccount       Boolean                   @default(false)
-  guestExpiryDate      DateTime?                 // Kapan guest account expired
-  activityLogs         ActivityLog[]
-  doctor               Doctor?
-  clinics              UserClinic[]
-  guestAssignments     GuestDoctorAssignment[]
+  id               String                  @id @default(uuid())
+  email            String?                 @unique // Nullable untuk guest account
+  username         String                  @unique
+  password         String
+  name             String
+  phone            String?
+  isActive         Boolean                 @default(true)
+  lastLogin        DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  role             Role                    @default(STAFF)
+  image            String?
+  deletedAt        DateTime?
+  isGuestAccount   Boolean                 @default(false)
+  guestExpiryDate  DateTime? // Kapan guest account expired
+  activityLogs     ActivityLog[]
+  doctor           Doctor?
+  clinics          UserClinic[]
+  guestAssignments GuestDoctorAssignment[]
 
   @@map("users")
 }
@@ -222,21 +222,21 @@ model DoctorSchedule {
 
 // Master profile dokter tamu/guest (tersimpan permanent)
 model GuestDoctorProfile {
-  id                String                  @id @default(uuid())
-  name              String                  // "Dr. Supardi"
-  licenseNumber     String                  @unique // SIP dokter
-  specialization    String                  // "Umum", "Gigi", dll
-  phone             String
-  email             String?                 // Optional
-  address           String?
-  isActive          Boolean                 @default(true)
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  clinicId          String
-  clinic            Clinic                  @relation(fields: [clinicId], references: [id])
-  
-  assignments       GuestDoctorAssignment[]
-  medicalRecords    MedicalRecord[]
+  id             String   @id @default(uuid())
+  name           String // "Dr. Supardi"
+  licenseNumber  String   @unique // SIP dokter
+  specialization String // "Umum", "Gigi", dll
+  phone          String
+  email          String? // Optional
+  address        String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  clinicId       String
+  clinic         Clinic   @relation(fields: [clinicId], references: [id])
+
+  assignments    GuestDoctorAssignment[]
+  medicalRecords MedicalRecord[]
 
   @@index([clinicId])
   @@index([licenseNumber])
@@ -245,25 +245,25 @@ model GuestDoctorProfile {
 
 // Assignment harian (dokter mana aktif hari ini)
 model GuestDoctorAssignment {
-  id                String               @id @default(uuid())
-  date              DateTime             @db.Date // Tanggal assignment
-  guestDoctorId     String
-  guestDoctor       GuestDoctorProfile   @relation(fields: [guestDoctorId], references: [id], onDelete: Cascade)
-  
-  userId            String?              // Akun login temporary (optional)
-  user              User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
-  createdByAdminId  String               // Admin yang buat assignment
-  status            String               @default("SCHEDULED") // SCHEDULED | ACTIVE | COMPLETED | CANCELLED
-  notes             String?              // "Pengganti Dr. Agus yang cuti"
-  
-  clinicId          String
-  clinic            Clinic               @relation(fields: [clinicId], references: [id])
-  
-  medicalRecords    MedicalRecord[]
-  
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  id            String             @id @default(uuid())
+  date          DateTime           @db.Date // Tanggal assignment
+  guestDoctorId String
+  guestDoctor   GuestDoctorProfile @relation(fields: [guestDoctorId], references: [id], onDelete: Cascade)
+
+  userId String? // Akun login temporary (optional)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdByAdminId String // Admin yang buat assignment
+  status           String  @default("SCHEDULED") // SCHEDULED | ACTIVE | COMPLETED | CANCELLED
+  notes            String? // "Pengganti Dr. Agus yang cuti"
+
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id])
+
+  medicalRecords MedicalRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([date, clinicId]) // Satu dokter tamu per hari per clinic
   @@index([guestDoctorId])
@@ -371,8 +371,8 @@ model MedicalRecord {
   appointmentId      String?
   patientId          String
   doctorId           String?
-  guestDoctorId      String?                   // Dokter guest/luar
-  guestAssignmentId  String?                   // Assignment dokter guest hari itu
+  guestDoctorId      String? // Dokter guest/luar
+  guestAssignmentId  String? // Assignment dokter guest hari itu
   chiefComplaint     String
   diagnosis          String?
   icd10Id            String?
@@ -393,6 +393,10 @@ model MedicalRecord {
   labOrders          LabOrder[]
   attachments        MedicalRecordAttachment[]
   services           MedicalRecordService[]
+  treatmentPlanId    String?
+  visitId            String?                   @unique
+  treatmentPlanRef   TreatmentPlan?            @relation(fields: [treatmentPlanId], references: [id])
+  visitRef           Visit?                    @relation(fields: [visitId], references: [id])
   appointment        Appointment?              @relation(fields: [appointmentId], references: [id])
   clinic             Clinic?                   @relation(fields: [clinicId], references: [id])
   doctor             Doctor?                   @relation(fields: [doctorId], references: [id])
@@ -926,25 +930,25 @@ model AssetInsurance {
 }
 
 model Invoice {
-  id             String             @id @default(uuid())
-  invoiceNo      String             @unique
-  appointmentId  String?
-  patientId      String
-  invoiceDate    DateTime
-  dueDate        DateTime?
-  subtotal       Float              @default(0)
-  discount       Float              @default(0)
-  tax            Float              @default(0)
-  total          Float
-  amountPaid     Float              @default(0)
-  status         String             @default("unpaid")
-  notes          String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  clinicId       String?
-  isPosted       Boolean            @default(false)
-  postedAt       DateTime?
-  bankId         String?
+  id              String             @id @default(uuid())
+  invoiceNo       String             @unique
+  appointmentId   String?
+  patientId       String
+  invoiceDate     DateTime
+  dueDate         DateTime?
+  subtotal        Float              @default(0)
+  discount        Float              @default(0)
+  tax             Float              @default(0)
+  total           Float
+  amountPaid      Float              @default(0)
+  status          String             @default("unpaid")
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  clinicId        String?
+  isPosted        Boolean            @default(false)
+  postedAt        DateTime?
+  bankId          String?
   registrationId  String?
   treatmentPlanId String?
   items           InvoiceItem[]
@@ -1126,8 +1130,8 @@ model LabOrderAttachment {
 }
 
 model LabTestMaster {
-  id              String            @id @default(uuid())
-  code            String            @unique
+  id              String          @id @default(uuid())
+  code            String          @unique
   name            String
   category        String
   unit            String?
@@ -1135,15 +1139,15 @@ model LabTestMaster {
   minNormal       Float?
   maxNormal       Float?
   price           Float
-  isActive        Boolean           @default(true)
+  isActive        Boolean         @default(true)
   parentId        String?
-  parent          LabTestMaster?    @relation("LegacyHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  legacyChildren  LabTestMaster[]   @relation("LegacyHierarchy")
+  parent          LabTestMaster?  @relation("LegacyHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  legacyChildren  LabTestMaster[] @relation("LegacyHierarchy")
 
-  parents         LabTestMaster[]   @relation("LabManyToMany")
-  children        LabTestMaster[]   @relation("LabManyToMany")
-  
-  results         LabResultDetail[]
+  parents  LabTestMaster[] @relation("LabManyToMany")
+  children LabTestMaster[] @relation("LabManyToMany")
+
+  results LabResultDetail[]
 
   @@map("lab_test_master")
 }
@@ -1695,20 +1699,20 @@ model Icd10 {
 }
 
 model DirectMedicinePurchase {
-  id           String                       @id @default(uuid())
-  purchaseNo   String                       @unique
-  employeeName String
-  purchaseDate DateTime                     @default(now())
-  status       String                       @default("DRAFT")
-  notes        String?
-  totalAmount  Float                        @default(0)
-  discount     Float                        @default(0)
-  createdAt    DateTime                     @default(now())
-  updatedAt    DateTime                     @updatedAt
-  clinicId     String
-  paymentMethod String                     @default("CASH")
-  items        DirectMedicinePurchaseItem[]
-  clinic       Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  id            String                       @id @default(uuid())
+  purchaseNo    String                       @unique
+  employeeName  String
+  purchaseDate  DateTime                     @default(now())
+  status        String                       @default("DRAFT")
+  notes         String?
+  totalAmount   Float                        @default(0)
+  discount      Float                        @default(0)
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+  clinicId      String
+  paymentMethod String                       @default("CASH")
+  items         DirectMedicinePurchaseItem[]
+  clinic        Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
   @@index([clinicId])
   @@index([status])
@@ -1747,17 +1751,18 @@ enum TreatmentPlanStatus {
 model TreatmentPlan {
   id          String              @id @default(uuid())
   patientId   String
-  description String              // Nama/deskripsi rangkaian, misal "Perawatan Saluran Akar Gigi 36"
+  description String // Nama/deskripsi rangkaian, misal "Perawatan Saluran Akar Gigi 36"
   totalAmount Float               @default(0)
   status      TreatmentPlanStatus @default(ACTIVE)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
   // === Relations ===
-  patient Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  visits  Visit[]
-  invoices Invoice[]
-  items   TreatmentPlanItem[]
+  patient        Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visits         Visit[]
+  invoices       Invoice[]
+  items          TreatmentPlanItem[]
+  medicalRecords MedicalRecord[]
 
   @@index([patientId])
   @@index([status])
@@ -1766,16 +1771,19 @@ model TreatmentPlan {
 
 /// Item perawatan detail pada Rangkaian Perawatan.
 model TreatmentPlanItem {
-  id              String        @id @default(uuid())
+  id              String    @id @default(uuid())
   treatmentPlanId String
   description     String
-  quantity        Int           @default(1)
-  price           Float         @default(0)
-  subtotal        Float         @default(0)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  quantity        Int       @default(1)
+  price           Float     @default(0)
+  subtotal        Float     @default(0)
+  status          String    @default("PENDING")
+  completedAt     DateTime?
+  completedById   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  treatmentPlan TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
 
   @@index([treatmentPlanId])
   @@map("treatment_plan_items")
@@ -1783,15 +1791,16 @@ model TreatmentPlanItem {
 
 /// Catatan setiap kedatangan pasien dalam rangkaian perawatan.
 model Visit {
-  id              String        @id @default(uuid())
+  id              String   @id @default(uuid())
   treatmentPlanId String
-  visitDate       DateTime      @default(now())
-  visitNumber     Int           // Kunjungan ke-1, ke-2, ke-3, dst
+  visitDate       DateTime @default(now())
+  visitNumber     Int // Kunjungan ke-1, ke-2, ke-3, dst
   notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  treatmentPlan TreatmentPlan  @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  medicalRecord MedicalRecord?
 
   @@index([treatmentPlanId])
   @@map("visits")

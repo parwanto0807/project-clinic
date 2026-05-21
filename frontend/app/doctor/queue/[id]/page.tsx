@@ -123,6 +123,11 @@ export default function DoctorConsultationPage() {
   const [notes, setNotes] = useState('')
   const [hasInformedConsent, setHasInformedConsent] = useState(false)
 
+  // Treatment Plan Integration States
+  const [activeTreatmentPlans, setActiveTreatmentPlans] = useState<any[]>([])
+  const [selectedTreatmentPlanId, setSelectedTreatmentPlanId] = useState<string | null>(null)
+  const [completedTreatmentPlanItemIds, setCompletedTreatmentPlanItemIds] = useState<string[]>([])
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [signeeName, setSigneeName] = useState('')
@@ -393,12 +398,15 @@ export default function DoctorConsultationPage() {
       const queueHeaders = qData?.clinicId ? { 'x-clinic-id': qData.clinicId } : undefined
 
       // Fetch independent resources in parallel to reduce total load time
-      const [medicalRecordRes, historyRes, svcRes, labTestRes, templateRes, clinicsRes, deptsRes] = await Promise.all([
+      const [medicalRecordRes, historyRes, activePlanRes, svcRes, labTestRes, templateRes, clinicsRes, deptsRes] = await Promise.all([
         qData.registrationId
           ? api.get(`transactions/medical-records/registration/${qData.registrationId}`)
           : Promise.resolve({ data: null }),
         qData.patientId
           ? api.get(`transactions/medical-records/patient/${qData.patientId}`)
+          : Promise.resolve({ data: [] }),
+        qData.patientId
+          ? api.get(`treatment-plans/patient/${qData.patientId}/active`)
           : Promise.resolve({ data: [] }),
         api.get('master/services', {
           params: { isActive: true, allClinics: true },
@@ -409,6 +417,10 @@ export default function DoctorConsultationPage() {
         api.get('master/clinics'),
         api.get('master/departments')
       ])
+
+      // Always set active treatment plans if fetched
+      const plansData = activePlanRes?.data?.data ? activePlanRes.data.data : (activePlanRes?.data || [])
+      setActiveTreatmentPlans(Array.isArray(plansData) ? plansData : [])
 
       // Fetch draft medical record
       if (qData.registrationId) {
@@ -465,6 +477,9 @@ export default function DoctorConsultationPage() {
 
           if (data.consultationDraft) {
             const draft = data.consultationDraft;
+            if (draft.treatmentPlanId) setSelectedTreatmentPlanId(draft.treatmentPlanId);
+            if (draft.completedTreatmentPlanItemIds) setCompletedTreatmentPlanItemIds(draft.completedTreatmentPlanItemIds);
+            
             if (draft.prescriptions) {
               // Merge draft prescriptions with availableStock from previously loaded DB prescriptions
               // to avoid losing stock info when draft overrides
@@ -822,6 +837,8 @@ export default function DoctorConsultationPage() {
         labResults,
         notes,
         hasInformedConsent,
+        treatmentPlanId: selectedTreatmentPlanId,
+        completedTreatmentPlanItemIds: completedTreatmentPlanItemIds,
         services: [
           ...serviceItems.map(s => ({
             serviceId: s.serviceId,
@@ -2549,6 +2566,87 @@ export default function DoctorConsultationPage() {
 
             {activeSegment === 'tindakan' && (
               <motion.div key="tindakan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                {/* Rangkaian Perawatan (Treatment Plan) Section */}
+                {activeTreatmentPlans.length > 0 && (
+                  <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+                    <div className="mb-4">
+                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Rangkaian Perawatan Aktif</h3>
+                      <p className="text-[10px] font-bold text-slate-400">Pilih rangkaian perawatan yang akan dikerjakan pada kunjungan ini</p>
+                    </div>
+
+                    {!isReadOnly ? (
+                      <div className="space-y-4">
+                        <select
+                          value={selectedTreatmentPlanId || ''}
+                          onChange={(e) => {
+                            setSelectedTreatmentPlanId(e.target.value || null)
+                            setCompletedTreatmentPlanItemIds([]) // Reset selections when plan changes
+                          }}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                        >
+                          <option value="">-- Pilih Rangkaian Perawatan --</option>
+                          {activeTreatmentPlans.map(plan => (
+                            <option key={plan.id} value={plan.id}>
+                              {plan.description} - Kunjungan ke-{(plan.visits?.length || 0) + 1}
+                            </option>
+                          ))}
+                        </select>
+
+                        {selectedTreatmentPlanId && (
+                          <div className="space-y-2 mt-4">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pilih Item yang Dikerjakan Hari Ini:</p>
+                            {activeTreatmentPlans.find(p => p.id === selectedTreatmentPlanId)?.items?.map((item: any) => (
+                              <label key={item.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.status === 'COMPLETED' ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed' : completedTreatmentPlanItemIds.includes(item.id) ? 'bg-primary/10 border-primary' : 'bg-white border-slate-200 hover:border-primary/50'}`}>
+                                <input
+                                  type="checkbox"
+                                  disabled={item.status === 'COMPLETED'}
+                                  checked={item.status === 'COMPLETED' || completedTreatmentPlanItemIds.includes(item.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setCompletedTreatmentPlanItemIds(prev => [...prev, item.id])
+                                    } else {
+                                      setCompletedTreatmentPlanItemIds(prev => prev.filter(id => id !== item.id))
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary"
+                                />
+                                <div>
+                                  <p className="text-sm font-bold text-slate-700">{item.description}</p>
+                                  <p className="text-xs text-slate-500">Qty: {item.quantity} | {item.status === 'COMPLETED' ? 'Selesai' : 'Belum Selesai'}</p>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {selectedTreatmentPlanId ? (
+                          <div>
+                            <p className="text-sm font-bold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                              {activeTreatmentPlans.find(p => p.id === selectedTreatmentPlanId)?.description || 'Rangkaian Perawatan'}
+                            </p>
+                            {completedTreatmentPlanItemIds.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Item Dikerjakan:</p>
+                                {activeTreatmentPlans.find(p => p.id === selectedTreatmentPlanId)?.items
+                                  ?.filter((item: any) => completedTreatmentPlanItemIds.includes(item.id))
+                                  .map((item: any) => (
+                                    <div key={item.id} className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                      <FiCheckCircle className="text-emerald-500" /> {item.description}
+                                    </div>
+                                  ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 italic">Tidak ada rangkaian perawatan yang dipilih pada kunjungan ini.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="bg-white/80 backdrop-blur-xl p-4 lg:p-6 rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] min-h-[300px]">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3 lg:mb-4 pb-3 border-b border-slate-50">
                     <div className="space-y-1">

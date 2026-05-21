@@ -104,6 +104,14 @@ export const getTreatmentPlanById = async (req: Request, res: Response) => {
           select: { id: true, name: true, medicalRecordNo: true, phone: true, gender: true, dateOfBirth: true, address: true }
         },
         visits: {
+          include: {
+            medicalRecord: {
+              include: {
+                doctor: { select: { id: true, name: true } },
+                icd10: { select: { code: true, nameId: true } }
+              }
+            }
+          },
           orderBy: { visitNumber: 'asc' }
         },
         invoices: {
@@ -128,6 +136,36 @@ export const getTreatmentPlanById = async (req: Request, res: Response) => {
     res.json(plan)
   } catch (e) {
     console.error('[getTreatmentPlanById] Error:', e)
+    res.status(500).json({ message: (e as Error).message })
+  }
+}
+
+/**
+ * GET /api/treatment-plans/patient/:patientId/active
+ * Get active treatment plans for a specific patient
+ */
+export const getActiveTreatmentPlansByPatient = async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params
+
+    const plans = await prisma.treatmentPlan.findMany({
+      where: { 
+        patientId,
+        status: 'ACTIVE'
+      },
+      include: {
+        items: true,
+        visits: {
+          orderBy: { visitNumber: 'desc' },
+          take: 1
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    res.json(plans)
+  } catch (e) {
+    console.error('[getActiveTreatmentPlansByPatient] Error:', e)
     res.status(500).json({ message: (e as Error).message })
   }
 }

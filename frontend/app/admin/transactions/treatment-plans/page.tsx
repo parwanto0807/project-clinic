@@ -29,6 +29,13 @@ interface Visit {
   visitNumber: number
   visitDate: string
   notes?: string
+  medicalRecord?: {
+    id: string
+    diagnosis?: string
+    treatmentPlan?: string
+    doctor?: { id: string, name: string }
+    icd10?: { code: string, nameId: string }
+  }
 }
 
 interface InvoiceItem {
@@ -617,12 +624,47 @@ export default function TreatmentPlansPage() {
                               }`}>
                                 {visit.visitNumber}
                               </div>
-                              <div className="flex-1 bg-gray-50 rounded-xl p-3.5 min-w-0">
-                                <div className="flex items-center justify-between gap-2 mb-1">
-                                  <p className="text-[10px] font-black text-gray-700 uppercase tracking-widest">Kunjungan #{visit.visitNumber}</p>
-                                  <p className="text-[9px] font-bold text-gray-400 tracking-widest">{formatDate(visit.visitDate)}</p>
+                              <div className="flex-1 bg-gray-50 rounded-xl p-4 min-w-0 border border-gray-100 shadow-sm">
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <div>
+                                    <p className="text-[10px] font-black text-primary uppercase tracking-widest">Kunjungan #{visit.visitNumber}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 tracking-widest mt-0.5">{formatDateTime(visit.visitDate)}</p>
+                                  </div>
+                                  {visit.medicalRecord?.doctor && (
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-gray-100">
+                                      <FiUser className="w-3 h-3 text-gray-400" />
+                                      <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest truncate max-w-[120px]">
+                                        {visit.medicalRecord.doctor.name}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
-                                {visit.notes && <p className="text-xs text-gray-600">{visit.notes}</p>}
+
+                                <div className="space-y-2 mt-3">
+                                  {visit.medicalRecord?.diagnosis && (
+                                    <div>
+                                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Diagnosa & Terapi</p>
+                                      <p className="text-xs font-medium text-gray-700 leading-relaxed">
+                                        {visit.medicalRecord.icd10 && (
+                                          <span className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black mr-1.5">
+                                            {visit.medicalRecord.icd10.code}
+                                          </span>
+                                        )}
+                                        {visit.medicalRecord.diagnosis}
+                                      </p>
+                                      {visit.medicalRecord.treatmentPlan && (
+                                        <p className="text-xs text-gray-600 mt-1 italic">"{visit.medicalRecord.treatmentPlan}"</p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {visit.notes && !visit.notes.includes('Kunjungan ke-') && (
+                                    <div>
+                                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Catatan</p>
+                                      <p className="text-xs text-gray-600">{visit.notes}</p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
