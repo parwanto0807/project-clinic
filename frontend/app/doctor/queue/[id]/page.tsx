@@ -400,22 +400,22 @@ export default function DoctorConsultationPage() {
       // Fetch independent resources in parallel to reduce total load time
       const [medicalRecordRes, historyRes, activePlanRes, svcRes, labTestRes, templateRes, clinicsRes, deptsRes] = await Promise.all([
         qData.registrationId
-          ? api.get(`transactions/medical-records/registration/${qData.registrationId}`)
+          ? api.get(`transactions/medical-records/registration/${qData.registrationId}`).catch(e => { console.error('Error fetching medical record:', e); return { data: null }; })
           : Promise.resolve({ data: null }),
         qData.patientId
-          ? api.get(`transactions/medical-records/patient/${qData.patientId}`)
+          ? api.get(`transactions/medical-records/patient/${qData.patientId}`).catch(e => { console.error('Error fetching history:', e); return { data: [] }; })
           : Promise.resolve({ data: [] }),
         qData.patientId
-          ? api.get(`treatment-plans/patient/${qData.patientId}/active`)
+          ? api.get(`treatment-plans/patient/${qData.patientId}/active`).catch(e => { console.error('Error fetching active plans:', e); return { data: [] }; })
           : Promise.resolve({ data: [] }),
         api.get('master/services', {
           params: { isActive: true, allClinics: true },
           headers: queueHeaders
-        }),
-        api.get('/lab/test-masters', { params: { isActive: true } }),
-        api.get('clinical/templates'),
-        api.get('master/clinics'),
-        api.get('master/departments')
+        }).catch(e => { console.error('Error fetching services:', e); return { data: [] }; }),
+        api.get('/lab/test-masters', { params: { isActive: true } }).catch(e => { console.error('Error fetching lab tests:', e); return { data: [] }; }),
+        api.get('clinical/templates').catch(e => { console.error('Error fetching templates:', e); return { data: [] }; }),
+        api.get('master/clinics').catch(e => { console.error('Error fetching clinics:', e); return { data: [] }; }),
+        api.get('master/departments').catch(e => { console.error('Error fetching depts:', e); return { data: [] }; })
       ])
 
       // Always set active treatment plans if fetched
