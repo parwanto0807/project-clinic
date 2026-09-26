@@ -174,19 +174,29 @@ export default function PatientsPage() {
        }
     }
     setForm({ 
-      ...r, 
-      dateOfBirth: dob,
-      allergies: r.allergies || '',
-      emergencyContact: r.emergencyContact || '',
-      emergencyPhone: r.emergencyPhone || '',
-      zipCode: r.zipCode || '',
+      medicalRecordNo: r.medicalRecordNo || '',
+      oldMedicalRecordNo: r.oldMedicalRecordNo || '',
+      name: r.name || '',
+      email: r.email || '',
+      phone: r.phone || '',
+      address: r.address || '',
       city: r.city || '',
       province: r.province || '',
-      address: r.address || '',
-      email: r.email || '',
+      zipCode: r.zipCode || '',
+      dateOfBirth: dob,
+      gender: r.gender || 'M',
+      bloodType: r.bloodType || '-',
+      identityType: r.identityType || 'KTP',
+      identityNumber: r.identityNumber || '',
+      familyHeadName: r.familyHeadName || '',
+      emergencyContact: r.emergencyContact || '',
+      emergencyPhone: r.emergencyPhone || '',
+      allergies: r.allergies || '',
+      bpjsNumber: r.bpjsNumber || '',
+      insuranceName: r.insuranceName || '',
       patientType: r.patientType || 'Poli Umum',
       corporatePartnerId: r.corporatePartnerId || '',
-      oldMedicalRecordNo: r.oldMedicalRecordNo || ''
+      isActive: r.isActive ?? true
     })
     setError(''); setModalOpen(true)
   }

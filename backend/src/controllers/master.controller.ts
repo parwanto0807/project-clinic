@@ -2392,45 +2392,62 @@ export const getNextMRNo = async (req: Request, res: Response) => {
 
 export const createPatient = async (req: Request, res: Response) => {
   try {
-    const { dateOfBirth, corporatePartnerId, ...rest } = req.body
-    
-    // Safer date parsing to prevent Prisma errors
-    let dob = null
-    if (dateOfBirth && dateOfBirth !== '') {
-      const parsedDate = new Date(dateOfBirth)
-      if (!isNaN(parsedDate.getTime())) {
-        dob = parsedDate
+    const allowedScalarFields = [
+      'medicalRecordNo',
+      'oldMedicalRecordNo',
+      'name',
+      'email',
+      'phone',
+      'address',
+      'city',
+      'province',
+      'zipCode',
+      'gender',
+      'bloodType',
+      'identityType',
+      'identityNumber',
+      'familyHeadName',
+      'emergencyContact',
+      'emergencyPhone',
+      'allergies',
+      'isActive',
+      'bpjsNumber',
+      'insuranceName',
+      'age',
+      'patientType',
+      'corporatePartnerId',
+      'deathCause',
+      'deathIcd10Id',
+      'deathPlace',
+      'isDeceased'
+    ] as const;
+
+    const dataPayload: any = {};
+    for (const field of allowedScalarFields) {
+      if (req.body[field] !== undefined) {
+        let val = req.body[field];
+        if (field === 'oldMedicalRecordNo' && val === '') val = null;
+        if (field === 'corporatePartnerId' && val === '') val = null;
+        if (field === 'deathIcd10Id' && val === '') val = null;
+        if (field === 'age' && val !== null && val !== '') val = Number(val);
+        dataPayload[field] = val;
       }
     }
 
-    // Strip out relational objects and non-updateable fields sent by frontend
-    delete rest.id;
-    delete rest.createdAt;
-    delete rest.updatedAt;
-    delete rest.corporatePartner;
-    delete rest.deathIcd10;
-    delete rest.medicalRecords;
-    delete rest.appointments;
-    delete rest.invoices;
-    delete rest.labOrders;
-    delete rest.birthRecords;
-    delete rest.prescriptions;
-    delete rest.queueNumbers;
-    delete rest.registrations;
-    delete rest.treatmentPlans;
-
-    const dataPayload: any = {
-      ...rest,
-      dateOfBirth: dob
-    }
-
-    if (dataPayload.oldMedicalRecordNo === '') {
-      dataPayload.oldMedicalRecordNo = null;
-    }
-    if (corporatePartnerId && corporatePartnerId !== '') {
-      dataPayload.corporatePartnerId = corporatePartnerId
+    if (req.body.dateOfBirth && req.body.dateOfBirth !== '') {
+      const parsedDate = new Date(req.body.dateOfBirth);
+      dataPayload.dateOfBirth = !isNaN(parsedDate.getTime()) ? parsedDate : null;
     } else {
-      dataPayload.corporatePartnerId = null
+      dataPayload.dateOfBirth = null;
+    }
+
+    if (req.body.dateOfDeath && req.body.dateOfDeath !== '') {
+      const parsedDate = new Date(req.body.dateOfDeath);
+      dataPayload.dateOfDeath = !isNaN(parsedDate.getTime()) ? parsedDate : null;
+    }
+
+    if (dataPayload.isActive === undefined) {
+      dataPayload.isActive = true;
     }
 
     const patient = await prisma.patient.create({
@@ -2445,46 +2462,66 @@ export const createPatient = async (req: Request, res: Response) => {
 
 export const updatePatient = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    const { dateOfBirth, corporatePartnerId, ...rest } = req.body
+    const { id } = req.params;
 
-    // Safer date parsing
-    let dob = null
-    if (dateOfBirth && dateOfBirth !== '') {
-      const parsedDate = new Date(dateOfBirth)
-      if (!isNaN(parsedDate.getTime())) {
-        dob = parsedDate
+    const allowedScalarFields = [
+      'medicalRecordNo',
+      'oldMedicalRecordNo',
+      'name',
+      'email',
+      'phone',
+      'address',
+      'city',
+      'province',
+      'zipCode',
+      'gender',
+      'bloodType',
+      'identityType',
+      'identityNumber',
+      'familyHeadName',
+      'emergencyContact',
+      'emergencyPhone',
+      'allergies',
+      'isActive',
+      'bpjsNumber',
+      'insuranceName',
+      'age',
+      'patientType',
+      'corporatePartnerId',
+      'deathCause',
+      'deathIcd10Id',
+      'deathPlace',
+      'isDeceased'
+    ] as const;
+
+    const dataPayload: any = {};
+    for (const field of allowedScalarFields) {
+      if (req.body[field] !== undefined) {
+        let val = req.body[field];
+        if (field === 'oldMedicalRecordNo' && val === '') val = null;
+        if (field === 'corporatePartnerId' && val === '') val = null;
+        if (field === 'deathIcd10Id' && val === '') val = null;
+        if (field === 'age' && val !== null && val !== '') val = Number(val);
+        dataPayload[field] = val;
       }
     }
 
-    // Strip out relational objects and non-updateable fields sent by frontend
-    delete rest.id;
-    delete rest.createdAt;
-    delete rest.updatedAt;
-    delete rest.corporatePartner;
-    delete rest.deathIcd10;
-    delete rest.medicalRecords;
-    delete rest.appointments;
-    delete rest.invoices;
-    delete rest.labOrders;
-    delete rest.birthRecords;
-    delete rest.prescriptions;
-    delete rest.queueNumbers;
-    delete rest.registrations;
-    delete rest.treatmentPlans;
-
-    const dataPayload: any = {
-      ...rest,
-      dateOfBirth: dob
+    if (req.body.dateOfBirth !== undefined) {
+      if (req.body.dateOfBirth && req.body.dateOfBirth !== '') {
+        const parsedDate = new Date(req.body.dateOfBirth);
+        dataPayload.dateOfBirth = !isNaN(parsedDate.getTime()) ? parsedDate : null;
+      } else {
+        dataPayload.dateOfBirth = null;
+      }
     }
 
-    if (dataPayload.oldMedicalRecordNo === '') {
-      dataPayload.oldMedicalRecordNo = null;
-    }
-    if (corporatePartnerId && corporatePartnerId !== '') {
-      dataPayload.corporatePartnerId = corporatePartnerId
-    } else {
-      dataPayload.corporatePartnerId = null
+    if (req.body.dateOfDeath !== undefined) {
+      if (req.body.dateOfDeath && req.body.dateOfDeath !== '') {
+        const parsedDate = new Date(req.body.dateOfDeath);
+        dataPayload.dateOfDeath = !isNaN(parsedDate.getTime()) ? parsedDate : null;
+      } else {
+        dataPayload.dateOfDeath = null;
+      }
     }
 
     const patient = await prisma.patient.update({
@@ -2492,8 +2529,9 @@ export const updatePatient = async (req: Request, res: Response) => {
       data: dataPayload
     })
     res.json(patient)
-  } catch (e) {
-    res.status(500).json({ message: (e as Error).message })
+  } catch (e: any) {
+    if (e.code === 'P2002') return res.status(400).json({ message: 'Nomor Rekam Medis atau nomor identitas sudah ada' })
+    res.status(500).json({ message: e.message })
   }
 }
 
