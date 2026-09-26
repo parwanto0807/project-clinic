@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import api from '@/lib/api'
 import { 
   FiRefreshCw, FiCheckCircle, FiAlertCircle, FiDollarSign, 
   FiDatabase, FiLayers, FiArrowRight, FiFileText, 
-  FiActivity, FiChevronDown, FiChevronUp, FiSettings
+  FiActivity, FiChevronDown, FiChevronUp, FiSettings,
+  FiUsers
 } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -59,6 +60,7 @@ export default function ReconciliationPage() {
   const [loading, setLoading] = useState(true)
   const [isReconciling, setIsReconciling] = useState(false)
   const [expandedJournal, setExpandedJournal] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'inventory' | 'commission'>('inventory')
   
   // Reconcile Modal Form
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -66,6 +68,11 @@ export default function ReconciliationPage() {
   const [customDebitCoa, setCustomDebitCoa] = useState('')
   const [customCreditCoa, setCustomCreditCoa] = useState('')
   const [availableCoas, setAvailableCoas] = useState<AccountInfo[]>([])
+
+  // Commission Reconciliation State
+  const [commissionData, setCommissionData] = useState<any>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [commissionReconciling, setCommissionReconciling] = useState(false)
 
   const user = useAuthStore(state => state.user)
   const activeClinic = user?.clinics?.find(c => c.id === activeClinicId) || user?.clinics?.[0]
@@ -153,6 +160,38 @@ export default function ReconciliationPage() {
     setExpandedJournal(prev => prev === id ? null : id)
   }
 
+  const runCommissionReconciliation = async () => {
+    setCommissionLoading(true)
+    try {
+      const { data } = await api.post('/finance/reconcile-commissions', { dryRun: true })
+      setCommissionData(data)
+      toast.success('Rekonsiliasi komisi berhasil dijalankan.')
+    } catch (e: any) {
+      console.error('Commission reconciliation failed', e)
+      toast.error(e.response?.data?.message || 'Gagal menjalankan rekonsiliasi.')
+    } finally {
+      setCommissionLoading(false)
+    }
+  }
+
+  const applyCommissionFix = async (dryRun: boolean) => {
+    setCommissionReconciling(true)
+    try {
+      const { data } = await api.post('/finance/reconcile-commissions', { dryRun })
+      setCommissionData(data)
+      if (!dryRun && data.results?.length > 0) {
+        toast.success('Perbaikan komisi diterapkan! Jalankan ulang untuk verifikasi.')
+      } else {
+        toast.success('Preview selesai. Jalankan tanpa dryRun untuk menerapkan.')
+      }
+    } catch (e: any) {
+      console.error('Commission fix failed', e)
+      toast.error(e.response?.data?.message || 'Gagal menerapkan perbaikan.')
+    } finally {
+      setCommissionReconciling(false)
+    }
+  }
+
   return (
     <div className="w-full px-4 sm:px-6 md:px-8 py-6 space-y-8 text-left">
       
@@ -164,19 +203,43 @@ export default function ReconciliationPage() {
               <FiRefreshCw className="w-5 h-5 animate-spin-slow" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter">Rekonsiliasi GL & Stok</h1>
-              <p className="text-slate-400 font-bold text-[10px] md:text-[11px] uppercase tracking-wide">Penyelarasan Saldo Buku Besar Keuangan dengan Aset Fisik Farmasi.</p>
+              <h1 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter">Rekonsiliasi Keuangan</h1>
+              <p className="text-slate-400 font-bold text-[10px] md:text-[11px] uppercase tracking-wide">Penyelarasan data Buku Besar dengan aktivitas transaksi.</p>
             </div>
           </div>
         </div>
 
-        <button 
-          onClick={fetchData}
-          className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-        >
-          <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh Data</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setActiveTab('inventory')}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              activeTab === 'inventory' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <FiDatabase className="w-3.5 h-3.5 inline mr-1.5" />
+            Rekonsiliasi Stok
+          </button>
+          <button 
+            onClick={() => setActiveTab('commission')}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              activeTab === 'commission' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <FiUsers className="w-3.5 h-3.5 inline mr-1.5" />
+            Rekonsiliasi Komisi
+          </button>
+          <button 
+            onClick={fetchData}
+            className="flex items-center gap-2 px-5 py-2 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+          >
+            <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* SUMMARY GLASSMORPHIC CARDS */}
@@ -421,6 +484,111 @@ export default function ReconciliationPage() {
         </div>
 
       </div>
+
+      {/* COMMISSION RECONCILIATION SECTION */}
+      {activeTab === 'commission' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Rekonsiliasi Komisi Dokter</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Sinkronkan saldo buku besar 2-1102 (Hutang Jasa Medik) dengan data komisi dokter.</p>
+              </div>
+              <button
+                onClick={runCommissionReconciliation}
+                disabled={commissionLoading}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+              >
+                {commissionLoading ? 'Memproses...' : 'Jalankan Rekonsiliasi'}
+              </button>
+            </div>
+
+            {commissionLoading && (
+              <div className="py-8 text-center">
+                <FiRefreshCw className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+                <p className="text-xs text-slate-400 mt-2">Memuat data rekonsiliasi...</p>
+              </div>
+            )}
+
+            {!commissionLoading && commissionData && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Komisi Belum Dibayar</p>
+                    <p className="text-lg font-black text-slate-800 mt-1">{commissionData.unpaidCommissionCount} record</p>
+                    <p className="text-xs font-bold text-slate-500">Rp {commissionData.totalUnpaidCommissions.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Komisi Sudah Dibayar</p>
+                    <p className="text-lg font-black text-slate-800 mt-1">{commissionData.paidCommissionCount} record</p>
+                    <p className="text-xs font-bold text-slate-500">Rp {commissionData.totalPaidCommissions.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">GL Credit 2-1102</p>
+                    <p className="text-lg font-black text-slate-800 mt-1">Rp {commissionData.totalCredits.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">GL Debit 2-1102</p>
+                    <p className="text-lg font-black text-slate-800 mt-1">Rp {commissionData.totalDebits.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+
+                <div className={`p-4 rounded-2xl border ${Math.abs(commissionData.difference) < 0.01 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Selisih</p>
+                      <p className={`text-xl font-black ${Math.abs(commissionData.difference) < 0.01 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        Rp {commissionData.difference.toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {Math.abs(commissionData.difference) < 0.01 ? (
+                        <>
+                          <FiCheckCircle className="w-6 h-6 text-emerald-600" />
+                          <span className="text-xs font-black text-emerald-700 uppercase">SEIMBANG</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiAlertCircle className="w-6 h-6 text-rose-600" />
+                          <span className="text-xs font-black text-rose-700 uppercase">TIDAK SEIMBANG</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {Math.abs(commissionData.difference) >= 0.01 && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => applyCommissionFix(false)}
+                      disabled={commissionReconciling}
+                      className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-lg shadow-rose-200"
+                    >
+                      {commissionReconciling ? 'Memperbaiki...' : 'Terapkan Perbaikan (dryRun=false)'}
+                    </button>
+                    <button
+                      onClick={() => applyCommissionFix(true)}
+                      disabled={commissionReconciling}
+                      className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-lg shadow-indigo-200"
+                    >
+                      Preview (dryRun=true)
+                    </button>
+                  </div>
+                )}
+
+                {commissionData.fixApplied && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <FiCheckCircle className="w-5 h-5 text-emerald-600" />
+                      <span className="text-xs font-black text-emerald-700 uppercase">Perbaikan diterapkan! Selisih Rp {Math.abs(commissionData.fixAmount).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* RECONCILIATION ACTION MODAL */}
       <AnimatePresence>

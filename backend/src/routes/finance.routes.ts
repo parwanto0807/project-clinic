@@ -7,7 +7,7 @@ import {
   deleteInvoice, releaseDeposit
 } from '../controllers/finance.controller'
 import { uploadBon } from '../middleware/procurementUpload.middleware'
-
+import { reconcileCommissions } from '../controllers/reconcile.controller'
 import { OpeningBalanceController } from '../controllers/opening-balance.controller'
 import corporateBillingRoutes from './corporateBilling.routes'
 
@@ -33,6 +33,7 @@ financeRoutes.post('/invoices/:id/reset-payment', resetInvoicePayment)
 financeRoutes.post('/invoices/:id/release-deposit', releaseDeposit)
 financeRoutes.put('/invoices/bank', updateInvoiceBank)
 financeRoutes.get('/summary', getFinancialSummary)
+financeRoutes.post('/reconcile-commissions', reconcileCommissions)
 
 // Expenses
 financeRoutes.get('/expenses', getExpenses)

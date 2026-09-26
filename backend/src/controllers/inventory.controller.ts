@@ -1512,3 +1512,98 @@ export const reconcileInventoryStock = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Repair Stock Integrity (Reconcile Batch currentQty with Stock onHandQty and sync Product quantities)
+ */
+export const repairStockIntegrity = async (req: Request, res: Response) => {
+  try {
+    console.log('[InventoryController] Starting inventory integrity repair...');
+    
+    // 1. Fetch all InventoryStock records that are linked to a batch
+    const stocks = await prisma.inventoryStock.findMany({
+      where: {
+        batchId: { not: null }
+      },
+      include: {
+        product: {
+          select: {
+            productName: true,
+            productCode: true
+          }
+        },
+        batch: true
+      }
+    });
+
+    let discrepancyCount = 0;
+
+    for (const stock of stocks) {
+      if (!stock.batch) continue;
+
+      const stockQty = stock.onHandQty;
+      const batchQty = stock.batch.currentQty;
+
+      // If there is a discrepancy between stock on hand and batch qty
+      if (stockQty !== batchQty) {
+        await prisma.inventoryBatch.update({
+          where: { id: stock.batch.id },
+          data: { currentQty: stockQty }
+        });
+        discrepancyCount++;
+      }
+    }
+
+    // 2. Fetch all products to ensure their aggregated sum matches the Product.quantity field
+    const products = await prisma.product.findMany({
+      select: {
+        id: true,
+        clinicId: true,
+        productName: true,
+        quantity: true
+      }
+    });
+
+    let productFixCount = 0;
+
+    for (const p of products) {
+      if (!p.clinicId) continue;
+
+      // Calculate sum of onHandQty in InventoryStock for this product and branch
+      const stockSum = await prisma.inventoryStock.aggregate({
+        where: {
+          productId: p.id,
+          branchId: p.clinicId
+        },
+        _sum: {
+          onHandQty: true
+        }
+      });
+
+      const calculatedSum = stockSum._sum.onHandQty || 0;
+
+      if (p.quantity !== calculatedSum) {
+        await prisma.product.update({
+          where: { id: p.id },
+          data: { quantity: calculatedSum }
+        });
+        productFixCount++;
+      }
+    }
+
+    res.json({
+      message: 'Perbaikan integritas stok berhasil dilakukan!',
+      data: {
+        batchDiscrepanciesAligned: discrepancyCount,
+        productQuantitiesResynced: productFixCount
+      }
+    });
+  } catch (error) {
+    console.error('[InventoryController] repairStockIntegrity Error:', error);
+    res.status(500).json({
+      message: 'Gagal melakukan perbaikan integritas stok',
+      details: (error as Error).message
+    });
+  }
+};
+

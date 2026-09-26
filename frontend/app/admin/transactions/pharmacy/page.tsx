@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/Card'
-import { Pill, Clock, ClipboardCheck, ArrowRight, Activity, Beaker, RefreshCw } from 'lucide-react'
+import { Pill, Clock, ClipboardCheck, ArrowRight, Activity, Beaker, RefreshCw, Wrench } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/useAuthStore'
 
 interface Prescription {
@@ -25,10 +25,11 @@ interface Prescription {
 
 export default function PharmacyQueuePage() {
   const router = useRouter()
-  const { activeClinicId } = useAuthStore()
+  const { activeClinicId, user } = useAuthStore()
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isRepairing, setIsRepairing] = useState(false)
 
   const fetchQueues = async (silent = false) => {
     try {
@@ -45,6 +46,29 @@ export default function PharmacyQueuePage() {
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
+    }
+  }
+
+  const handleRepairStock = async () => {
+    const confirmRepair = window.confirm(
+      'Apakah Anda ingin melakukan perbaikan integritas data stok?\n\nProses ini akan menyelaraskan kuantitas batch obat dengan data stok fisik di database untuk mencegah kegagalan penyerahan obat.'
+    )
+    if (!confirmRepair) return
+
+    try {
+      setIsRepairing(true)
+      const res = await api.post('/inventory/repair-stock')
+      alert(
+        `Perbaikan integritas stok berhasil!\n\n` +
+        `- Batch mismatch diselaraskan: ${res.data.data.batchDiscrepanciesAligned}\n` +
+        `- Kuantitas produk disinkronkan: ${res.data.data.productQuantitiesResynced}`
+      )
+      fetchQueues(true)
+    } catch (e: any) {
+      console.error(e)
+      alert(e.response?.data?.message || 'Gagal memperbaiki integritas stok.')
+    } finally {
+      setIsRepairing(false)
     }
   }
 
@@ -83,14 +107,27 @@ export default function PharmacyQueuePage() {
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Status resep masuk dan penyerahan obat hari ini.</p>
         </div>
 
-        <button 
-          onClick={() => fetchQueues(false)}
-          disabled={isRefreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 text-gray-600 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-primary ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-        </button>
+        <div className="flex gap-2">
+          {user?.role === 'SUPER_ADMIN' && (
+            <button
+              onClick={handleRepairStock}
+              disabled={isRepairing}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-700 rounded-xl shadow-sm active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+            >
+              <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
+              {isRepairing ? 'Repairing...' : 'Repair Stock'}
+            </button>
+          )}
+
+          <button 
+            onClick={() => fetchQueues(false)}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 text-gray-600 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-primary ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+          </button>
+        </div>
       </div>
 
       {incomplete.length > 0 && (
